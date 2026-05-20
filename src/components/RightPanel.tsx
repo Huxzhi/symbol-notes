@@ -1,0 +1,116 @@
+import { createSignal, createMemo, For, Show } from 'solid-js'
+import { fileSystemStore } from '../stores/fileSystemStore'
+import { knowledgeStore } from '../stores/knowledgeStore'
+import { editorStore } from '../stores/editorStore'
+import { parseFrontmatter } from '../lib/parseFrontmatter'
+
+type Tab = 'links' | 'outline' | 'tags'
+
+interface Heading { level: number; text: string }
+
+export function RightPanel() {
+  const [activeTab, setActiveTab] = createSignal<Tab>('links')
+
+  const currentMeta = createMemo(() => {
+    const path = fileSystemStore.activeFilePath
+    return path ? knowledgeStore.index[path] ?? null : null
+  })
+
+  const outLinks = createMemo(() => currentMeta()?.outLinks ?? [])
+
+  const backlinks = createMemo(() => {
+    const path = fileSystemStore.activeFilePath
+    return path ? knowledgeStore.backlinkMap[path] ?? [] : []
+  })
+
+  const tags = createMemo(() => currentMeta()?.tags ?? [])
+
+  const outline = createMemo((): Heading[] => {
+    const { body } = parseFrontmatter(editorStore.content)
+    return body.split('\n').flatMap(line => {
+      const m = line.match(/^(#{1,6})\s+(.+)/)
+      return m ? [{ level: m[1].length, text: m[2] }] : []
+    })
+  })
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'links', label: '链接' },
+    { id: 'outline', label: '大纲' },
+    { id: 'tags', label: '标签' },
+  ]
+
+  return (
+    <div class="w-[200px] h-full bg-[#111120] border-l border-[#1e1e35] flex flex-col shrink-0">
+      <div class="flex border-b border-[#1e1e35] shrink-0">
+        <For each={tabs}>
+          {(tab) => (
+            <button
+              class={`flex-1 py-1.5 text-[10px] cursor-pointer transition-colors
+                ${activeTab() === tab.id
+                  ? 'text-[#6c63ff] border-b-2 border-[#6c63ff] -mb-px'
+                  : 'text-[#555] hover:text-[#888]'}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          )}
+        </For>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-2 text-[11px]">
+        <Show when={activeTab() === 'links'}>
+          <div class="text-[#555] text-[10px] uppercase tracking-widest mb-1.5">出链 ({outLinks().length})</div>
+          <For each={outLinks()}>
+            {(link) => (
+              <div class="text-[#7ec8e3] py-0.5 flex items-center gap-1">
+                <span class="text-[#6c63ff] text-[10px]">↗</span> {link}
+              </div>
+            )}
+          </For>
+          <div class="text-[#555] text-[10px] uppercase tracking-widest mt-3 mb-1.5">入链 ({backlinks().length})</div>
+          <For each={backlinks()}>
+            {(link) => (
+              <div class="text-[#a09cf7] py-0.5 flex items-center gap-1">
+                <span class="text-[#6c63ff] text-[10px]">↙</span> {link}
+              </div>
+            )}
+          </For>
+          <Show when={outLinks().length === 0 && backlinks().length === 0}>
+            <div class="text-[#333] italic mt-1">暂无链接</div>
+          </Show>
+        </Show>
+
+        <Show when={activeTab() === 'outline'}>
+          <For each={outline()}>
+            {(h) => (
+              <div
+                class="py-0.5 text-[#888] hover:text-[#ccc] cursor-pointer truncate"
+                style={{ 'padding-left': `${(h.level - 1) * 10}px`, 'font-size': h.level === 1 ? '12px' : '11px' }}
+              >
+                {h.text}
+              </div>
+            )}
+          </For>
+          <Show when={outline().length === 0}>
+            <div class="text-[#333] italic">暂无标题</div>
+          </Show>
+        </Show>
+
+        <Show when={activeTab() === 'tags'}>
+          <div class="flex flex-wrap gap-1.5 mt-1">
+            <For each={tags()}>
+              {(tag) => (
+                <span class="bg-[#6c63ff22] border border-[#6c63ff44] text-[#a09cf7] text-[10px] px-2 py-0.5 rounded-full">
+                  #{tag}
+                </span>
+              )}
+            </For>
+          </div>
+          <Show when={tags().length === 0}>
+            <div class="text-[#333] italic mt-1">暂无标签</div>
+          </Show>
+        </Show>
+      </div>
+    </div>
+  )
+}
