@@ -5,6 +5,7 @@ import {
   EditorView,
   ViewPlugin,
   type ViewUpdate,
+  WidgetType,
 } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
 
@@ -13,6 +14,52 @@ const wikiLinkMark = Decoration.mark({ class: 'cm-wikilink' })
 
 function cursorInNode(cursorPos: number, from: number, to: number): boolean {
   return cursorPos >= from && cursorPos <= to
+}
+
+class HRWidget extends WidgetType {
+  toDOM() {
+    const el = document.createElement('div')
+    el.className = 'cm-hr-widget'
+    return el
+  }
+  eq() { return true }
+}
+
+class TableWidget extends WidgetType {
+  constructor(readonly text: string) { super() }
+
+  eq(other: TableWidget) { return other.text === this.text }
+
+  toDOM() {
+    const lines = this.text.split('\n').filter(l => l.trim())
+    const parseRow = (line: string) =>
+      line.split('|').slice(1, -1).map(c => c.trim())
+
+    const headers = parseRow(lines[0] ?? '')
+    const dataRows = lines.slice(2).map(parseRow)
+
+    const table = document.createElement('table')
+    table.className = 'cm-table-widget'
+
+    const thead = table.createTHead()
+    const headerRow = thead.insertRow()
+    headers.forEach(h => {
+      const th = document.createElement('th')
+      th.textContent = h
+      headerRow.appendChild(th)
+    })
+
+    const tbody = table.createTBody()
+    dataRows.forEach(cells => {
+      const tr = tbody.insertRow()
+      cells.forEach(cell => {
+        const td = tr.insertCell()
+        td.textContent = cell
+      })
+    })
+
+    return table
+  }
 }
 
 function buildDecos(view: EditorView): DecorationSet {
@@ -48,7 +95,6 @@ function buildDecos(view: EditorView): DecorationSet {
             const c = node.node.cursor()
             if (!c.firstChild()) return
             do {
-              // +1 covers the space after the # markers (e.g. "# " or "## ")
               if (c.name === 'HeaderMark') builder.add(c.from, c.to + 1, hide)
             } while (c.nextSibling())
             break
@@ -76,6 +122,25 @@ function buildDecos(view: EditorView): DecorationSet {
               }
             } while (c.nextSibling())
             break
+          }
+
+          case 'HorizontalRule': {
+            if (state.doc.lineAt(node.from).number === cursorLine) return
+            builder.add(node.from, node.to, Decoration.replace({
+              widget: new HRWidget(),
+              block: true,
+            }))
+            break
+          }
+
+          case 'Table': {
+            if (cursorInNode(cursorPos, node.from, node.to)) return
+            const text = state.doc.sliceString(node.from, node.to)
+            builder.add(node.from, node.to, Decoration.replace({
+              widget: new TableWidget(text),
+              block: true,
+            }))
+            return false  // skip child nodes, table is handled as one unit
           }
         }
       },

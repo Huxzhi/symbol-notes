@@ -4,6 +4,7 @@ import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting } from '@codemirror/language'
+import { GFM } from '@lezer/markdown'
 import { darkTheme, darkHighlightStyle } from '../lib/cmTheme'
 import { wikiLinkParser } from '../lib/wikiLinkParser'
 import { livePreviewExtension } from '../lib/livePreviewExtension'
@@ -22,8 +23,9 @@ export function Editor() {
     view = new EditorView({
       state: EditorState.create({
         doc: body,
+        selection: { anchor: body.length },
         extensions: [
-          markdown({ codeLanguages: languages, extensions: [wikiLinkParser] }),
+          markdown({ codeLanguages: languages, extensions: [GFM, wikiLinkParser] }),
           syntaxHighlighting(darkHighlightStyle),
           darkTheme,
           livePreviewExtension,

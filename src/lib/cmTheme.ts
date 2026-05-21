@@ -24,6 +24,33 @@ export const darkTheme = EditorView.theme(
       textDecorationStyle: 'dotted',
       cursor: 'pointer',
     },
+    '.cm-hr-widget': {
+      display: 'block',
+      height: '1px',
+      background: '#3a3a5c',
+      border: 'none',
+      margin: '12px 0',
+      width: '100%',
+    },
+    '.cm-table-widget': {
+      borderCollapse: 'collapse',
+      width: '100%',
+      margin: '8px 0',
+      fontSize: '14px',
+    },
+    '.cm-table-widget th, .cm-table-widget td': {
+      border: '1px solid #3a3a5c',
+      padding: '4px 12px',
+      textAlign: 'left',
+      color: '#ccc',
+    },
+    '.cm-table-widget thead': {
+      background: '#1a1a2e',
+    },
+    '.cm-table-widget thead th': {
+      color: '#9d8dff',
+      fontWeight: 'bold',
+    },
   },
   { dark: true },
 )
