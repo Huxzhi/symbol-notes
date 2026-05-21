@@ -75,7 +75,9 @@ function buildBlockDecos(state: EditorState): DecorationSet {
     enter(node) {
       if (node.name === 'HorizontalRule') {
         if (state.doc.lineAt(node.from).number === cursorLine) return
-        builder.add(node.from, node.to, Decoration.replace({
+        // +1 to include the trailing \n — CM6 block decorations must cover complete lines
+        const to = Math.min(node.to + 1, state.doc.length)
+        builder.add(node.from, to, Decoration.replace({
           widget: new HRWidget(),
           block: true,
         }))
@@ -83,9 +85,11 @@ function buildBlockDecos(state: EditorState): DecorationSet {
       }
 
       if (node.name === 'Table') {
-        if (cursorPos >= node.from && cursorPos <= node.to) return
+        // +1 to include the trailing \n for the same reason
+        const to = Math.min(node.to + 1, state.doc.length)
+        if (cursorPos >= node.from && cursorPos < to) return
         const text = state.doc.sliceString(node.from, node.to)
-        builder.add(node.from, node.to, Decoration.replace({
+        builder.add(node.from, to, Decoration.replace({
           widget: new TableWidget(text),
           block: true,
         }))
