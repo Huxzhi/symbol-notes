@@ -7,14 +7,14 @@ import {
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
-import { RangeSetBuilder } from '@codemirror/state'
+import { RangeSetBuilder, StateField, type EditorState } from '@codemirror/state'
+
+// ── Shared decorations ──────────────────────────────────────────────────────
 
 const hide = Decoration.replace({})
 const wikiLinkMark = Decoration.mark({ class: 'cm-wikilink' })
 
-function cursorInNode(cursorPos: number, from: number, to: number): boolean {
-  return cursorPos >= from && cursorPos <= to
-}
+// ── Block widgets (must live in StateField, not ViewPlugin) ─────────────────
 
 class HRWidget extends WidgetType {
   toDOM() {
@@ -62,7 +62,54 @@ class TableWidget extends WidgetType {
   }
 }
 
-function buildDecos(view: EditorView): DecorationSet {
+// ── StateField: block decorations (HR + Table) ──────────────────────────────
+
+function buildBlockDecos(state: EditorState): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>()
+  const cursorPos = state.selection.main.head
+  const cursorLine = state.doc.lineAt(cursorPos).number
+
+  syntaxTree(state).iterate({
+    from: 0,
+    to: state.doc.length,
+    enter(node) {
+      if (node.name === 'HorizontalRule') {
+        if (state.doc.lineAt(node.from).number === cursorLine) return
+        builder.add(node.from, node.to, Decoration.replace({
+          widget: new HRWidget(),
+          block: true,
+        }))
+        return
+      }
+
+      if (node.name === 'Table') {
+        if (cursorPos >= node.from && cursorPos <= node.to) return
+        const text = state.doc.sliceString(node.from, node.to)
+        builder.add(node.from, node.to, Decoration.replace({
+          widget: new TableWidget(text),
+          block: true,
+        }))
+        return false  // skip Table children — handled as one unit
+      }
+    },
+  })
+
+  return builder.finish()
+}
+
+const blockPreviewField = StateField.define<DecorationSet>({
+  create(state) { return buildBlockDecos(state) },
+  update(decos, tr) {
+    const selMoved = tr.state.selection.main.head !== tr.startState.selection.main.head
+    if (tr.docChanged || selMoved) return buildBlockDecos(tr.state)
+    return decos.map(tr.changes)
+  },
+  provide: f => EditorView.decorations.from(f),
+})
+
+// ── ViewPlugin: inline decorations (bold / italic / code / wikilink) ─────────
+
+function buildInlineDecos(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { state } = view
   const cursorPos = state.selection.main.head
@@ -76,7 +123,7 @@ function buildDecos(view: EditorView): DecorationSet {
         switch (node.name) {
           case 'StrongEmphasis':
           case 'Emphasis': {
-            if (cursorInNode(cursorPos, node.from, node.to)) return
+            if (cursorPos >= node.from && cursorPos <= node.to) return
             const c = node.node.cursor()
             if (!c.firstChild()) return
             do {
@@ -101,7 +148,7 @@ function buildDecos(view: EditorView): DecorationSet {
           }
 
           case 'InlineCode': {
-            if (cursorInNode(cursorPos, node.from, node.to)) return
+            if (cursorPos >= node.from && cursorPos <= node.to) return
             const c = node.node.cursor()
             if (!c.firstChild()) return
             do {
@@ -111,7 +158,7 @@ function buildDecos(view: EditorView): DecorationSet {
           }
 
           case 'WikiLink': {
-            if (cursorInNode(cursorPos, node.from, node.to)) return
+            if (cursorPos >= node.from && cursorPos <= node.to) return
             const c = node.node.cursor()
             if (!c.firstChild()) return
             do {
@@ -123,25 +170,6 @@ function buildDecos(view: EditorView): DecorationSet {
             } while (c.nextSibling())
             break
           }
-
-          case 'HorizontalRule': {
-            if (state.doc.lineAt(node.from).number === cursorLine) return
-            builder.add(node.from, node.to, Decoration.replace({
-              widget: new HRWidget(),
-              block: true,
-            }))
-            break
-          }
-
-          case 'Table': {
-            if (cursorInNode(cursorPos, node.from, node.to)) return
-            const text = state.doc.sliceString(node.from, node.to)
-            builder.add(node.from, node.to, Decoration.replace({
-              widget: new TableWidget(text),
-              block: true,
-            }))
-            return false  // skip child nodes, table is handled as one unit
-          }
         }
       },
     })
@@ -150,17 +178,21 @@ function buildDecos(view: EditorView): DecorationSet {
   return builder.finish()
 }
 
-export const livePreviewExtension = ViewPlugin.fromClass(
+const inlinePreviewPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
     constructor(view: EditorView) {
-      this.decorations = buildDecos(view)
+      this.decorations = buildInlineDecos(view)
     }
     update(update: ViewUpdate) {
       if (update.docChanged || update.selectionSet || update.viewportChanged) {
-        this.decorations = buildDecos(update.view)
+        this.decorations = buildInlineDecos(update.view)
       }
     }
   },
   { decorations: v => v.decorations },
 )
+
+// ── Public export ────────────────────────────────────────────────────────────
+
+export const livePreviewExtension = [inlinePreviewPlugin, blockPreviewField]
