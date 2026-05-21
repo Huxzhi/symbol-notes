@@ -5,7 +5,8 @@ import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting } from '@codemirror/language'
 import { darkTheme, darkHighlightStyle } from '../lib/cmTheme'
-import { wikiLinkExtension } from '../lib/wikiLinkExtension'
+import { wikiLinkParser } from '../lib/wikiLinkParser'
+import { livePreviewExtension } from '../lib/livePreviewExtension'
 import { editorStore, setEditorStore } from '../stores/editorStore'
 import { saveCurrentFile } from '../services/fileSystemService'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
@@ -22,10 +23,10 @@ export function Editor() {
       state: EditorState.create({
         doc: body,
         extensions: [
-          markdown({ codeLanguages: languages }),
+          markdown({ codeLanguages: languages, extensions: [wikiLinkParser] }),
           syntaxHighlighting(darkHighlightStyle),
           darkTheme,
-          wikiLinkExtension,
+          livePreviewExtension,
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !isExternalUpdate) {
               setEditorStore('isDirty', true)
