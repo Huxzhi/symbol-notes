@@ -45,7 +45,7 @@ export function PropertiesPanel() {
           <For each={fields()}>
             {([key, value]) => (
               <div class="flex items-center gap-1.5">
-                <span class="text-[11px] text-[#6c63ff] font-semibold w-[64px] text-right shrink-0">{key}</span>
+                <span class="text-[11px] text-[#6c63ff] font-semibold w-16 text-right shrink-0">{key}</span>
                 <span class="text-[#3a3a5c] shrink-0">:</span>
                 <input
                   class="flex-1 bg-[#1e1e35] border border-[#3a3a5c] rounded px-2 py-0.5 text-[12px] text-[#e0e0ff] font-mono focus:outline-none focus:border-[#6c63ff] min-w-0"

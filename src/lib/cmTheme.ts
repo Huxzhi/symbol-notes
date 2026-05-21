@@ -18,6 +18,16 @@ export const darkTheme = EditorView.theme(
     '.cm-selectionBackground, ::selection': { backgroundColor: '#2d2d4a !important' },
     '&.cm-focused .cm-selectionBackground': { backgroundColor: '#3a3a5c !important' },
     '.cm-line': { padding: '0' },
+    '.cm-blockquote': {
+      borderLeft: '3px solid #6c63ff',
+      paddingLeft: '16px',
+    },
+    '.cm-task-checkbox': {
+      cursor: 'pointer',
+      verticalAlign: 'middle',
+      marginRight: '4px',
+      accentColor: '#6c63ff',
+    },
     '.cm-wikilink': {
       color: '#7ec8e3',
       textDecoration: 'underline',
@@ -28,14 +38,18 @@ export const darkTheme = EditorView.theme(
       display: 'block',
       height: '1px',
       background: '#3a3a5c',
+      backgroundClip: 'content-box',
       border: 'none',
-      margin: '12px 0',
+      padding: '11px 0',
       width: '100%',
+      boxSizing: 'content-box',
+    },
+    '.cm-table-widget-wrapper': {
+      padding: '8px 0',
     },
     '.cm-table-widget': {
       borderCollapse: 'collapse',
       width: '100%',
-      margin: '8px 0',
       fontSize: '14px',
     },
     '.cm-table-widget th, .cm-table-widget td': {
