@@ -38,8 +38,8 @@ export default function App() {
           </Show>
         </div>
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+          <TabBar />
           <Show when={uiStore.mainView === 'editor'} fallback={<CalendarPage />}>
-            <TabBar />
             <FileTitle />
             <div class="flex-1 flex flex-col overflow-hidden">
               <Editor />
