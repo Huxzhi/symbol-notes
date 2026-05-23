@@ -1,4 +1,4 @@
-import { FolderOpen, Search, Network, Settings, CalendarDays } from 'lucide-solid'
+import { FolderOpen, Search, Network, Settings, CalendarDays, CalendarRange } from 'lucide-solid'
 import { PanelLeft } from 'lucide-solid'
 import { openDirectory } from '../services/fileSystemService'
 import { uiStore, setUIStore } from '../stores/uiStore'
@@ -48,6 +48,16 @@ export function Ribbon() {
         onClick={() => switchView('calendar')}
       >
         <CalendarDays size={18} />
+      </button>
+      <button
+        class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-[var(--bg-hover)]
+          ${uiStore.mainView === 'calendar'
+            ? 'text-[var(--accent)]'
+            : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
+        title="日历大图"
+        onClick={() => setUIStore('mainView', uiStore.mainView === 'calendar' ? 'editor' : 'calendar')}
+      >
+        <CalendarRange size={18} />
       </button>
       <button
         class="p-1.5 text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] rounded cursor-pointer transition-colors"
