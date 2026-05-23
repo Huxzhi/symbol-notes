@@ -1,6 +1,7 @@
 import { For, Show, createSignal } from 'solid-js'
+import { FolderOpen } from 'lucide-solid'
 import { fileSystemStore } from '../stores/fileSystemStore'
-import { openFile, createFile, createDirectory } from '../services/fileSystemService'
+import { openFile, openDirectory, createFile, createDirectory } from '../services/fileSystemService'
 import type { FileNode } from '../stores/fileSystemStore'
 
 function FileTreeNode(props: { node: FileNode; depth: number }) {
@@ -62,8 +63,18 @@ export function Sidebar() {
 
   return (
     <div class="w-[190px] h-full bg-[var(--bg-surface)] border-r border-[var(--border)] flex flex-col">
-      <div class="px-2.5 py-2 text-[10px] text-[var(--accent)] font-bold tracking-widest uppercase border-b border-[var(--border)] flex items-center gap-1 min-w-0">
-        <span class="truncate flex-1">{fileSystemStore.rootHandle?.name ?? '未选择文件夹'}</span>
+      {/* Header: left part opens/switches folder, right part has new-folder/new-file */}
+      <div class="border-b border-[var(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
+        <button
+          class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors min-w-0 group"
+          onClick={openDirectory}
+          title={fileSystemStore.rootHandle ? '切换文件夹' : '打开文件夹'}
+        >
+          <FolderOpen size={12} class="shrink-0 text-[var(--accent)] group-hover:text-[var(--accent-2)]" />
+          <span class="truncate text-[10px] text-[var(--accent)] font-bold tracking-widest uppercase group-hover:text-[var(--accent-2)]">
+            {fileSystemStore.rootHandle?.name ?? '打开文件夹'}
+          </span>
+        </button>
         <Show when={fileSystemStore.rootHandle}>
           <button
             class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors text-[13px]"

@@ -1,6 +1,5 @@
-import { FolderOpen, Search, Network, Settings, CalendarDays, CalendarRange } from 'lucide-solid'
+import { Search, Network, Settings, CalendarDays, CalendarRange } from 'lucide-solid'
 import { PanelLeft } from 'lucide-solid'
-import { openDirectory } from '../services/fileSystemService'
 import { uiStore, setUIStore } from '../stores/uiStore'
 
 export function Ribbon() {
@@ -22,13 +21,7 @@ export function Ribbon() {
       >
         <PanelLeft size={18} />
       </button>
-      <button
-        onClick={openDirectory}
-        class="p-1.5 text-[var(--accent)] hover:bg-[var(--bg-hover)] rounded cursor-pointer transition-colors"
-        title="打开文件夹"
-      >
-        <FolderOpen size={18} />
-      </button>
+
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-[var(--bg-hover)]
           ${uiStore.sidebarView === 'files' && uiStore.showLeft
