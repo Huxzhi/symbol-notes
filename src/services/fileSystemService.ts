@@ -121,17 +121,31 @@ async function updateBacklinks(
   )
 }
 
+export async function createDirectory(path: string): Promise<void> {
+  const { rootHandle } = fileSystemStore
+  if (!rootHandle) return
+  const parts = path.split('/').filter(Boolean)
+  let dir: FileSystemDirectoryHandle = rootHandle
+  for (const part of parts) {
+    dir = await dir.getDirectoryHandle(part, { create: true })
+  }
+  setFileSystemStore('tree', await buildTree(rootHandle))
+}
+
 export async function createFile(name: string, dirPath?: string): Promise<void> {
   const { rootHandle } = fileSystemStore
   if (!rootHandle) return
-  const filename = name.endsWith('.md') ? name : `${name}.md`
+  // Support path/to/note syntax in name (auto-create intermediate dirs)
+  const combined = dirPath ? `${dirPath}/${name}` : name
+  const parts = combined.split('/').filter(Boolean)
+  const rawFilename = parts[parts.length - 1]
+  const dirParts = parts.slice(0, -1)
+  const filename = rawFilename.endsWith('.md') ? rawFilename : `${rawFilename}.md`
   let dir: FileSystemDirectoryHandle = rootHandle
-  if (dirPath) {
-    for (const part of dirPath.split('/')) {
-      dir = await dir.getDirectoryHandle(part)
-    }
+  for (const part of dirParts) {
+    dir = await dir.getDirectoryHandle(part, { create: true })
   }
-  const filePath = dirPath ? `${dirPath}/${filename}` : filename
+  const filePath = [...dirParts, filename].join('/')
   const handle = await dir.getFileHandle(filename, { create: true })
   const writable = await handle.createWritable()
   await writable.write('')

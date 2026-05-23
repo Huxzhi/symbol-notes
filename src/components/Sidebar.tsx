@@ -1,6 +1,6 @@
 import { For, Show, createSignal } from 'solid-js'
 import { fileSystemStore } from '../stores/fileSystemStore'
-import { openFile, createFile } from '../services/fileSystemService'
+import { openFile, createFile, createDirectory } from '../services/fileSystemService'
 import type { FileNode } from '../stores/fileSystemStore'
 
 function FileTreeNode(props: { node: FileNode; depth: number }) {
@@ -30,30 +30,34 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
   )
 }
 
+type CreateMode = 'file' | 'folder' | null
+
 export function Sidebar() {
-  const [creating, setCreating] = createSignal(false)
+  const [createMode, setCreateMode] = createSignal<CreateMode>(null)
   const [newName, setNewName] = createSignal('')
 
-  const startCreate = () => {
+  const startCreate = (mode: CreateMode) => {
     setNewName('')
-    setCreating(true)
+    setCreateMode(mode)
   }
 
-  const cancelCreate = () => {
-    setCreating(false)
+  const cancel = () => {
+    setCreateMode(null)
     setNewName('')
   }
 
-  const confirmCreate = async () => {
+  const confirm = async () => {
     const name = newName().trim()
-    if (!name) { cancelCreate(); return }
-    cancelCreate()
-    await createFile(name)
+    if (!name) { cancel(); return }
+    const mode = createMode()
+    cancel()
+    if (mode === 'file') await createFile(name)
+    else if (mode === 'folder') await createDirectory(name)
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') confirmCreate()
-    else if (e.key === 'Escape') cancelCreate()
+    if (e.key === 'Enter') confirm()
+    else if (e.key === 'Escape') cancel()
   }
 
   return (
@@ -62,9 +66,16 @@ export function Sidebar() {
         <span class="truncate flex-1">{fileSystemStore.rootHandle?.name ?? '未选择文件夹'}</span>
         <Show when={fileSystemStore.rootHandle}>
           <button
+            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors text-[13px]"
+            title="新建文件夹"
+            onClick={() => startCreate('folder')}
+          >
+            ⊞
+          </button>
+          <button
             class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors"
             title="新建文件"
-            onClick={startCreate}
+            onClick={() => startCreate('file')}
           >
             +
           </button>
@@ -72,16 +83,18 @@ export function Sidebar() {
       </div>
 
       <div class="overflow-y-auto flex-1 py-1">
-        <Show when={creating()}>
+        <Show when={createMode() !== null}>
           <div class="flex items-center gap-1 px-2 py-1">
-            <span class="text-[9px] text-[var(--text-3)]">◻</span>
+            <span class="text-[9px] text-[var(--text-3)]">
+              {createMode() === 'folder' ? '▸' : '◻'}
+            </span>
             <input
               class="flex-1 bg-[var(--bg-hover)] border border-[var(--accent)] rounded px-1.5 py-0.5 text-[11px] text-[var(--text)] outline-none min-w-0"
-              placeholder="文件名.md"
+              placeholder={createMode() === 'folder' ? '文件夹 或 父/子/文件夹' : '文件名 或 目录/文件名'}
               value={newName()}
               onInput={e => setNewName(e.currentTarget.value)}
               onKeyDown={onKeyDown}
-              onBlur={confirmCreate}
+              onBlur={confirm}
               ref={el => setTimeout(() => el?.focus(), 0)}
             />
           </div>
