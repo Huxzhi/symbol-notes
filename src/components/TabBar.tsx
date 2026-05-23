@@ -4,6 +4,7 @@ import { fileSystemStore } from '../stores/fileSystemStore'
 import { openFile, closeFile } from '../services/fileSystemService'
 import { uiStore, setUIStore, openPage, closePage, isPageTab } from '../stores/uiStore'
 import { PAGE_MAP } from '../lib/pageRegistry'
+import { isImagePath } from '../lib/fileTypes'
 import type { Component } from 'solid-js'
 
 const PAGE_ICONS: Record<string, Component<{ size?: number; class?: string }>> = {
@@ -35,7 +36,7 @@ export function TabBar() {
                         : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'}`}
                     onClick={() => { setUIStore('activePageId', null); openFile(id) }}
                   >
-                    <span class="text-[9px] text-[var(--accent)]">◻</span>
+                    <span class="text-[9px] text-[var(--accent)]">{isImagePath(id) ? '⊡' : '◻'}</span>
                     <span class="max-w-[120px] truncate">{baseName(id)}</span>
                     <button
                       class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"

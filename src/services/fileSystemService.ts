@@ -196,6 +196,15 @@ export async function createFile(
   await openFile(filePath)
 }
 
+export async function openImageFile(path: string): Promise<void> {
+  setFileSystemStore('activeFilePath', path)
+  if (!fileSystemStore.openFilePaths.includes(path)) {
+    setFileSystemStore('openFilePaths', [...fileSystemStore.openFilePaths, path])
+    setUIStore('tabOrder', [...uiStore.tabOrder, path])
+  }
+  setUIStore('activePageId', null)
+}
+
 export async function openFile(path: string): Promise<void> {
   const handle = await getFileHandle(path)
   const file = await handle.getFile()

@@ -5,12 +5,15 @@ import { CalendarPanel } from './components/CalendarPanel'
 import { CalendarPage } from './components/CalendarPage'
 import { TabBar } from './components/TabBar'
 import { Editor } from './components/Editor'
+import { ImageViewer } from './components/ImageViewer'
 import { RightPanel } from './components/RightPanel'
 import { StatusBar } from './components/StatusBar'
 import { Settings } from './components/Settings'
 import { FileTitle } from './components/FileTitle'
 import { restoreDirectory } from './services/fileSystemService'
+import { fileSystemStore } from './stores/fileSystemStore'
 import { uiStore } from './stores/uiStore'
+import { isImagePath } from './lib/fileTypes'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
@@ -53,10 +56,19 @@ export default function App() {
             when={uiStore.activePageId === null}
             fallback={<PageRouter id={uiStore.activePageId!} />}
           >
-            <FileTitle />
-            <div class="flex-1 flex flex-col overflow-hidden">
-              <Editor />
-            </div>
+            <Show
+              when={isImagePath(fileSystemStore.activeFilePath)}
+              fallback={
+                <>
+                  <FileTitle />
+                  <div class="flex-1 flex flex-col overflow-hidden">
+                    <Editor />
+                  </div>
+                </>
+              }
+            >
+              <ImageViewer path={fileSystemStore.activeFilePath!} />
+            </Show>
           </Show>
         </div>
         <div class={`transition-all duration-200 overflow-hidden ${uiStore.showRight ? 'w-50' : 'w-0'}`}>

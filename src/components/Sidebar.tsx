@@ -2,10 +2,9 @@ import { For, Show, createSignal } from 'solid-js'
 import { FolderOpen } from 'lucide-solid'
 import { fileSystemStore } from '../stores/fileSystemStore'
 import { uiStore } from '../stores/uiStore'
-import { openFile, openDirectory, createFile, createDirectory } from '../services/fileSystemService'
+import { openFile, openImageFile, openDirectory, createFile, createDirectory } from '../services/fileSystemService'
 import type { FileNode } from '../stores/fileSystemStore'
-
-const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif'])
+import { isImagePath, isMdPath, IMAGE_EXTS } from '../lib/fileTypes'
 
 function fileIcon(name: string): string {
   if (name.endsWith('.md')) return '◻'
@@ -18,19 +17,12 @@ function displayName(name: string): string {
   return name.endsWith('.md') ? name.slice(0, -3) : name
 }
 
-function isMd(name: string): boolean {
-  return name.endsWith('.md')
-}
-
-function isOther(name: string): boolean {
-  return !isMd(name)
-}
-
 function FileTreeNode(props: { node: FileNode; depth: number }) {
   const isActive = () => fileSystemStore.activeFilePath === props.node.path
+  const isOther = () => props.node.kind === 'file' && !isMdPath(props.node.name)
   const show = () =>
     props.node.kind === 'directory' ||
-    isMd(props.node.name) ||
+    isMdPath(props.node.name) ||
     uiStore.showOtherFiles
 
   return (
@@ -40,14 +32,14 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
           class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-[var(--bg-hover)] select-none
             ${isActive()
               ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
-              : isOther(props.node.name) && props.node.kind === 'file'
+              : isOther()
                 ? 'text-[var(--text-4)] border-l-2 border-transparent'
                 : 'text-[var(--text-2)] border-l-2 border-transparent'}`}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
-            if (props.node.kind === 'file' && isMd(props.node.name)) {
-              openFile(props.node.path)
-            }
+            if (props.node.kind !== 'file') return
+            if (isMdPath(props.node.name)) openFile(props.node.path)
+            else if (isImagePath(props.node.path)) openImageFile(props.node.path)
           }}
         >
           <span class="text-[9px] text-[var(--text-3)]">
