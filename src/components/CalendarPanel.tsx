@@ -9,7 +9,7 @@ export function CalendarPanel() {
 
   const [viewYear, setViewYear] = createSignal(now.getFullYear())
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
-  const [selectedDay, setSelectedDay] = createSignal<string | null>(null)
+  const [selectedDay, setSelectedDay] = createSignal<string | null>(todayStr)
 
   const dayData = createMemo(() => buildDayData(knowledgeStore.index))
   const calendarGrid = createMemo(() => buildCalendarGrid(viewYear(), viewMonth()))
