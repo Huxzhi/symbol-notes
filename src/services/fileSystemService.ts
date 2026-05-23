@@ -11,6 +11,7 @@ export async function openDirectory(): Promise<void> {
   await set(DB_KEY, handle)
   setFileSystemStore({ rootHandle: handle, activeFilePath: null, openFilePaths: [] })
   setFileSystemStore('tree', await buildTree(handle))
+  await scanDirectory()
 }
 
 export async function restoreDirectory(): Promise<void> {
