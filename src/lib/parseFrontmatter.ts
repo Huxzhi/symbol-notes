@@ -55,6 +55,31 @@ function parseScalar(value: string): unknown {
   return value
 }
 
+export function formatTimestamp(ms: number): string {
+  const d = new Date(ms)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+// Set or add a single frontmatter field in-place, preserving all other content.
+// Creates a frontmatter block if the file has none.
+export function setFrontmatterField(content: string, key: string, value: string): string {
+  if (!content.startsWith('---')) {
+    return `---\n${key}: ${value}\n---\n\n${content}`
+  }
+  const fmEnd = content.indexOf('\n---', 3)
+  if (fmEnd === -1) {
+    return `---\n${key}: ${value}\n---\n\n${content}`
+  }
+  const yaml = content.slice(4, fmEnd)
+  const rest = content.slice(fmEnd + 4)          // everything after closing ---
+  const fieldRe = new RegExp(`^(${key}:[ \\t]*).*$`, 'm')
+  if (fieldRe.test(yaml)) {
+    return `---\n${yaml.replace(fieldRe, `$1${value}`)}\n---${rest}`
+  }
+  return `---\n${yaml}\n${key}: ${value}\n---${rest}`
+}
+
 export function serializeFrontmatter(
   frontmatter: Record<string, unknown>,
   body: string,

@@ -1,6 +1,6 @@
 import { onMount, onCleanup, createEffect } from 'solid-js'
 import { EditorView } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Transaction } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting } from '@codemirror/language'
@@ -56,7 +56,8 @@ export function Editor() {
                 }, 500)
               }
 
-              if (!isExternalUpdate) {
+              const isRemote = update.transactions.some(tr => tr.annotation(Transaction.remote))
+              if (!isExternalUpdate && !isRemote) {
                 setEditorStore('isDirty', true)
                 setEditorStore('content', update.state.doc.toString())
               }

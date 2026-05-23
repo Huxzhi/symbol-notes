@@ -8,6 +8,7 @@ interface UIState {
   theme: ThemeId
   customCSS: string
   showSettings: boolean
+  autoTimestamps: boolean
 }
 
 function saved<T>(key: string, fallback: T): T {
@@ -25,6 +26,7 @@ const [uiStore, setUIStore] = createStore<UIState>({
   showSettings: false,
   theme: saved<ThemeId>('sn-theme', 'dark'),
   customCSS: saved<string>('sn-customCSS', ''),
+  autoTimestamps: saved<boolean>('sn-autoTimestamps', true),
 })
 
 export { uiStore, setUIStore }

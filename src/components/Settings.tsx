@@ -1,6 +1,14 @@
-import { createSignal, For } from 'solid-js'
+import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import { uiStore, setUIStore } from '../stores/uiStore'
 import type { ThemeId } from '../stores/uiStore'
+
+type Section = 'appearance' | 'files' | 'shortcuts'
+
+const SECTIONS: { id: Section; label: string }[] = [
+  { id: 'appearance', label: '外观' },
+  { id: 'files',      label: '文件' },
+  { id: 'shortcuts',  label: '快捷键' },
+]
 
 const THEMES: { id: ThemeId; label: string; sub: string; swatch: string[] }[] = [
   { id: 'dark',  label: '深空', sub: 'Dark',  swatch: ['#0f0f1c', '#6c63ff', '#7ec8e3', '#cccccc'] },
@@ -8,26 +16,33 @@ const THEMES: { id: ThemeId; label: string; sub: string; swatch: string[] }[] = 
   { id: 'nord',  label: '极光', sub: 'Nord',  swatch: ['#2e3440', '#88c0d0', '#81a1c1', '#eceff4'] },
 ]
 
-function persistTheme(theme: ThemeId) {
-  try { localStorage.setItem('sn-theme', JSON.stringify(theme)) } catch {}
-}
-function persistCSS(css: string) {
-  try { localStorage.setItem('sn-customCSS', JSON.stringify(css)) } catch {}
+const SHORTCUTS = [
+  { keys: 'Ctrl / ⌘  S',       desc: '保存文件' },
+  { keys: 'Ctrl / ⌘  Z',       desc: '撤销' },
+  { keys: 'Ctrl / ⌘  Shift Z', desc: '重做' },
+  { keys: 'Ctrl / ⌘  B',       desc: '加粗' },
+  { keys: 'Ctrl / ⌘  I',       desc: '斜体' },
+]
+
+function persist(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
 }
 
 export function Settings() {
+  const [section, setSection] = createSignal<Section>('appearance')
   const [draftTheme, setDraftTheme] = createSignal<ThemeId>(uiStore.theme)
   const [draftCSS, setDraftCSS] = createSignal(uiStore.customCSS)
+  const [draftAutoTs, setDraftAutoTs] = createSignal(uiStore.autoTimestamps)
 
   const close = () => setUIStore('showSettings', false)
 
   const apply = () => {
-    const theme = draftTheme()
-    const css = draftCSS()
-    setUIStore('theme', theme)
-    setUIStore('customCSS', css)
-    persistTheme(theme)
-    persistCSS(css)
+    setUIStore('theme', draftTheme())
+    setUIStore('customCSS', draftCSS())
+    setUIStore('autoTimestamps', draftAutoTs())
+    persist('sn-theme', draftTheme())
+    persist('sn-customCSS', draftCSS())
+    persist('sn-autoTimestamps', draftAutoTs())
     close()
   }
 
@@ -36,64 +51,133 @@ export function Settings() {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={(e) => { if (e.target === e.currentTarget) close() }}
     >
-      <div class="bg-elevated border b-theme rounded-lg w-[480px] max-w-[90vw] flex flex-col p-5 gap-5 shadow-2xl">
+      <div class="bg-elevated border b-theme rounded-lg w-[580px] max-w-[92vw] max-h-[82vh] flex flex-col shadow-2xl overflow-hidden">
 
-        <div class="flex items-center justify-between">
+        {/* Header */}
+        <div class="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border)] shrink-0">
           <h2 class="text-[14px] font-semibold t-base">设置</h2>
-          <button
-            class="interactive w-6 h-6 flex items-center justify-center rounded text-[13px]"
-            onClick={close}
-          >
-            ✕
-          </button>
+          <button class="interactive w-6 h-6 flex items-center justify-center rounded text-[13px]" onClick={close}>✕</button>
         </div>
 
-        <div>
-          <div class="text-[10px] t-3 mb-2.5 uppercase tracking-widest">主题</div>
-          <div class="flex gap-2">
-            <For each={THEMES}>
-              {(t) => (
+        {/* Body */}
+        <div class="flex flex-1 overflow-hidden min-h-0">
+
+          {/* Left nav */}
+          <div class="w-28 shrink-0 border-r border-[var(--border)] py-2">
+            <For each={SECTIONS}>
+              {(s) => (
                 <button
-                  class={`flex-1 rounded-lg border-2 p-3 cursor-pointer transition-colors text-center ${
-                    draftTheme() === t.id
-                      ? 'border-[var(--accent)] bg-[var(--accent-bg)]'
-                      : 'border-[var(--border)] hover:border-[var(--border-2)]'
+                  class={`w-full text-left px-4 py-2 text-[12px] cursor-pointer transition-colors ${
+                    section() === s.id
+                      ? 'text-[var(--accent)] bg-[var(--accent-bg)] font-medium'
+                      : 't-2 hover:bg-[var(--bg-hover)]'
                   }`}
-                  onClick={() => setDraftTheme(t.id)}
+                  onClick={() => setSection(s.id)}
                 >
-                  <div class="flex gap-1 mb-2 justify-center">
-                    <For each={t.swatch}>
-                      {(c) => <div class="w-4 h-4 rounded-full border border-white/10" style={{ background: c }} />}
-                    </For>
-                  </div>
-                  <div class={`text-[12px] font-medium ${draftTheme() === t.id ? 'text-[var(--accent)]' : 't-base'}`}>
-                    {t.label}
-                  </div>
-                  <div class="text-[10px] t-3">{t.sub}</div>
+                  {s.label}
                 </button>
               )}
             </For>
           </div>
+
+          {/* Content */}
+          <div class="flex-1 overflow-y-auto p-5 min-w-0">
+            <Switch>
+
+              <Match when={section() === 'appearance'}>
+                <div class="text-[10px] t-3 mb-2.5 uppercase tracking-widest">主题</div>
+                <div class="flex gap-2 mb-5">
+                  <For each={THEMES}>
+                    {(t) => (
+                      <button
+                        class={`flex-1 rounded-lg border-2 p-3 cursor-pointer transition-colors text-center ${
+                          draftTheme() === t.id
+                            ? 'border-[var(--accent)] bg-[var(--accent-bg)]'
+                            : 'border-[var(--border)] hover:border-[var(--border-2)]'
+                        }`}
+                        onClick={() => setDraftTheme(t.id)}
+                      >
+                        <div class="flex gap-1 mb-2 justify-center">
+                          <For each={t.swatch}>
+                            {(c) => <div class="w-4 h-4 rounded-full border border-white/10" style={{ background: c }} />}
+                          </For>
+                        </div>
+                        <div class={`text-[12px] font-medium ${draftTheme() === t.id ? 'text-[var(--accent)]' : 't-base'}`}>{t.label}</div>
+                        <div class="text-[10px] t-3">{t.sub}</div>
+                      </button>
+                    )}
+                  </For>
+                </div>
+
+                <div class="text-[10px] t-3 mb-2 uppercase tracking-widest">自定义 CSS</div>
+                <textarea
+                  class="w-full h-36 bg-[var(--bg-base)] border border-[var(--border)] rounded p-2.5 text-[12px] t-base font-mono resize-none outline-none transition-colors focus:border-[var(--accent)]"
+                  placeholder="/* 在此输入自定义 CSS */"
+                  value={draftCSS()}
+                  onInput={(e) => setDraftCSS(e.currentTarget.value)}
+                  spellcheck={false}
+                />
+              </Match>
+
+              <Match when={section() === 'files'}>
+                <div class="text-[10px] t-3 mb-3 uppercase tracking-widest">自动时间戳</div>
+                <label class="flex items-start gap-3 cursor-pointer select-none">
+                  {/* Toggle switch */}
+                  <div class="relative mt-0.5 shrink-0">
+                    <input
+                      type="checkbox"
+                      class="sr-only"
+                      checked={draftAutoTs()}
+                      onChange={(e) => setDraftAutoTs(e.currentTarget.checked)}
+                    />
+                    <div class={`w-9 h-5 rounded-full transition-colors ${draftAutoTs() ? 'bg-[var(--accent)]' : 'bg-[var(--bg-active)]'}`} />
+                    <div class={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${draftAutoTs() ? 'translate-x-4' : ''}`} />
+                  </div>
+                  <div>
+                    <div class="text-[13px] t-base font-medium">启用自动时间戳</div>
+                    <div class="text-[11px] t-3 mt-1 leading-relaxed">
+                      打开文件时若缺少
+                      <code class="bg-[var(--bg-hover)] px-1 mx-0.5 rounded text-[10px]">created</code>
+                      或
+                      <code class="bg-[var(--bg-hover)] px-1 mx-0.5 rounded text-[10px]">updated</code>
+                      字段则自动写入；每次保存时更新
+                      <code class="bg-[var(--bg-hover)] px-1 mx-0.5 rounded text-[10px]">updated</code>
+                      为当前时间。
+                    </div>
+                    <div class="text-[11px] t-3 mt-1">
+                      格式：<code class="bg-[var(--bg-hover)] px-1 rounded text-[10px]">YYYY-MM-DD HH:mm</code>
+                    </div>
+                    <Show when={draftAutoTs()}>
+                      <div class="text-[10px] t-3 mt-2 leading-relaxed border-l-2 border-[var(--border-2)] pl-2">
+                        注：浏览器 API 仅暴露文件的修改时间，<code class="text-[var(--text-3)]">created</code> 字段将以文件的最后修改时间作为初始值。
+                      </div>
+                    </Show>
+                  </div>
+                </label>
+              </Match>
+
+              <Match when={section() === 'shortcuts'}>
+                <div class="text-[10px] t-3 mb-3 uppercase tracking-widest">键盘快捷键</div>
+                <div>
+                  <For each={SHORTCUTS}>
+                    {(s) => (
+                      <div class="flex items-center justify-between py-2 border-b border-[var(--border)]">
+                        <span class="text-[12px] t-base">{s.desc}</span>
+                        <kbd class="text-[11px] t-2 bg-[var(--bg-hover)] border border-[var(--border)] px-2 py-0.5 rounded font-mono">{s.keys}</kbd>
+                      </div>
+                    )}
+                  </For>
+                </div>
+                <div class="text-[10px] t-3 mt-4">自定义快捷键功能即将支持。</div>
+              </Match>
+
+            </Switch>
+          </div>
         </div>
 
-        <div>
-          <div class="text-[10px] t-3 mb-2 uppercase tracking-widest">自定义 CSS</div>
-          <textarea
-            class="w-full h-36 bg-[var(--bg-base)] border border-[var(--border)] rounded p-2.5 text-[12px] t-base font-mono resize-none outline-none transition-colors focus:border-[var(--accent)]"
-            placeholder="/* 在此输入自定义 CSS */"
-            value={draftCSS()}
-            onInput={(e) => setDraftCSS(e.currentTarget.value)}
-            spellcheck={false}
-          />
-        </div>
-
-        <div class="flex justify-end gap-2">
-          <button
-            class="interactive px-4 py-1.5 text-[12px] rounded border border-[var(--border)]"
-            onClick={close}
-          >
-            取消
-          </button>
+        {/* Footer */}
+        <div class="flex justify-end gap-2 px-5 py-3 border-t border-[var(--border)] shrink-0">
+          <button class="interactive px-4 py-1.5 text-[12px] rounded border border-[var(--border)]" onClick={close}>取消</button>
           <button
             class="px-4 py-1.5 text-[12px] rounded bg-[var(--accent)] text-white cursor-pointer hover:bg-[var(--accent-2)] transition-colors"
             onClick={apply}

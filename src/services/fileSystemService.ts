@@ -1,10 +1,13 @@
 import { get, set } from 'idb-keyval'
+import { Transaction } from '@codemirror/state'
 import { fileSystemStore, setFileSystemStore, type FileNode } from '../stores/fileSystemStore'
 import { editorStore, setEditorStore } from '../stores/editorStore'
 import { batch } from 'solid-js'
 import { knowledgeStore } from '../stores/knowledgeStore'
+import { uiStore } from '../stores/uiStore'
 import { reindexFile, scanDirectory, applyFileMeta, removeFileMeta } from './knowledgeService'
 import { startBackgroundParsing } from './backgroundParser'
+import { parseFrontmatter, formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
 
 const DB_KEY = 'rootHandle'
 
@@ -140,7 +143,22 @@ export async function createFile(name: string, dirPath?: string): Promise<void> 
 export async function openFile(path: string): Promise<void> {
   const handle = await getFileHandle(path)
   const file = await handle.getFile()
-  const content = await file.text()
+  let content = await file.text()
+
+  if (uiStore.autoTimestamps) {
+    const { frontmatter } = parseFrontmatter(content)
+    const ts = formatTimestamp(file.lastModified)
+    let updated = content
+    if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
+    if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
+    if (updated !== content) {
+      const writable = await handle.createWritable()
+      await writable.write(updated)
+      await writable.close()
+      content = updated
+    }
+  }
+
   setEditorStore({ content, isDirty: false })
   setFileSystemStore('activeFilePath', path)
   if (!fileSystemStore.openFilePaths.includes(path)) {
@@ -154,7 +172,23 @@ export async function saveCurrentFile(): Promise<void> {
   const { cmView } = editorStore
   if (!rootHandle || !activeFilePath || !cmView) return
 
-  const newContent = cmView.state.doc.toString()
+  let newContent = cmView.state.doc.toString()
+
+  if (uiStore.autoTimestamps) {
+    const ts = formatTimestamp(Date.now())
+    const withUpdated = setFrontmatterField(newContent, 'updated', ts)
+    if (withUpdated !== newContent) {
+      let from = 0
+      while (from < newContent.length && from < withUpdated.length && newContent[from] === withUpdated[from]) from++
+      let toOld = newContent.length, toNew = withUpdated.length
+      while (toOld > from && toNew > from && newContent[toOld - 1] === withUpdated[toNew - 1]) { toOld--; toNew-- }
+      cmView.dispatch({
+        changes: { from, to: toOld, insert: withUpdated.slice(from, toNew) },
+        annotations: Transaction.remote.of(true),
+      })
+      newContent = withUpdated
+    }
+  }
 
   const handle = await getFileHandle(activeFilePath)
   const writable = await handle.createWritable()
