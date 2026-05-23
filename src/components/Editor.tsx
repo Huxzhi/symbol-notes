@@ -6,8 +6,9 @@ import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting } from '@codemirror/language'
 import { GFM } from '@lezer/markdown'
 import { darkTheme, darkHighlightStyle } from '../lib/cmTheme'
-import { wikiLinkParser } from '../lib/wikiLinkParser'
+import { wikiLinkParser, wikiEmbedParser } from '../lib/wikiLinkParser'
 import { livePreviewExtension } from '../lib/livePreviewExtension'
+import { embedPreviewPlugin, embedTheme } from '../lib/embedExtension'
 import { frontmatterField } from '../lib/frontmatterField'
 import { outLinksField } from '../lib/outLinksField'
 import { inlineTagsField, inlineTagDecoField } from '../lib/inlineTagsField'
@@ -31,10 +32,12 @@ export function Editor() {
         doc,
         selection: { anchor: doc.length },
         extensions: [
-          markdown({ codeLanguages: languages, extensions: [GFM, wikiLinkParser] }),
+          markdown({ codeLanguages: languages, extensions: [GFM, wikiLinkParser, wikiEmbedParser] }),
           syntaxHighlighting(darkHighlightStyle),
           darkTheme,
           livePreviewExtension,
+          embedPreviewPlugin,
+          embedTheme,
           frontmatterField,
           outLinksField,
           inlineTagsField,
