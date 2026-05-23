@@ -1,20 +1,14 @@
-import { get, set, createStore } from 'idb-keyval'
+import { get, set, del, keys, createStore } from 'idb-keyval'
 import type { FileMetadata } from '../stores/knowledgeStore'
 
-interface CacheEntry {
-  hash: string
-  frontmatter: Record<string, unknown>
-  outLinks: string[]
-  tags: string[]
-  aliases: string[]
-}
-
-type CachedFields = Pick<FileMetadata, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'>
+export type CachedFields = Pick<FileMetadata, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'>
 
 const idbStore = createStore('symbol-notes', 'file-meta-cache')
 
-// djb2 hash — fast, sync, collision-resistant enough for cache invalidation
-function hashContent(s: string): string {
+// djb2 hash — fast, sync, good enough for cache invalidation
+// Primary key for cache entries: same content always maps to same hash,
+// path-agnostic so rename/move/WebDAV/S3 path changes don't invalidate cache.
+export function hashContent(s: string): string {
   let h = 5381
   for (let i = 0; i < s.length; i++) {
     h = ((h << 5) + h) ^ s.charCodeAt(i)
@@ -23,27 +17,32 @@ function hashContent(s: string): string {
   return h.toString(36)
 }
 
-export async function getCachedMeta(
-  path: string,
-  content: string,
-): Promise<CachedFields | null> {
+export async function getCachedMeta(hash: string): Promise<CachedFields | null> {
   try {
-    const entry = await get<CacheEntry>(path, idbStore)
-    if (!entry || entry.hash !== hashContent(content)) return null
-    return { frontmatter: entry.frontmatter, outLinks: entry.outLinks, tags: entry.tags, aliases: entry.aliases ?? [] }
+    const entry = await get<CachedFields>(hash, idbStore)
+    return entry ?? null
   } catch {
     return null
   }
 }
 
-export async function setCachedMeta(
-  path: string,
-  content: string,
-  meta: CachedFields,
-): Promise<void> {
+export async function setCachedMeta(hash: string, meta: CachedFields): Promise<void> {
   try {
-    await set(path, { hash: hashContent(content), ...meta } satisfies CacheEntry, idbStore)
+    await set(hash, meta, idbStore)
   } catch {
     // cache write failure is non-fatal
+  }
+}
+
+// Remove cache entries whose hashes are no longer referenced by any known file.
+// Call after a full vault scan when the complete set of active hashes is known.
+export async function pruneCache(activeHashes: Set<string>): Promise<void> {
+  try {
+    const allKeys = await keys<string>(idbStore)
+    await Promise.all(
+      allKeys.filter(k => !activeHashes.has(k)).map(k => del(k, idbStore)),
+    )
+  } catch {
+    // GC failure is non-fatal
   }
 }

@@ -2,7 +2,7 @@ import { knowledgeStore, setKnowledgeStore } from '../stores/knowledgeStore'
 import { fileSystemStore } from '../stores/fileSystemStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import type { FileMetadata } from '../stores/knowledgeStore'
-import { getCachedMeta, setCachedMeta } from './fileCacheService'
+import { hashContent, getCachedMeta, setCachedMeta, pruneCache } from './fileCacheService'
 
 export function extractLinks(content: string): string[] {
   const matches = [...content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)]
@@ -109,8 +109,13 @@ export async function scanDirectory(): Promise<void> {
   const files = await readAllFiles(rootHandle)
   const index: Record<string, FileMetadata> = {}
 
+  const activeHashes = new Set<string>()
+
   await Promise.all(files.map(async ({ path, content }) => {
-    const cached = await getCachedMeta(path, content)
+    const hash = hashContent(content)
+    activeHashes.add(hash)
+
+    const cached = await getCachedMeta(hash)
     if (cached) {
       index[path] = { path, ...cached }
       return
@@ -123,12 +128,13 @@ export async function scanDirectory(): Promise<void> {
       aliases: extractAliases(frontmatter.aliases),
     }
     index[path] = { path, ...parsed }
-    await setCachedMeta(path, content, parsed)
+    await setCachedMeta(hash, parsed)
   }))
 
   const backlinkMap = buildBacklinkMap(index)
   const tagMap = buildTagMap(index)
   setKnowledgeStore({ index, backlinkMap, tagMap })
+  pruneCache(activeHashes).catch(() => {})
 }
 
 /**
@@ -164,7 +170,8 @@ export function applyFileMeta(newMeta: FileMetadata, prevMeta?: FileMetadata): v
 }
 
 export async function reindexFile(path: string, content: string): Promise<void> {
-  const cached = await getCachedMeta(path, content)
+  const hash = hashContent(content)
+  const cached = await getCachedMeta(hash)
   let parsed: Omit<FileMetadata, 'path'>
 
   if (cached) {
@@ -177,7 +184,7 @@ export async function reindexFile(path: string, content: string): Promise<void> 
       tags: mergeTagsWithBody(extractTags(frontmatter.tags), extractBodyTags(body)),
       aliases: extractAliases(frontmatter.aliases),
     }
-    await setCachedMeta(path, content, parsed)
+    await setCachedMeta(hash, parsed)
   }
 
   applyFileMeta({ path, ...parsed }, knowledgeStore.index[path])

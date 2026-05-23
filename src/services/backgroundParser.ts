@@ -7,7 +7,7 @@ import { inlineTagsField } from '../lib/inlineTagsField'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { fileSystemStore } from '../stores/fileSystemStore'
 import { knowledgeStore } from '../stores/knowledgeStore'
-import { getCachedMeta, setCachedMeta } from './fileCacheService'
+import { hashContent, getCachedMeta, setCachedMeta } from './fileCacheService'
 import { extractTags, extractAliases, mergeTagsWithBody, applyFileMeta } from './knowledgeService'
 import type { FileNode } from '../stores/fileSystemStore'
 
@@ -72,9 +72,10 @@ async function runSession(
 
     try {
       const content = await readContent(path, rootHandle)
+      const hash = hashContent(content)
 
       // Cache hit + already indexed → nothing to do
-      const cached = await getCachedMeta(path, content)
+      const cached = await getCachedMeta(hash)
       if (cached && knowledgeStore.index[path]) continue
 
       // Parse with headless CM6
@@ -92,7 +93,7 @@ async function runSession(
         aliases: extractAliases(frontmatter.aliases),
       }
 
-      await setCachedMeta(path, content, parsed)
+      await setCachedMeta(hash, parsed)
 
       // Incremental update — no full rebuild, backlinkMap grows file-by-file
       applyFileMeta({ path, ...parsed }, knowledgeStore.index[path])
