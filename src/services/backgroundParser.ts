@@ -9,6 +9,7 @@ import { fileSystemStore } from '../stores/fileSystemStore'
 import { knowledgeStore } from '../stores/knowledgeStore'
 import { hashContent, getCachedMeta, setCachedMeta } from './fileCacheService'
 import { extractTags, extractAliases, mergeTagsWithBody, applyFileMeta } from './knowledgeService'
+import { setKnowledgeStore } from '../stores/knowledgeStore'
 import type { FileNode } from '../stores/fileSystemStore'
 
 interface Session {
@@ -65,10 +66,11 @@ async function runSession(
   rootHandle: FileSystemDirectoryHandle,
   paths: string[],
 ): Promise<void> {
+  setKnowledgeStore('isIndexing', true)
   for (const path of paths) {
-    if (session.cancelled) return
+    if (session.cancelled) break
     await idle()
-    if (session.cancelled) return
+    if (session.cancelled) break
 
     try {
       const content = await readContent(path, rootHandle)
@@ -100,6 +102,11 @@ async function runSession(
     } catch {
       // Individual file errors are non-fatal
     }
+  }
+  // Only the latest session clears the flag; a cancelled session leaves it
+  // for the newer session to clear when it finishes.
+  if (currentSession === session) {
+    setKnowledgeStore('isIndexing', false)
   }
 }
 

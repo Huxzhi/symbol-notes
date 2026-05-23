@@ -21,7 +21,7 @@ export function Editor() {
   let container!: HTMLDivElement
   let view: EditorView | null = null
   let isExternalUpdate = false
-  let tagSyncTimer: ReturnType<typeof setTimeout> | null = null
+  let reindexTimer: ReturnType<typeof setTimeout> | null = null
 
   onMount(() => {
     const doc = editorStore.content
@@ -45,16 +45,16 @@ export function Editor() {
               setEditorStore('outLinks', update.state.field(outLinksField))
               setEditorStore('headings', update.state.field(headingsField))
 
-              if (update.state.field(inlineTagsField) !== update.startState.field(inlineTagsField)) {
-                if (tagSyncTimer !== null) clearTimeout(tagSyncTimer)
-                tagSyncTimer = setTimeout(() => {
-                  tagSyncTimer = null
-                  const { activeFilePath } = fileSystemStore
-                  if (activeFilePath && view) {
-                    reindexFile(activeFilePath, view.state.doc.toString())
-                  }
-                }, 500)
-              }
+              // Debounced reindex: fires when outLinks OR tags change so the
+              // backlink map stays current while the user is editing.
+              if (reindexTimer !== null) clearTimeout(reindexTimer)
+              reindexTimer = setTimeout(() => {
+                reindexTimer = null
+                const { activeFilePath } = fileSystemStore
+                if (activeFilePath && view) {
+                  reindexFile(activeFilePath, view.state.doc.toString())
+                }
+              }, 800)
 
               const isRemote = update.transactions.some(tr => tr.annotation(Transaction.remote))
               if (!isExternalUpdate && !isRemote) {
@@ -83,7 +83,7 @@ export function Editor() {
   })
 
   onCleanup(() => {
-    if (tagSyncTimer !== null) clearTimeout(tagSyncTimer)
+    if (reindexTimer !== null) clearTimeout(reindexTimer)
     view?.destroy()
     setEditorStore('cmView', null)
   })

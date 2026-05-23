@@ -12,12 +12,14 @@ export interface KnowledgeState {
   index: Record<string, FileMetadata>
   backlinkMap: Record<string, string[]>
   tagMap: Record<string, string[]>
+  isIndexing: boolean
 }
 
 const [knowledgeStore, setKnowledgeStore] = createStore<KnowledgeState>({
   index: {},
   backlinkMap: {},
   tagMap: {},
+  isIndexing: false,
 })
 
 export { knowledgeStore, setKnowledgeStore }
