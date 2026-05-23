@@ -70,20 +70,20 @@ export function CalendarPanel() {
           <For each={calendarGrid()}>
             {(day) => {
               if (day === null) return <div class="h-7" />
-              const dayStr = toIsoDate(viewYear(), viewMonth(), day)
-              const isToday = dayStr === todayStr
-              const isSelected = () => selectedDay() === dayStr
-              const hasCreated = () => (dayData().created[dayStr]?.length ?? 0) > 0
-              const hasUpdated = () => (dayData().updated[dayStr]?.length ?? 0) > 0
+              const dayStr = () => toIsoDate(viewYear(), viewMonth(), day)
+              const isToday = () => dayStr() === todayStr
+              const isSelected = () => selectedDay() === dayStr()
+              const hasCreated = () => (dayData().created[dayStr()]?.length ?? 0) > 0
+              const hasUpdated = () => (dayData().updated[dayStr()]?.length ?? 0) > 0
               return (
                 <button
                   class={`h-7 flex flex-col items-center justify-center rounded text-[11px] leading-none cursor-pointer transition-colors
                     ${isSelected()
                       ? 'bg-[var(--accent)] text-white'
-                      : isToday
+                      : isToday()
                         ? 'bg-[var(--accent-bg)] text-[var(--accent)] font-semibold'
                         : 'text-[var(--text-2)] hover:bg-[var(--bg-hover)]'}`}
-                  onClick={() => setSelectedDay(isSelected() ? null : dayStr)}
+                  onClick={() => setSelectedDay(isSelected() ? null : dayStr())}
                 >
                   <span class="leading-none">{day}</span>
                   <div class="flex gap-px mt-0.5 h-1.5 items-center">

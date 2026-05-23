@@ -92,20 +92,20 @@ export function CalendarPage() {
               )
             }
 
-            const dayStr = toIsoDate(viewYear(), viewMonth(), day)
-            const isToday = dayStr === todayStr
-            const created = () => dayData().created[dayStr] ?? []
-            const updated = () => dayData().updated[dayStr] ?? []
+            const dayStr = () => toIsoDate(viewYear(), viewMonth(), day)
+            const isToday = () => dayStr() === todayStr
+            const created = () => dayData().created[dayStr()] ?? []
+            const updated = () => dayData().updated[dayStr()] ?? []
 
             return (
               <div
                 class={`border-b border-[var(--border)] p-1.5 flex flex-col min-h-0 overflow-hidden group
                   ${isLastCol() ? '' : 'border-r border-[var(--border)]'}
-                  ${isToday ? 'bg-[var(--accent-bg)]' : 'bg-[var(--bg-base)]'}`}
+                  ${isToday() ? 'bg-[var(--accent-bg)]' : 'bg-[var(--bg-base)]'}`}
               >
                 {/* Day number */}
                 <div class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none
-                  ${isToday
+                  ${isToday()
                     ? 'bg-[var(--accent)] text-white'
                     : 'text-[var(--text-3)] group-hover:text-[var(--text-2)]'}`}
                 >
