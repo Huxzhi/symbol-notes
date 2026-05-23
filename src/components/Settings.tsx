@@ -33,6 +33,7 @@ export function Settings() {
   const [draftTheme, setDraftTheme] = createSignal<ThemeId>(uiStore.theme)
   const [draftCSS, setDraftCSS] = createSignal(uiStore.customCSS)
   const [draftAutoTs, setDraftAutoTs] = createSignal(uiStore.autoTimestamps)
+  const [draftShowOtherFiles, setDraftShowOtherFiles] = createSignal(uiStore.showOtherFiles)
 
   const close = () => setUIStore('showSettings', false)
 
@@ -40,9 +41,11 @@ export function Settings() {
     setUIStore('theme', draftTheme())
     setUIStore('customCSS', draftCSS())
     setUIStore('autoTimestamps', draftAutoTs())
+    setUIStore('showOtherFiles', draftShowOtherFiles())
     persist('sn-theme', draftTheme())
     persist('sn-customCSS', draftCSS())
     persist('sn-autoTimestamps', draftAutoTs())
+    persist('sn-showOtherFiles', draftShowOtherFiles())
     close()
   }
 
@@ -152,6 +155,26 @@ export function Settings() {
                         注：浏览器 API 仅暴露文件的修改时间，<code class="text-[var(--text-3)]">created</code> 字段将以文件的最后修改时间作为初始值。
                       </div>
                     </Show>
+                  </div>
+                </label>
+
+                <div class="mt-5 mb-3 text-[10px] t-3 uppercase tracking-widest">文件树</div>
+                <label class="flex items-start gap-3 cursor-pointer select-none">
+                  <div class="relative mt-0.5 shrink-0">
+                    <input
+                      type="checkbox"
+                      class="sr-only"
+                      checked={draftShowOtherFiles()}
+                      onChange={(e) => setDraftShowOtherFiles(e.currentTarget.checked)}
+                    />
+                    <div class={`w-9 h-5 rounded-full transition-colors ${draftShowOtherFiles() ? 'bg-[var(--accent)]' : 'bg-[var(--bg-active)]'}`} />
+                    <div class={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${draftShowOtherFiles() ? 'translate-x-4' : ''}`} />
+                  </div>
+                  <div>
+                    <div class="text-[13px] t-base font-medium">显示附件文件</div>
+                    <div class="text-[11px] t-3 mt-1 leading-relaxed">
+                      在文件树中显示图片、PDF 等非 Markdown 文件。关闭后仅显示 <code class="bg-[var(--bg-hover)] px-1 mx-0.5 rounded text-[10px]">.md</code> 文件。
+                    </div>
                   </div>
                 </label>
               </Match>

@@ -77,7 +77,7 @@ async function buildTree(
         nodePath,
       )
       nodes.push({ name, path: nodePath, kind: 'directory', children })
-    } else if (name.endsWith('.md')) {
+    } else {
       nodes.push({ name, path: nodePath, kind: 'file' })
     }
   }

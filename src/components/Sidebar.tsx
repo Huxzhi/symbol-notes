@@ -1,33 +1,69 @@
 import { For, Show, createSignal } from 'solid-js'
 import { FolderOpen } from 'lucide-solid'
 import { fileSystemStore } from '../stores/fileSystemStore'
+import { uiStore } from '../stores/uiStore'
 import { openFile, openDirectory, createFile, createDirectory } from '../services/fileSystemService'
 import type { FileNode } from '../stores/fileSystemStore'
 
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif'])
+
+function fileIcon(name: string): string {
+  if (name.endsWith('.md')) return '◻'
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
+  if (IMAGE_EXTS.has(ext)) return '⊡'
+  return '◫'
+}
+
+function displayName(name: string): string {
+  return name.endsWith('.md') ? name.slice(0, -3) : name
+}
+
+function isMd(name: string): boolean {
+  return name.endsWith('.md')
+}
+
+function isOther(name: string): boolean {
+  return !isMd(name)
+}
+
 function FileTreeNode(props: { node: FileNode; depth: number }) {
   const isActive = () => fileSystemStore.activeFilePath === props.node.path
+  const show = () =>
+    props.node.kind === 'directory' ||
+    isMd(props.node.name) ||
+    uiStore.showOtherFiles
 
   return (
-    <div>
-      <div
-        class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-[var(--bg-hover)] select-none
-          ${isActive()
-            ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
-            : 'text-[var(--text-2)] border-l-2 border-transparent'}`}
-        style={{ 'padding-left': `${6 + props.depth * 14}px` }}
-        onClick={() => { if (props.node.kind === 'file') openFile(props.node.path) }}
-      >
-        <span class="text-[9px] text-[var(--text-3)]">
-          {props.node.kind === 'directory' ? '▸' : '◻'}
-        </span>
-        <span class={isActive() ? 'text-[var(--accent)]' : ''}>{props.node.name}</span>
+    <Show when={show()}>
+      <div>
+        <div
+          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-[var(--bg-hover)] select-none
+            ${isActive()
+              ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
+              : isOther(props.node.name) && props.node.kind === 'file'
+                ? 'text-[var(--text-4)] border-l-2 border-transparent'
+                : 'text-[var(--text-2)] border-l-2 border-transparent'}`}
+          style={{ 'padding-left': `${6 + props.depth * 14}px` }}
+          onClick={() => {
+            if (props.node.kind === 'file' && isMd(props.node.name)) {
+              openFile(props.node.path)
+            }
+          }}
+        >
+          <span class="text-[9px] text-[var(--text-3)]">
+            {props.node.kind === 'directory' ? '▸' : fileIcon(props.node.name)}
+          </span>
+          <span class={isActive() ? 'text-[var(--accent)]' : ''}>
+            {displayName(props.node.name)}
+          </span>
+        </div>
+        <Show when={props.node.kind === 'directory'}>
+          <For each={props.node.children ?? []}>
+            {(child) => <FileTreeNode node={child} depth={props.depth + 1} />}
+          </For>
+        </Show>
       </div>
-      <Show when={props.node.kind === 'directory'}>
-        <For each={props.node.children ?? []}>
-          {(child) => <FileTreeNode node={child} depth={props.depth + 1} />}
-        </For>
-      </Show>
-    </div>
+    </Show>
   )
 }
 

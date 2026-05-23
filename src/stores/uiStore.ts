@@ -16,6 +16,7 @@ interface UIState {
   customCSS: string
   showSettings: boolean
   autoTimestamps: boolean
+  showOtherFiles: boolean
 }
 
 function saved<T>(key: string, fallback: T): T {
@@ -37,6 +38,7 @@ const [uiStore, setUIStore] = createStore<UIState>({
   theme: saved<ThemeId>('sn-theme', 'dark'),
   customCSS: saved<string>('sn-customCSS', ''),
   autoTimestamps: saved<boolean>('sn-autoTimestamps', true),
+  showOtherFiles: saved<boolean>('sn-showOtherFiles', true),
 })
 
 /** Open a page tab (if not already open) and make it active. */
