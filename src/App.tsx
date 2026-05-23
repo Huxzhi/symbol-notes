@@ -1,6 +1,7 @@
 import { createEffect, onMount, Show } from 'solid-js'
 import { Ribbon } from './components/Ribbon'
 import { Sidebar } from './components/Sidebar'
+import { CalendarPanel } from './components/CalendarPanel'
 import { TabBar } from './components/TabBar'
 import { Editor } from './components/Editor'
 import { RightPanel } from './components/RightPanel'
@@ -31,7 +32,9 @@ export default function App() {
       <div class="flex flex-1 overflow-hidden">
         <Ribbon />
         <div class={`transition-all duration-200 overflow-hidden ${uiStore.showLeft ? 'w-47.5' : 'w-0'}`}>
-          <Sidebar />
+          <Show when={uiStore.sidebarView === 'calendar'} fallback={<Sidebar />}>
+            <CalendarPanel />
+          </Show>
         </div>
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
           <TabBar />

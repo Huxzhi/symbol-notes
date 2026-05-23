@@ -1,10 +1,12 @@
 import { createStore } from 'solid-js/store'
 
 export type ThemeId = 'dark' | 'light' | 'nord'
+export type SidebarView = 'files' | 'calendar'
 
 interface UIState {
   showLeft: boolean
   showRight: boolean
+  sidebarView: SidebarView
   theme: ThemeId
   customCSS: string
   showSettings: boolean
@@ -23,6 +25,7 @@ function saved<T>(key: string, fallback: T): T {
 const [uiStore, setUIStore] = createStore<UIState>({
   showLeft: true,
   showRight: true,
+  sidebarView: 'files',
   showSettings: false,
   theme: saved<ThemeId>('sn-theme', 'dark'),
   customCSS: saved<string>('sn-customCSS', ''),
