@@ -6,6 +6,7 @@ import { Editor } from './components/Editor'
 import { RightPanel } from './components/RightPanel'
 import { StatusBar } from './components/StatusBar'
 import { Settings } from './components/Settings'
+import { FileTitle } from './components/FileTitle'
 import { restoreDirectory } from './services/fileSystemService'
 import { uiStore } from './stores/uiStore'
 
@@ -34,6 +35,7 @@ export default function App() {
         </div>
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
           <TabBar />
+          <FileTitle />
           <div class="flex-1 flex flex-col overflow-hidden">
             <Editor />
           </div>
