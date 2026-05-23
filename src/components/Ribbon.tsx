@@ -1,6 +1,6 @@
 import { Search, Network, Settings, CalendarDays, CalendarRange } from 'lucide-solid'
 import { PanelLeft } from 'lucide-solid'
-import { uiStore, setUIStore } from '../stores/uiStore'
+import { uiStore, setUIStore, openPage } from '../stores/uiStore'
 
 export function Ribbon() {
   const switchView = (view: 'files' | 'calendar') => {
@@ -44,17 +44,11 @@ export function Ribbon() {
       </button>
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-[var(--bg-hover)]
-          ${uiStore.calendarActive
+          ${uiStore.activePageId === 'calendar'
             ? 'text-[var(--accent)]'
             : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
         title="日历大图"
-        onClick={() => {
-          if (!uiStore.calendarOpen) {
-            setUIStore({ calendarOpen: true, calendarActive: true })
-          } else {
-            setUIStore('calendarActive', true)
-          }
-        }}
+        onClick={() => openPage('calendar')}
       >
         <CalendarRange size={18} />
       </button>

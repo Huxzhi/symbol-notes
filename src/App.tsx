@@ -1,4 +1,4 @@
-import { createEffect, onMount, Show } from 'solid-js'
+import { Match, Switch, createEffect, onMount, Show } from 'solid-js'
 import { Ribbon } from './components/Ribbon'
 import { Sidebar } from './components/Sidebar'
 import { CalendarPanel } from './components/CalendarPanel'
@@ -14,6 +14,16 @@ import { uiStore } from './stores/uiStore'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
+
+// Route a page ID to its component.
+// Add a new <Match> here whenever a new page type is registered.
+function PageRouter(props: { id: string }) {
+  return (
+    <Switch fallback={null}>
+      <Match when={props.id === 'calendar'}><CalendarPage /></Match>
+    </Switch>
+  )
+}
 
 export default function App() {
   createEffect(() => {
@@ -39,7 +49,10 @@ export default function App() {
         </div>
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
           <TabBar />
-          <Show when={!uiStore.calendarActive} fallback={<CalendarPage />}>
+          <Show
+            when={uiStore.activePageId === null}
+            fallback={<PageRouter id={uiStore.activePageId!} />}
+          >
             <FileTitle />
             <div class="flex-1 flex flex-col overflow-hidden">
               <Editor />
