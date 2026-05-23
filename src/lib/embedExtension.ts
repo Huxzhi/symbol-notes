@@ -124,44 +124,41 @@ function markdownToHtml(md: string): string {
 }
 
 // ── Widget ────────────────────────────────────────────────────────────────────
+// resolved is pre-computed in buildEmbedDecos; if resolution fails we skip
+// the decoration entirely (raw text shows) so the widget never gets stuck
+// in a "missing" state after the file tree becomes available.
 
 class EmbedWidget extends WidgetType {
-  constructor(readonly target: string) { super() }
+  constructor(readonly target: string, readonly resolved: string) { super() }
 
-  eq(other: EmbedWidget) { return other.target === this.target }
+  eq(other: EmbedWidget) {
+    return other.target === this.target && other.resolved === this.resolved
+  }
 
   toDOM() {
-    const root = fileSystemStore.rootHandle
-    const resolved = resolveEmbedTarget(this.target)
+    const root = fileSystemStore.rootHandle!
     const el = document.createElement('div')
-
-    if (!resolved || !root) {
-      el.className = 'cm-embed cm-embed-missing'
-      el.textContent = `![[${this.target}]]`
-      return el
-    }
-
     el.className = 'cm-embed'
 
-    const resolvedExt = resolved.slice(resolved.lastIndexOf('.')).toLowerCase()
-    if (IMAGE_EXTS.has(resolvedExt)) {
+    const ext = this.resolved.slice(this.resolved.lastIndexOf('.')).toLowerCase()
+    if (IMAGE_EXTS.has(ext)) {
       const img = document.createElement('img')
       img.className = 'cm-embed-img'
       img.alt = this.target
       el.appendChild(img)
-      getImageUrl(resolved, root)
+      getImageUrl(this.resolved, root)
         .then(url => { img.src = url })
         .catch(() => { el.textContent = `[图片加载失败: ${this.target}]` })
-    } else if (resolved.endsWith('.md')) {
+    } else {
       el.className += ' cm-embed-md'
       const title = document.createElement('div')
       title.className = 'cm-embed-md-title'
-      title.textContent = resolved.split('/').pop()!.replace(/\.md$/, '')
+      title.textContent = this.resolved.split('/').pop()!.replace(/\.md$/, '')
       const body = document.createElement('div')
       body.className = 'cm-embed-md-body'
       el.appendChild(title)
       el.appendChild(body)
-      getFile(resolved, root)
+      getFile(this.resolved, root)
         .then(async f => { body.innerHTML = markdownToHtml(await f.text()) })
         .catch(() => { body.textContent = `[文件加载失败: ${this.target}]` })
     }
@@ -178,13 +175,14 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { state } = view
   const sel = state.selection.main
+  const root = fileSystemStore.rootHandle
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
       from, to,
       enter(node) {
         if (node.name !== 'WikiEmbed') return
-        if (sel.from <= node.to && sel.to >= node.from) return false // reveal raw text
+        if (sel.from <= node.to && sel.to >= node.from) return false
 
         let target = ''
         const c = node.node.cursor()
@@ -195,7 +193,12 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
         }
         if (!target) return false
 
-        builder.add(node.from, node.to, Decoration.replace({ widget: new EmbedWidget(target) }))
+        // Skip decoration if tree not ready or file not found — raw text shows instead
+        if (!root) return false
+        const resolved = resolveEmbedTarget(target)
+        if (!resolved) return false
+
+        builder.add(node.from, node.to, Decoration.replace({ widget: new EmbedWidget(target, resolved) }))
         return false
       },
     })
