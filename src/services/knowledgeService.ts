@@ -1,3 +1,4 @@
+import { produce } from 'solid-js/store'
 import { knowledgeStore, setKnowledgeStore } from '../stores/knowledgeStore'
 import { fileSystemStore } from '../stores/fileSystemStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
@@ -167,6 +168,19 @@ export function applyFileMeta(newMeta: FileMetadata, prevMeta?: FileMetadata): v
     if (!prevTags.has(t))
       setKnowledgeStore('tagMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
   }
+}
+
+// Remove a file from the knowledge index and clean up backlinkMap/tagMap entries.
+export function removeFileMeta(path: string): void {
+  const meta = knowledgeStore.index[path]
+  if (!meta) return
+  for (const t of meta.outLinks) {
+    setKnowledgeStore('backlinkMap', t, list => list?.filter(p => p !== path) ?? [])
+  }
+  for (const t of meta.tags) {
+    setKnowledgeStore('tagMap', t, list => list?.filter(p => p !== path) ?? [])
+  }
+  setKnowledgeStore(produce(s => { delete s.index[path] }))
 }
 
 export async function reindexFile(path: string, content: string): Promise<void> {

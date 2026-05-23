@@ -1,7 +1,9 @@
 import { get, set } from 'idb-keyval'
 import { fileSystemStore, setFileSystemStore, type FileNode } from '../stores/fileSystemStore'
 import { editorStore, setEditorStore } from '../stores/editorStore'
-import { reindexFile, scanDirectory } from './knowledgeService'
+import { batch } from 'solid-js'
+import { knowledgeStore } from '../stores/knowledgeStore'
+import { reindexFile, scanDirectory, applyFileMeta, removeFileMeta } from './knowledgeService'
 import { startBackgroundParsing } from './backgroundParser'
 
 const DB_KEY = 'rootHandle'
@@ -156,11 +158,17 @@ export async function renameFile(oldPath: string, newBaseName: string): Promise<
   setFileSystemStore('activeFilePath', newPath)
   setEditorStore({ isDirty: false })
 
-  // Rebuild file tree and knowledge index
-  // Knowledge index: old path disappears (deleted), new path appears; cache hit
-  // because content hash is identical — no re-parse needed.
   setFileSystemStore('tree', await buildTree(rootHandle))
-  await scanDirectory()
+
+  // Incremental knowledge index update — O(links+tags), no full vault scan.
+  // Content hash is unchanged so the cache entry for the new path is a hit.
+  const oldMeta = knowledgeStore.index[oldPath]
+  if (oldMeta) {
+    batch(() => {
+      applyFileMeta({ ...oldMeta, path: newPath }, undefined)
+      removeFileMeta(oldPath)
+    })
+  }
 }
 
 export function closeFile(path: string): void {
