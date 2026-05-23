@@ -96,6 +96,7 @@ export function Editor() {
     isExternalUpdate = true
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: content },
+      selection: { anchor: content.length },
     })
     isExternalUpdate = false
   })

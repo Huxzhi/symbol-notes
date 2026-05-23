@@ -1,4 +1,5 @@
 import { createSignal, createMemo, For, Show } from 'solid-js'
+import { EditorView } from '@codemirror/view'
 import { fileSystemStore } from '../stores/fileSystemStore'
 import { knowledgeStore } from '../stores/knowledgeStore'
 import { editorStore } from '../stores/editorStore'
@@ -32,6 +33,16 @@ export function RightPanel() {
 
   const tags = createMemo(() => currentMeta()?.tags ?? [])
   const outline = createMemo(() => editorStore.headings)
+
+  const jumpToHeading = (pos: number) => {
+    const view = editorStore.cmView
+    if (!view) return
+    view.dispatch({
+      selection: { anchor: pos },
+      effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 40 }),
+    })
+    view.focus()
+  }
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'links', label: '链接' },
@@ -98,12 +109,18 @@ export function RightPanel() {
           <For each={outline()}>
             {(h) => (
               <div
-                class="py-0.5 text-[var(--text-2)] hover:text-[var(--text)] cursor-pointer truncate transition-colors"
+                class="py-0.5 text-[var(--text-2)] hover:text-[var(--accent)] cursor-pointer truncate transition-colors leading-snug"
                 style={{
-                  'padding-left': `${(h.level - 1) * 10}px`,
+                  'padding-left': `${(h.level - 1) * 10 + 2}px`,
                   'font-size': h.level === 1 ? '12px' : '11px',
+                  'font-weight': h.level === 1 ? '500' : '400',
                 }}
+                onClick={() => jumpToHeading(h.from)}
+                title={h.text}
               >
+                <span class="text-[var(--text-4)] mr-1" style={{ 'font-size': '9px' }}>
+                  {'H' + h.level}
+                </span>
                 {h.text}
               </div>
             )}
