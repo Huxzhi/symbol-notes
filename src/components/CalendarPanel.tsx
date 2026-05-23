@@ -31,7 +31,12 @@ export function CalendarPanel() {
   const selectedFiles = createMemo(() => {
     const day = selectedDay()
     if (!day) return null
-    return { day, created: dayData().created[day] ?? [], updated: dayData().updated[day] ?? [] }
+    return {
+      day,
+      dated:   dayData().dated[day]   ?? [],
+      created: dayData().created[day] ?? [],
+      updated: dayData().updated[day] ?? [],
+    }
   })
 
   return (
@@ -75,6 +80,7 @@ export function CalendarPanel() {
               const isSelected = () => selectedDay() === dayStr()
               const hasCreated = () => (dayData().created[dayStr()]?.length ?? 0) > 0
               const hasUpdated = () => (dayData().updated[dayStr()]?.length ?? 0) > 0
+              const hasDated  = () => (dayData().dated[dayStr()]?.length ?? 0) > 0
               return (
                 <button
                   class={`h-7 flex flex-col items-center justify-center rounded text-[11px] leading-none cursor-pointer transition-colors
@@ -87,6 +93,9 @@ export function CalendarPanel() {
                 >
                   <span class="leading-none">{day}</span>
                   <div class="flex gap-px mt-0.5 h-1.5 items-center">
+                    <Show when={hasDated()}>
+                      <span class={`block w-1 h-1 rounded-full ${isSelected() ? 'bg-white' : 'bg-[var(--text-2)]'}`} />
+                    </Show>
                     <Show when={hasCreated()}>
                       <span class={`block w-1 h-1 rounded-full ${isSelected() ? 'bg-white/80' : 'bg-[var(--accent)]'}`} />
                     </Show>
@@ -103,6 +112,9 @@ export function CalendarPanel() {
 
       <div class="flex gap-3 px-2 py-1 mt-0.5 border-t border-[var(--border)] shrink-0">
         <span class="flex items-center gap-1 text-[9px] text-[var(--text-4)]">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--text-2)] shrink-0" />日记
+        </span>
+        <span class="flex items-center gap-1 text-[9px] text-[var(--text-4)]">
           <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />创建
         </span>
         <span class="flex items-center gap-1 text-[9px] text-[var(--text-4)]">
@@ -116,6 +128,22 @@ export function CalendarPanel() {
             <div class="px-2 pt-1.5 pb-0.5 text-[9px] text-[var(--text-3)] uppercase tracking-widest select-none">
               {sel().day}
             </div>
+            <Show when={sel().dated.length > 0}>
+              <div class="px-2 py-0.5 text-[9px] text-[var(--text-3)] flex items-center gap-1">
+                <span class="w-1 h-1 rounded-full bg-[var(--text-2)] shrink-0" />日记
+              </div>
+              <For each={sel().dated}>
+                {(path) => (
+                  <button
+                    class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors truncate block cursor-pointer"
+                    onClick={() => openFile(path)}
+                    title={path}
+                  >
+                    {path.split('/').pop()?.replace(/\.md$/, '')}
+                  </button>
+                )}
+              </For>
+            </Show>
             <Show when={sel().created.length > 0}>
               <div class="px-2 py-0.5 text-[9px] text-[var(--accent)] flex items-center gap-1">
                 <span class="w-1 h-1 rounded-full bg-[var(--accent)] shrink-0" />创建
@@ -148,7 +176,7 @@ export function CalendarPanel() {
                 )}
               </For>
             </Show>
-            <Show when={sel().created.length === 0 && sel().updated.length === 0}>
+            <Show when={sel().dated.length === 0 && sel().created.length === 0 && sel().updated.length === 0}>
               <div class="px-2 py-2 text-[10px] text-[var(--text-4)] italic">该日无记录</div>
             </Show>
           </div>

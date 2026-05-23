@@ -52,6 +52,9 @@ export function CalendarPage() {
         <div class="flex-1" />
         <div class="flex items-center gap-4 text-[10px] text-[var(--text-4)]">
           <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-sm bg-[var(--bg-hover)]" />日记
+          </span>
+          <span class="flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-sm bg-[var(--accent)]" />创建
           </span>
           <span class="flex items-center gap-1.5">
@@ -91,6 +94,7 @@ export function CalendarPage() {
 
             const dayStr = () => toIsoDate(viewYear(), viewMonth(), day)
             const isToday = () => dayStr() === todayStr
+            const dated   = () => dayData().dated[dayStr()]   ?? []
             const created = () => dayData().created[dayStr()] ?? []
             const updated = () => dayData().updated[dayStr()] ?? []
 
@@ -111,6 +115,17 @@ export function CalendarPage() {
 
                 {/* File chips */}
                 <div class="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0.5">
+                  <For each={dated()}>
+                    {(path) => (
+                      <button
+                        class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
+                        onClick={() => openAndEdit(path)}
+                        title={path}
+                      >
+                        {path.split('/').pop()?.replace(/\.md$/, '')}
+                      </button>
+                    )}
+                  </For>
                   <For each={created()}>
                     {(path) => (
                       <button
@@ -133,7 +148,7 @@ export function CalendarPage() {
                       </button>
                     )}
                   </For>
-                  <Show when={created().length === 0 && updated().length === 0}>
+                  <Show when={dated().length === 0 && created().length === 0 && updated().length === 0}>
                     <div class="flex-1" />
                   </Show>
                 </div>
