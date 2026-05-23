@@ -21,6 +21,7 @@ import {
   removeFileMeta,
   scanDirectory,
 } from './knowledgeService'
+import { clearEmbedUrlCache } from '../lib/embedExtension'
 
 declare global {
   interface Window {
@@ -38,6 +39,7 @@ declare global {
 const DB_KEY = 'rootHandle'
 
 export async function openDirectory(): Promise<void> {
+  clearEmbedUrlCache()
   const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
   await set(DB_KEY, handle)
   setFileSystemStore({

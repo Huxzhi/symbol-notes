@@ -8,27 +8,38 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
-import { fileSystemStore } from '../stores/fileSystemStore'
-import { knowledgeStore } from '../stores/knowledgeStore'
+import { fileSystemStore, type FileNode } from '../stores/fileSystemStore'
 import { IMAGE_EXTS } from './fileTypes'
 import { parseFrontmatter } from './parseFrontmatter'
 
-// ── Target resolution ─────────────────────────────────────────────────────────
+// ── Target resolution via file tree (available before knowledge scan) ─────────
+
+function searchTree(nodes: FileNode[], name: string): string | null {
+  for (const node of nodes) {
+    if (node.kind === 'file' && node.name === name) return node.path
+    if (node.kind === 'directory' && node.children) {
+      const found = searchTree(node.children, name)
+      if (found) return found
+    }
+  }
+  return null
+}
 
 function resolveEmbedTarget(target: string): string | null {
-  const index = knowledgeStore.index
-  const targetStem = target.split('/').pop()!
-  const hasExt = targetStem.includes('.')
+  const stem = target.split('/').pop()!
+  const hasExt = stem.includes('.')
+  const searchName = hasExt ? stem : `${stem}.md`
+  return searchTree(fileSystemStore.tree, searchName)
+}
 
-  if (hasExt) {
-    if (index[target]) return target
-    return Object.keys(index).find(p => p.split('/').pop() === targetStem) ?? null
-  }
+// ── Image URL cache — keyed by path, valid for the session ───────────────────
+// Avoids the object URL being revoked when cursor enters/exits the embed range.
 
-  const mdFull = target.includes('/') ? `${target}.md` : null
-  if (mdFull && index[mdFull]) return mdFull
-  const mdStem = `${targetStem}.md`
-  return Object.keys(index).find(p => p.split('/').pop() === mdStem) ?? null
+const imageUrlCache = new Map<string, string>()
+
+export function clearEmbedUrlCache() {
+  for (const url of imageUrlCache.values()) URL.revokeObjectURL(url)
+  imageUrlCache.clear()
 }
 
 // ── File loading ──────────────────────────────────────────────────────────────
@@ -40,6 +51,14 @@ async function getFile(path: string, root: FileSystemDirectoryHandle): Promise<F
     dir = await dir.getDirectoryHandle(parts[i])
   }
   return (await dir.getFileHandle(parts[parts.length - 1])).getFile()
+}
+
+async function getImageUrl(path: string, root: FileSystemDirectoryHandle): Promise<string> {
+  const cached = imageUrlCache.get(path)
+  if (cached) return cached
+  const url = URL.createObjectURL(await getFile(path, root))
+  imageUrlCache.set(path, url)
+  return url
 }
 
 // ── Markdown → safe HTML ──────────────────────────────────────────────────────
@@ -130,12 +149,8 @@ class EmbedWidget extends WidgetType {
       img.className = 'cm-embed-img'
       img.alt = this.target
       el.appendChild(img)
-      getFile(resolved, root)
-        .then(f => {
-          const url = URL.createObjectURL(f)
-          img.src = url
-          img.dataset.objUrl = url
-        })
+      getImageUrl(resolved, root)
+        .then(url => { img.src = url })
         .catch(() => { el.textContent = `[图片加载失败: ${this.target}]` })
     } else if (resolved.endsWith('.md')) {
       el.className += ' cm-embed-md'
@@ -152,11 +167,6 @@ class EmbedWidget extends WidgetType {
     }
 
     return el
-  }
-
-  destroy(dom: HTMLElement) {
-    const img = dom.querySelector('img') as HTMLImageElement | null
-    if (img?.dataset.objUrl) URL.revokeObjectURL(img.dataset.objUrl)
   }
 
   ignoreEvent() { return false }
