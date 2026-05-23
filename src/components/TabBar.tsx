@@ -20,7 +20,30 @@ export function TabBar() {
     <div class="h-8 bg-[var(--bg-base)] border-b border-[var(--border)] flex items-stretch shrink-0 overflow-y-hidden">
       <div class="flex flex-1 overflow-x-auto overflow-y-hidden">
 
-        {/* Page tabs (calendar, graph, …) — rendered in open order */}
+        {/* File tabs */}
+        <For each={fileSystemStore.openFilePaths}>
+          {(path) => {
+            const isActive = () => fileSystemStore.activeFilePath === path && uiStore.activePageId === null
+            return (
+              <div
+                class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
+                  ${isActive()
+                    ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
+                    : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'}`}
+                onClick={() => { setUIStore('activePageId', null); openFile(path) }}
+              >
+                <span class="text-[9px] text-[var(--accent)]">◻</span>
+                <span class="max-w-[120px] truncate">{baseName(path)}</span>
+                <button
+                  class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
+                  onClick={(e) => { e.stopPropagation(); closeFile(path) }}
+                >×</button>
+              </div>
+            )
+          }}
+        </For>
+
+        {/* Page tabs (calendar, graph, …) — appended after file tabs */}
         <For each={uiStore.openPageIds}>
           {(id) => {
             const def = PAGE_MAP[id]
@@ -43,29 +66,6 @@ export function TabBar() {
                   class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5 cursor-pointer"
                   onClick={(e) => { e.stopPropagation(); closePage(id) }}
                   title={`关闭${def.label}`}
-                >×</button>
-              </div>
-            )
-          }}
-        </For>
-
-        {/* File tabs */}
-        <For each={fileSystemStore.openFilePaths}>
-          {(path) => {
-            const isActive = () => fileSystemStore.activeFilePath === path && uiStore.activePageId === null
-            return (
-              <div
-                class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
-                  ${isActive()
-                    ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
-                    : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'}`}
-                onClick={() => { setUIStore('activePageId', null); openFile(path) }}
-              >
-                <span class="text-[9px] text-[var(--accent)]">◻</span>
-                <span class="max-w-[120px] truncate">{baseName(path)}</span>
-                <button
-                  class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
-                  onClick={(e) => { e.stopPropagation(); closeFile(path) }}
                 >×</button>
               </div>
             )
