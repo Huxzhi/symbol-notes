@@ -1,20 +1,50 @@
-import { get, set } from 'idb-keyval'
 import { Transaction } from '@codemirror/state'
-import { fileSystemStore, setFileSystemStore, type FileNode } from '../stores/fileSystemStore'
-import { editorStore, setEditorStore } from '../stores/editorStore'
+import { get, set } from 'idb-keyval'
 import { batch } from 'solid-js'
+import {
+  formatTimestamp,
+  parseFrontmatter,
+  setFrontmatterField,
+} from '../lib/parseFrontmatter'
+import { editorStore, setEditorStore } from '../stores/editorStore'
+import {
+  fileSystemStore,
+  setFileSystemStore,
+  type FileNode,
+} from '../stores/fileSystemStore'
 import { knowledgeStore } from '../stores/knowledgeStore'
-import { uiStore, setUIStore } from '../stores/uiStore'
-import { reindexFile, scanDirectory, applyFileMeta, removeFileMeta } from './knowledgeService'
+import { setUIStore, uiStore } from '../stores/uiStore'
 import { startBackgroundParsing } from './backgroundParser'
-import { parseFrontmatter, formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
+import {
+  applyFileMeta,
+  reindexFile,
+  removeFileMeta,
+  scanDirectory,
+} from './knowledgeService'
+
+declare global {
+  interface Window {
+    showDirectoryPicker: (options?: {
+      mode?: 'read' | 'readwrite'
+    }) => Promise<FileSystemDirectoryHandle>
+  }
+  interface FileSystemDirectoryHandle {
+    requestPermission: (options?: {
+      mode?: 'read' | 'readwrite'
+    }) => Promise<PermissionState>
+  }
+}
 
 const DB_KEY = 'rootHandle'
 
 export async function openDirectory(): Promise<void> {
   const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
   await set(DB_KEY, handle)
-  setFileSystemStore({ rootHandle: handle, activeFilePath: null, openFilePaths: [] })
+  setFileSystemStore({
+    rootHandle: handle,
+    activeFilePath: null,
+    openFilePaths: [],
+  })
   setFileSystemStore('tree', await buildTree(handle))
   await scanDirectory()
 }
@@ -42,7 +72,10 @@ async function buildTree(
     if (name.startsWith('.')) continue
     const nodePath = path ? `${path}/${name}` : name
     if (handle.kind === 'directory') {
-      const children = await buildTree(handle as FileSystemDirectoryHandle, nodePath)
+      const children = await buildTree(
+        handle as FileSystemDirectoryHandle,
+        nodePath,
+      )
       nodes.push({ name, path: nodePath, kind: 'directory', children })
     } else if (name.endsWith('.md')) {
       nodes.push({ name, path: nodePath, kind: 'file' })
@@ -72,11 +105,15 @@ function escapeRegex(s: string): string {
 // Replace [[oldTarget]] / [[oldTarget|alias]] with [[newTarget]] / [[newTarget|alias]].
 // Handles both bare stem (note) and fully-qualified (folder/note) forms, with or
 // without the .md extension, so all four common variants are covered in one pass.
-function replaceWikiLinks(content: string, oldPath: string, newPath: string): string {
-  const oldBase = oldPath.replace(/\.md$/, '')   // folder/note
-  const newBase = newPath.replace(/\.md$/, '')   // folder/newname
-  const oldStem = oldBase.split('/').pop()!      // note
-  const newStem = newBase.split('/').pop()!      // newname
+function replaceWikiLinks(
+  content: string,
+  oldPath: string,
+  newPath: string,
+): string {
+  const oldBase = oldPath.replace(/\.md$/, '') // folder/note
+  const newBase = newPath.replace(/\.md$/, '') // folder/newname
+  const oldStem = oldBase.split('/').pop()! // note
+  const newStem = newBase.split('/').pop()! // newname
 
   // Build (old, new) pairs from most-specific to least-specific so a longer
   // match is replaced before its substring can match again.
@@ -132,7 +169,10 @@ export async function createDirectory(path: string): Promise<void> {
   setFileSystemStore('tree', await buildTree(rootHandle))
 }
 
-export async function createFile(name: string, dirPath?: string): Promise<void> {
+export async function createFile(
+  name: string,
+  dirPath?: string,
+): Promise<void> {
   const { rootHandle } = fileSystemStore
   if (!rootHandle) return
   // Support path/to/note syntax in name (auto-create intermediate dirs)
@@ -140,7 +180,9 @@ export async function createFile(name: string, dirPath?: string): Promise<void> 
   const parts = combined.split('/').filter(Boolean)
   const rawFilename = parts[parts.length - 1]
   const dirParts = parts.slice(0, -1)
-  const filename = rawFilename.endsWith('.md') ? rawFilename : `${rawFilename}.md`
+  const filename = rawFilename.endsWith('.md')
+    ? rawFilename
+    : `${rawFilename}.md`
   let dir: FileSystemDirectoryHandle = rootHandle
   for (const part of dirParts) {
     dir = await dir.getDirectoryHandle(part, { create: true })
@@ -163,8 +205,10 @@ export async function openFile(path: string): Promise<void> {
     const { frontmatter } = parseFrontmatter(content)
     const ts = formatTimestamp(file.lastModified)
     let updated = content
-    if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
-    if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
+    if (!frontmatter.created)
+      updated = setFrontmatterField(updated, 'created', ts)
+    if (!frontmatter.updated)
+      updated = setFrontmatterField(updated, 'updated', ts)
     if (updated !== content) {
       const writable = await handle.createWritable()
       await writable.write(updated)
@@ -176,9 +220,12 @@ export async function openFile(path: string): Promise<void> {
   setEditorStore({ content, isDirty: false })
   setFileSystemStore('activeFilePath', path)
   if (!fileSystemStore.openFilePaths.includes(path)) {
-    setFileSystemStore('openFilePaths', [...fileSystemStore.openFilePaths, path])
+    setFileSystemStore('openFilePaths', [
+      ...fileSystemStore.openFilePaths,
+      path,
+    ])
+    setUIStore('tabOrder', [...uiStore.tabOrder, path])
   }
-  // Deactivate any open page tab so the editor becomes visible
   setUIStore('activePageId', null)
   startBackgroundParsing(path)
 }
@@ -195,9 +242,22 @@ export async function saveCurrentFile(): Promise<void> {
     const withUpdated = setFrontmatterField(newContent, 'updated', ts)
     if (withUpdated !== newContent) {
       let from = 0
-      while (from < newContent.length && from < withUpdated.length && newContent[from] === withUpdated[from]) from++
-      let toOld = newContent.length, toNew = withUpdated.length
-      while (toOld > from && toNew > from && newContent[toOld - 1] === withUpdated[toNew - 1]) { toOld--; toNew-- }
+      while (
+        from < newContent.length &&
+        from < withUpdated.length &&
+        newContent[from] === withUpdated[from]
+      )
+        from++
+      let toOld = newContent.length,
+        toNew = withUpdated.length
+      while (
+        toOld > from &&
+        toNew > from &&
+        newContent[toOld - 1] === withUpdated[toNew - 1]
+      ) {
+        toOld--
+        toNew--
+      }
       cmView.dispatch({
         changes: { from, to: toOld, insert: withUpdated.slice(from, toNew) },
         annotations: Transaction.remote.of(true),
@@ -215,15 +275,21 @@ export async function saveCurrentFile(): Promise<void> {
   await reindexFile(activeFilePath, newContent)
 }
 
-export async function renameFile(oldPath: string, newBaseName: string): Promise<void> {
+export async function renameFile(
+  oldPath: string,
+  newBaseName: string,
+): Promise<void> {
   const { rootHandle } = fileSystemStore
   if (!rootHandle) return
 
   const parts = oldPath.split('/')
   const oldFileName = parts[parts.length - 1]
   const dirParts = parts.slice(0, -1)
-  const newFileName = newBaseName.endsWith('.md') ? newBaseName : `${newBaseName}.md`
-  const newPath = dirParts.length > 0 ? `${dirParts.join('/')}/${newFileName}` : newFileName
+  const newFileName = newBaseName.endsWith('.md')
+    ? newBaseName
+    : `${newBaseName}.md`
+  const newPath =
+    dirParts.length > 0 ? `${dirParts.join('/')}/${newFileName}` : newFileName
 
   if (newPath === oldPath) return
 
@@ -246,12 +312,14 @@ export async function renameFile(oldPath: string, newBaseName: string): Promise<
   } catch {
     const proceed = window.confirm(
       `文件系统不支持删除操作。\n` +
-      `已成功创建「${newFileName}」，但「${oldFileName}」无法自动删除。\n\n` +
-      `是否切换到新文件？（旧文件将保留）`,
+        `已成功创建「${newFileName}」，但「${oldFileName}」无法自动删除。\n\n` +
+        `是否切换到新文件？（旧文件将保留）`,
     )
     if (!proceed) {
       // Roll back: remove the newly created file and abort
-      try { await parentDir.removeEntry(newFileName) } catch {}
+      try {
+        await parentDir.removeEntry(newFileName)
+      } catch {}
       return
     }
   }
@@ -263,7 +331,11 @@ export async function renameFile(oldPath: string, newBaseName: string): Promise<
   // Update open tab list and active path
   setFileSystemStore(
     'openFilePaths',
-    fileSystemStore.openFilePaths.map(p => (p === oldPath ? newPath : p)),
+    fileSystemStore.openFilePaths.map((p) => (p === oldPath ? newPath : p)),
+  )
+  setUIStore(
+    'tabOrder',
+    uiStore.tabOrder.map((t) => (t === oldPath ? newPath : t)),
   )
   setFileSystemStore('activeFilePath', newPath)
   setEditorStore({ isDirty: false })
@@ -282,11 +354,15 @@ export async function renameFile(oldPath: string, newBaseName: string): Promise<
 
   // Prompt to update backlinks only when some exist
   if (backlinks.length > 0) {
-    const preview = backlinks.slice(0, 5).map(p => `  • ${p}`).join('\n')
-    const extra = backlinks.length > 5 ? `\n  ...还有 ${backlinks.length - 5} 个` : ''
+    const preview = backlinks
+      .slice(0, 5)
+      .map((p) => `  • ${p}`)
+      .join('\n')
+    const extra =
+      backlinks.length > 5 ? `\n  ...还有 ${backlinks.length - 5} 个` : ''
     const confirmed = window.confirm(
       `有 ${backlinks.length} 个文件引用了「${oldFileName}」：\n${preview}${extra}\n\n` +
-      `是否将链接同步更新为「${newFileName}」？`,
+        `是否将链接同步更新为「${newFileName}」？`,
     )
     if (confirmed) {
       await updateBacklinks(backlinks, oldPath, newPath)
@@ -295,8 +371,12 @@ export async function renameFile(oldPath: string, newBaseName: string): Promise<
 }
 
 export function closeFile(path: string): void {
-  const paths = fileSystemStore.openFilePaths.filter(p => p !== path)
+  const paths = fileSystemStore.openFilePaths.filter((p) => p !== path)
   setFileSystemStore('openFilePaths', paths)
+  setUIStore(
+    'tabOrder',
+    uiStore.tabOrder.filter((t) => t !== path),
+  )
   if (fileSystemStore.activeFilePath === path) {
     const next = paths[paths.length - 1] ?? null
     setFileSystemStore('activeFilePath', next)
