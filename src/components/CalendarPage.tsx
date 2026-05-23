@@ -29,7 +29,7 @@ export function CalendarPage() {
 
   const openAndEdit = (path: string) => {
     openFile(path)
-    setUIStore('mainView', 'editor')
+    setUIStore('calendarActive', false)
   }
 
   return (

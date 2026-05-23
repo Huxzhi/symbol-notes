@@ -44,11 +44,17 @@ export function Ribbon() {
       </button>
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-[var(--bg-hover)]
-          ${uiStore.mainView === 'calendar'
+          ${uiStore.calendarActive
             ? 'text-[var(--accent)]'
             : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
         title="日历大图"
-        onClick={() => setUIStore('mainView', uiStore.mainView === 'calendar' ? 'editor' : 'calendar')}
+        onClick={() => {
+          if (!uiStore.calendarOpen) {
+            setUIStore({ calendarOpen: true, calendarActive: true })
+          } else {
+            setUIStore('calendarActive', true)
+          }
+        }}
       >
         <CalendarRange size={18} />
       </button>

@@ -2,13 +2,13 @@ import { createStore } from 'solid-js/store'
 
 export type ThemeId = 'dark' | 'light' | 'nord'
 export type SidebarView = 'files' | 'calendar'
-export type MainView = 'editor' | 'calendar'
 
 interface UIState {
   showLeft: boolean
   showRight: boolean
   sidebarView: SidebarView
-  mainView: MainView
+  calendarOpen: boolean   // calendar tab exists in tab bar
+  calendarActive: boolean // calendar is the currently visible view
   theme: ThemeId
   customCSS: string
   showSettings: boolean
@@ -28,7 +28,8 @@ const [uiStore, setUIStore] = createStore<UIState>({
   showLeft: true,
   showRight: true,
   sidebarView: 'files',
-  mainView: 'editor',
+  calendarOpen: false,
+  calendarActive: false,
   showSettings: false,
   theme: saved<ThemeId>('sn-theme', 'dark'),
   customCSS: saved<string>('sn-customCSS', ''),
