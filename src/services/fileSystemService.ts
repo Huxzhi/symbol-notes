@@ -4,7 +4,7 @@ import { fileSystemStore, setFileSystemStore, type FileNode } from '../stores/fi
 import { editorStore, setEditorStore } from '../stores/editorStore'
 import { batch } from 'solid-js'
 import { knowledgeStore } from '../stores/knowledgeStore'
-import { uiStore } from '../stores/uiStore'
+import { uiStore, setUIStore } from '../stores/uiStore'
 import { reindexFile, scanDirectory, applyFileMeta, removeFileMeta } from './knowledgeService'
 import { startBackgroundParsing } from './backgroundParser'
 import { parseFrontmatter, formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
@@ -178,6 +178,8 @@ export async function openFile(path: string): Promise<void> {
   if (!fileSystemStore.openFilePaths.includes(path)) {
     setFileSystemStore('openFilePaths', [...fileSystemStore.openFilePaths, path])
   }
+  // Deactivate any open page tab so the editor becomes visible
+  setUIStore('activePageId', null)
   startBackgroundParsing(path)
 }
 

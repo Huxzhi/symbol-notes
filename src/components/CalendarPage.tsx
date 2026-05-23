@@ -27,10 +27,7 @@ export function CalendarPage() {
     setViewMonth(now.getMonth())
   })
 
-  const openAndEdit = (path: string) => {
-    openFile(path)
-    setUIStore('activePageId', null)
-  }
+  const openAndEdit = (path: string) => { openFile(path) }
 
   return (
     <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]">
