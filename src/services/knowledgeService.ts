@@ -2,10 +2,14 @@ import { knowledgeStore, setKnowledgeStore } from '../stores/knowledgeStore'
 import { fileSystemStore } from '../stores/fileSystemStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import type { FileMetadata } from '../stores/knowledgeStore'
+import { getCachedMeta, setCachedMeta } from './fileCacheService'
 
 export function extractLinks(content: string): string[] {
   const matches = [...content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)]
-  return [...new Set(matches.map(m => m[1].trim()))]
+  return [...new Set(matches.map(m => {
+    const t = m[1].trim()
+    return t.endsWith('.md') ? t : `${t}.md`
+  }))]
 }
 
 export function extractTags(raw: unknown): string[] {
@@ -13,6 +17,42 @@ export function extractTags(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.map(String)
   if (typeof raw === 'string') return raw.split(',').map(s => s.trim()).filter(Boolean)
   return []
+}
+
+export function extractAliases(raw: unknown): string[] {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
+  if (typeof raw === 'string') return raw.split(',').map(s => s.trim()).filter(Boolean)
+  return []
+}
+
+// Inline #tag regex: must not be preceded by non-whitespace, first char non-digit
+const BODY_TAG_RE = /(?<!\S)#([a-zA-Z_一-龥][a-zA-Z0-9_一-龥\/-]*)/g
+
+export function extractBodyTags(body: string): string[] {
+  // Strip fenced code blocks and inline code before matching
+  const stripped = body
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`[^`\n]+`/g, '')
+  const seen = new Set<string>()
+  for (const m of stripped.matchAll(BODY_TAG_RE)) {
+    seen.add(m[1])
+  }
+  return [...seen]
+}
+
+function expandEtag(etag: string): string[] {
+  const parts = etag.split('/')
+  return parts.map((_, i) => parts.slice(0, i + 1).join('/'))
+}
+
+// Merge frontmatter tags with Obsidian-style expanded inline body tags
+export function mergeTagsWithBody(fmTags: string[], bodyEtags: string[]): string[] {
+  const set = new Set(fmTags)
+  for (const etag of bodyEtags) {
+    for (const t of expandEtag(etag)) set.add(t)
+  }
+  return [...set]
 }
 
 export function buildBacklinkMap(
@@ -31,7 +71,7 @@ export function buildBacklinkMap(
   return map
 }
 
-function buildTagMap(
+export function buildTagMap(
   index: Record<string, FileMetadata>,
 ): Record<string, string[]> {
   const map: Record<string, string[]> = {}
@@ -68,30 +108,77 @@ export async function scanDirectory(): Promise<void> {
   if (!rootHandle) return
   const files = await readAllFiles(rootHandle)
   const index: Record<string, FileMetadata> = {}
-  for (const { path, content } of files) {
+
+  await Promise.all(files.map(async ({ path, content }) => {
+    const cached = await getCachedMeta(path, content)
+    if (cached) {
+      index[path] = { path, ...cached }
+      return
+    }
     const { frontmatter, body } = parseFrontmatter(content)
-    index[path] = {
-      path,
+    const parsed = {
       frontmatter,
       outLinks: extractLinks(body),
-      tags: extractTags(frontmatter.tags),
+      tags: mergeTagsWithBody(extractTags(frontmatter.tags), extractBodyTags(body)),
+      aliases: extractAliases(frontmatter.aliases),
     }
-  }
+    index[path] = { path, ...parsed }
+    await setCachedMeta(path, content, parsed)
+  }))
+
   const backlinkMap = buildBacklinkMap(index)
   const tagMap = buildTagMap(index)
   setKnowledgeStore({ index, backlinkMap, tagMap })
 }
 
-export async function reindexFile(path: string, content: string): Promise<void> {
-  const { frontmatter, body } = parseFrontmatter(content)
-  const meta: FileMetadata = {
-    path,
-    frontmatter,
-    outLinks: extractLinks(body),
-    tags: extractTags(frontmatter.tags),
+/**
+ * Incremental update of backlinkMap and tagMap for a single file.
+ * Diffs old vs new outLinks/tags and only touches affected entries — O(links+tags).
+ * Unresolved links (targets not yet in index) are stored as-is; when the target
+ * is eventually indexed its backlinks are already present.
+ */
+export function applyFileMeta(newMeta: FileMetadata, prevMeta?: FileMetadata): void {
+  setKnowledgeStore('index', newMeta.path, newMeta)
+
+  const prevLinks = new Set(prevMeta?.outLinks ?? [])
+  const nextLinks = new Set(newMeta.outLinks)
+  for (const t of prevLinks) {
+    if (!nextLinks.has(t))
+      setKnowledgeStore('backlinkMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
   }
-  const newIndex = { ...knowledgeStore.index, [path]: meta }
-  setKnowledgeStore('index', path, meta)
-  setKnowledgeStore('backlinkMap', buildBacklinkMap(newIndex))
-  setKnowledgeStore('tagMap', buildTagMap(newIndex))
+  for (const t of nextLinks) {
+    if (!prevLinks.has(t))
+      setKnowledgeStore('backlinkMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
+  }
+
+  const prevTags = new Set(prevMeta?.tags ?? [])
+  const nextTags = new Set(newMeta.tags)
+  for (const t of prevTags) {
+    if (!nextTags.has(t))
+      setKnowledgeStore('tagMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
+  }
+  for (const t of nextTags) {
+    if (!prevTags.has(t))
+      setKnowledgeStore('tagMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
+  }
+}
+
+export async function reindexFile(path: string, content: string): Promise<void> {
+  const cached = await getCachedMeta(path, content)
+  let parsed: Omit<FileMetadata, 'path'>
+
+  if (cached) {
+    parsed = cached
+  } else {
+    const { frontmatter, body } = parseFrontmatter(content)
+    parsed = {
+      frontmatter,
+      outLinks: extractLinks(body),
+      tags: mergeTagsWithBody(extractTags(frontmatter.tags), extractBodyTags(body)),
+      aliases: extractAliases(frontmatter.aliases),
+    }
+    await setCachedMeta(path, content, parsed)
+  }
+
+  applyFileMeta({ path, ...parsed }, knowledgeStore.index[path])
 }

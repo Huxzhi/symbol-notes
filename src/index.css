@@ -1,8 +1,6 @@
 @import "tailwindcss";
 
-* {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
   height: 100%;
@@ -10,3 +8,125 @@ html, body, #root {
   padding: 0;
   overflow: hidden;
 }
+
+/* ── Theme: Dark (default) ───────────────────────────── */
+:root, :root[data-theme="dark"] {
+  --bg-base:     #0f0f1c;
+  --bg-surface:  #111120;
+  --bg-elevated: #13131f;
+  --bg-hover:    #1e1e35;
+  --bg-active:   #2d2d4a;
+  --bg-active2:  #3a3a5c;
+
+  --border:      #1e1e35;
+  --border-2:    #2d2d4a;
+
+  --text:        #cccccc;
+  --text-2:      #888888;
+  --text-3:      #555555;
+  --text-4:      #333333;
+
+  --accent:      #6c63ff;
+  --accent-2:    #9d8dff;
+  --accent-bg:   rgba(108,99,255,.13);
+
+  --link:        #7ec8e3;
+  --link-2:      #a09cf7;
+  --tag:         #56c596;
+  --caret:       #6c63ff;
+
+  --cm-h1: #6c63ff; --cm-h2: #9d8dff; --cm-h3: #b0a4ff;
+  --cm-h4: #c4baff; --cm-strong: #ffffff; --cm-em: #7ec8e3;
+  --cm-strike: #555555; --cm-code: #a09cf7; --cm-quote: #888888;
+  --cm-list: #6c63ff; --cm-meta: #555555;
+}
+
+/* ── Theme: Light (晴日) ─────────────────────────────── */
+:root[data-theme="light"] {
+  --bg-base:     #f8f8fc;
+  --bg-surface:  #f0f0f8;
+  --bg-elevated: #ffffff;
+  --bg-hover:    #e8e8f2;
+  --bg-active:   #d8d8ee;
+  --bg-active2:  #c8c8e0;
+
+  --border:      #deded0;  /* slightly warm */
+  --border-2:    #c8c8dc;
+
+  --text:        #2a2a3c;
+  --text-2:      #6a6a80;
+  --text-3:      #9898b0;
+  --text-4:      #c0c0d4;
+
+  --accent:      #5a52e8;
+  --accent-2:    #7a72f0;
+  --accent-bg:   rgba(90,82,232,.1);
+
+  --link:        #2980b9;
+  --link-2:      #7a52a8;
+  --tag:         #279367;
+  --caret:       #5a52e8;
+
+  --cm-h1: #5a52e8; --cm-h2: #7a72f0; --cm-h3: #9a92f4;
+  --cm-h4: #b0aaf6; --cm-strong: #1a1a2c; --cm-em: #2980b9;
+  --cm-strike: #9898b0; --cm-code: #7a52a8; --cm-quote: #7a7a90;
+  --cm-list: #5a52e8; --cm-meta: #9898b0;
+}
+
+/* ── Theme: Nord (极光) ──────────────────────────────── */
+:root[data-theme="nord"] {
+  --bg-base:     #2e3440;
+  --bg-surface:  #3b4252;
+  --bg-elevated: #434c5e;
+  --bg-hover:    #4c566a;
+  --bg-active:   #575f72;
+  --bg-active2:  #60697a;
+
+  --border:      #4c566a;
+  --border-2:    #575f72;
+
+  --text:        #eceff4;
+  --text-2:      #aeb3be;
+  --text-3:      #7b8494;
+  --text-4:      #4c566a;
+
+  --accent:      #88c0d0;
+  --accent-2:    #8fbcbb;
+  --accent-bg:   rgba(136,192,208,.15);
+
+  --link:        #81a1c1;
+  --link-2:      #b48ead;
+  --tag:         #a3be8c;
+  --caret:       #88c0d0;
+
+  --cm-h1: #88c0d0; --cm-h2: #8fbcbb; --cm-h3: #a3b8c0;
+  --cm-h4: #b0c4c8; --cm-strong: #eceff4; --cm-em: #81a1c1;
+  --cm-strike: #7b8494; --cm-code: #b48ead; --cm-quote: #7b8494;
+  --cm-list: #88c0d0; --cm-meta: #7b8494;
+}
+
+/* ── Semantic utility classes ────────────────────────── */
+.t-base      { color: var(--text); }
+.t-2         { color: var(--text-2); }
+.t-3         { color: var(--text-3); }
+.t-4         { color: var(--text-4); }
+.t-accent    { color: var(--accent); }
+.t-accent-2  { color: var(--accent-2); }
+.t-link      { color: var(--link); }
+.t-link-2    { color: var(--link-2); }
+
+.bg-base     { background: var(--bg-base); }
+.bg-surface  { background: var(--bg-surface); }
+.bg-elevated { background: var(--bg-elevated); }
+.bg-active   { background: var(--bg-active); }
+
+.b-theme     { border-color: var(--border) !important; }
+.b-accent    { border-color: var(--accent) !important; }
+
+.interactive {
+  color: var(--text-3);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.interactive:hover { background: var(--bg-hover); color: var(--text); }

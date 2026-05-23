@@ -14,11 +14,26 @@ const wikiLinkInlineParser: InlineParser = {
     }
     if (end >= cx.end) return -1
 
-    return cx.addElement(cx.elt('WikiLink', pos, end + 2, [
-      cx.elt('WikiLinkMark',   pos,     pos + 2),
-      cx.elt('WikiLinkTarget', pos + 2, end),
-      cx.elt('WikiLinkMark',   end,     end + 2),
-    ]))
+    let pipePos = -1
+    for (let i = pos + 2; i < end; i++) {
+      if (cx.char(i) === 124 /* | */) { pipePos = i; break }
+    }
+
+    const children = pipePos === -1
+      ? [
+          cx.elt('WikiLinkMark',   pos,         pos + 2),
+          cx.elt('WikiLinkTarget', pos + 2,     end),
+          cx.elt('WikiLinkMark',   end,         end + 2),
+        ]
+      : [
+          cx.elt('WikiLinkMark',   pos,         pos + 2),
+          cx.elt('WikiLinkTarget', pos + 2,     pipePos),
+          cx.elt('WikiLinkMark',   pipePos,     pipePos + 1),
+          cx.elt('WikiLinkAlias',  pipePos + 1, end),
+          cx.elt('WikiLinkMark',   end,         end + 2),
+        ]
+
+    return cx.addElement(cx.elt('WikiLink', pos, end + 2, children))
   },
 }
 
@@ -27,6 +42,7 @@ export const wikiLinkParser: MarkdownConfig = {
     { name: 'WikiLink',       style: tags.link },
     { name: 'WikiLinkMark',   style: tags.processingInstruction },
     { name: 'WikiLinkTarget', style: tags.link },
+    { name: 'WikiLinkAlias',  style: tags.labelName },
   ],
   parseInline: [wikiLinkInlineParser],
 }

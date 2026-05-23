@@ -5,6 +5,7 @@ export interface FileMetadata {
   frontmatter: Record<string, unknown>
   outLinks: string[]
   tags: string[]
+  aliases: string[]
 }
 
 export interface KnowledgeState {

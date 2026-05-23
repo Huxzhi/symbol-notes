@@ -1,8 +1,8 @@
 import { get, set } from 'idb-keyval'
 import { fileSystemStore, setFileSystemStore, type FileNode } from '../stores/fileSystemStore'
 import { editorStore, setEditorStore } from '../stores/editorStore'
-import { parseFrontmatter, serializeFrontmatter } from '../lib/parseFrontmatter'
 import { reindexFile, scanDirectory } from './knowledgeService'
+import { startBackgroundParsing } from './backgroundParser'
 
 const DB_KEY = 'rootHandle'
 
@@ -59,6 +59,25 @@ async function getFileHandle(path: string): Promise<FileSystemFileHandle> {
   return dir.getFileHandle(parts[parts.length - 1])
 }
 
+export async function createFile(name: string, dirPath?: string): Promise<void> {
+  const { rootHandle } = fileSystemStore
+  if (!rootHandle) return
+  const filename = name.endsWith('.md') ? name : `${name}.md`
+  let dir: FileSystemDirectoryHandle = rootHandle
+  if (dirPath) {
+    for (const part of dirPath.split('/')) {
+      dir = await dir.getDirectoryHandle(part)
+    }
+  }
+  const filePath = dirPath ? `${dirPath}/${filename}` : filename
+  const handle = await dir.getFileHandle(filename, { create: true })
+  const writable = await handle.createWritable()
+  await writable.write('')
+  await writable.close()
+  setFileSystemStore('tree', await buildTree(rootHandle))
+  await openFile(filePath)
+}
+
 export async function openFile(path: string): Promise<void> {
   const handle = await getFileHandle(path)
   const file = await handle.getFile()
@@ -68,16 +87,15 @@ export async function openFile(path: string): Promise<void> {
   if (!fileSystemStore.openFilePaths.includes(path)) {
     setFileSystemStore('openFilePaths', [...fileSystemStore.openFilePaths, path])
   }
+  startBackgroundParsing(path)
 }
 
 export async function saveCurrentFile(): Promise<void> {
   const { rootHandle, activeFilePath } = fileSystemStore
-  const { content, cmView } = editorStore
-  if (!rootHandle || !activeFilePath) return
+  const { cmView } = editorStore
+  if (!rootHandle || !activeFilePath || !cmView) return
 
-  const { frontmatter } = parseFrontmatter(content)
-  const body = cmView?.state.doc.toString() ?? parseFrontmatter(content).body
-  const newContent = serializeFrontmatter(frontmatter, body)
+  const newContent = cmView.state.doc.toString()
 
   const handle = await getFileHandle(activeFilePath)
   const writable = await handle.createWritable()

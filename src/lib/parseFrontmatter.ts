@@ -12,7 +12,7 @@ export function parseFrontmatter(raw: string): ParsedFile {
   return { frontmatter: parseYamlSubset(yamlStr), body }
 }
 
-function parseYamlSubset(yaml: string): Record<string, unknown> {
+export function parseYamlSubset(yaml: string): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   const lines = yaml.split('\n')
   let i = 0

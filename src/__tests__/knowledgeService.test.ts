@@ -36,8 +36,8 @@ describe('extractTags', () => {
 describe('buildBacklinkMap', () => {
   it('builds reverse index', () => {
     const index = {
-      'a.md': { path: 'a.md', frontmatter: {}, outLinks: ['b.md'], tags: [] },
-      'b.md': { path: 'b.md', frontmatter: {}, outLinks: [], tags: [] },
+      'a.md': { path: 'a.md', frontmatter: {}, outLinks: ['b.md'], tags: [], aliases: [] },
+      'b.md': { path: 'b.md', frontmatter: {}, outLinks: [], tags: [], aliases: [] },
     }
     const map = buildBacklinkMap(index)
     expect(map['b.md']).toEqual(['a.md'])

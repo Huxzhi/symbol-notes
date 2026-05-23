@@ -8,30 +8,58 @@ import { GFM } from '@lezer/markdown'
 import { darkTheme, darkHighlightStyle } from '../lib/cmTheme'
 import { wikiLinkParser } from '../lib/wikiLinkParser'
 import { livePreviewExtension } from '../lib/livePreviewExtension'
+import { frontmatterField } from '../lib/frontmatterField'
+import { outLinksField } from '../lib/outLinksField'
+import { inlineTagsField, inlineTagDecoField } from '../lib/inlineTagsField'
+import { headingsField } from '../lib/headingsField'
 import { editorStore, setEditorStore } from '../stores/editorStore'
+import { fileSystemStore } from '../stores/fileSystemStore'
 import { saveCurrentFile } from '../services/fileSystemService'
-import { parseFrontmatter } from '../lib/parseFrontmatter'
+import { reindexFile } from '../services/knowledgeService'
 
 export function Editor() {
   let container!: HTMLDivElement
   let view: EditorView | null = null
   let isExternalUpdate = false
+  let tagSyncTimer: ReturnType<typeof setTimeout> | null = null
 
   onMount(() => {
-    const { body } = parseFrontmatter(editorStore.content)
+    const doc = editorStore.content
 
     view = new EditorView({
       state: EditorState.create({
-        doc: body,
-        selection: { anchor: body.length },
+        doc,
+        selection: { anchor: doc.length },
         extensions: [
           markdown({ codeLanguages: languages, extensions: [GFM, wikiLinkParser] }),
           syntaxHighlighting(darkHighlightStyle),
           darkTheme,
           livePreviewExtension,
+          frontmatterField,
+          outLinksField,
+          inlineTagsField,
+          inlineTagDecoField,
+          headingsField,
           EditorView.updateListener.of((update) => {
-            if (update.docChanged && !isExternalUpdate) {
-              setEditorStore('isDirty', true)
+            if (update.docChanged) {
+              setEditorStore('outLinks', update.state.field(outLinksField))
+              setEditorStore('headings', update.state.field(headingsField))
+
+              if (update.state.field(inlineTagsField) !== update.startState.field(inlineTagsField)) {
+                if (tagSyncTimer !== null) clearTimeout(tagSyncTimer)
+                tagSyncTimer = setTimeout(() => {
+                  tagSyncTimer = null
+                  const { activeFilePath } = fileSystemStore
+                  if (activeFilePath && view) {
+                    reindexFile(activeFilePath, view.state.doc.toString())
+                  }
+                }, 500)
+              }
+
+              if (!isExternalUpdate) {
+                setEditorStore('isDirty', true)
+                setEditorStore('content', update.state.doc.toString())
+              }
             }
           }),
           EditorView.domEventHandlers({
@@ -49,21 +77,24 @@ export function Editor() {
     })
 
     setEditorStore('cmView', view)
+    setEditorStore('outLinks', view.state.field(outLinksField))
+    setEditorStore('headings', view.state.field(headingsField))
   })
 
   onCleanup(() => {
+    if (tagSyncTimer !== null) clearTimeout(tagSyncTimer)
     view?.destroy()
     setEditorStore('cmView', null)
   })
 
   createEffect(() => {
     if (!view) return
-    const { body } = parseFrontmatter(editorStore.content)
+    const content = editorStore.content
     const current = view.state.doc.toString()
-    if (current === body) return
+    if (current === content) return
     isExternalUpdate = true
     view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: body },
+      changes: { from: 0, to: view.state.doc.length, insert: content },
     })
     isExternalUpdate = false
   })

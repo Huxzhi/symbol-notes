@@ -8,11 +8,13 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { RangeSetBuilder, StateField, type EditorState } from '@codemirror/state'
+import { detectFrontmatter } from './frontmatterField'
 
 // ── Shared decorations ──────────────────────────────────────────────────────
 
 const hide = Decoration.replace({})
 const wikiLinkMark = Decoration.mark({ class: 'cm-wikilink' })
+const mdLinkMark = Decoration.mark({ class: 'cm-mdlink' })
 
 // ── Widgets ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,31 @@ class CheckboxWidget extends WidgetType {
         },
       })
     })
+    return el
+  }
+}
+
+class FencedTopWidget extends WidgetType {
+  constructor(readonly lang: string) { super() }
+  eq(other: FencedTopWidget) { return other.lang === this.lang }
+  toDOM() {
+    const el = document.createElement('div')
+    el.className = 'cm-fenced-top'
+    if (this.lang) {
+      const label = document.createElement('span')
+      label.className = 'cm-fenced-lang'
+      label.textContent = this.lang
+      el.appendChild(label)
+    }
+    return el
+  }
+}
+
+class FencedBottomWidget extends WidgetType {
+  eq() { return true }
+  toDOM() {
+    const el = document.createElement('div')
+    el.className = 'cm-fenced-bottom'
     return el
   }
 }
@@ -101,6 +128,7 @@ function buildBlockDecos(state: EditorState): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const sel = state.selection.main
   const seenLines = new Set<number>()
+  const fm = detectFrontmatter(state)
 
   syntaxTree(state).iterate({
     from: 0,
@@ -119,7 +147,54 @@ function buildBlockDecos(state: EditorState): DecorationSet {
         return
       }
 
+      if (node.name === 'FencedCode') {
+        const openLine = state.doc.lineAt(node.from)
+
+        // Find lang (CodeInfo) and closing CodeMark position
+        const c = node.node.cursor()
+        let lang = ''
+        let closeMarkFrom = node.to
+        if (c.firstChild()) {
+          do {
+            if (c.name === 'CodeInfo') lang = state.doc.sliceString(c.from, c.to).trim()
+            else if (c.name === 'CodeMark' && c.from > openLine.to) closeMarkFrom = c.from
+          } while (c.nextSibling())
+        }
+        const closeLine = state.doc.lineAt(closeMarkFrom)
+
+        const cursorOnOpen  = sel.from <= openLine.to  && sel.to >= openLine.from
+        const cursorOnClose = sel.from <= closeLine.to && sel.to >= closeLine.from
+
+        // Opening ``` line → top border widget (hide only if cursor is on that line)
+        if (!cursorOnOpen) {
+          const openTo = Math.min(openLine.to + 1, state.doc.length)
+          builder.add(openLine.from, openTo, Decoration.replace({
+            widget: new FencedTopWidget(lang), block: true,
+          }))
+        }
+
+        // Code content lines → side-border line class (always, no height change on cursor move)
+        const fencedLine = Decoration.line({ class: 'cm-fenced-code-line' })
+        for (let n = openLine.number + 1; n < closeLine.number; n++) {
+          const ln = state.doc.line(n)
+          builder.add(ln.from, ln.from, fencedLine)
+        }
+
+        // Closing ``` line → bottom border widget (hide only if cursor is on that line)
+        if (!cursorOnClose && closeLine.from > openLine.to) {
+          const closeFrom = closeLine.from
+          const closeTo = Math.min(closeLine.to + 1, state.doc.length)
+          builder.add(closeFrom, closeTo, Decoration.replace({
+            widget: new FencedBottomWidget(), block: true,
+          }))
+        }
+
+        return false
+      }
+
       if (node.name === 'HorizontalRule' || node.name === 'Table') {
+        // Skip HR nodes that are the --- delimiters of a frontmatter block
+        if (fm && node.name === 'HorizontalRule' && node.from < fm.blockTo) return
         // +1 to include the trailing \n — block decorations must cover complete lines
         const to = Math.min(node.to + 1, state.doc.length)
         if (sel.from < to && sel.to >= node.from) return
@@ -163,6 +238,10 @@ function buildInlineDecos(view: EditorView): DecorationSet {
       enter(node) {
         const selOverlaps = sel.from <= node.to && sel.to >= node.from
         switch (node.name) {
+          case 'FencedCode':
+          case 'CodeBlock':
+            return false  // skip — content handled by blockPreviewField; embedded language nodes can break ordering
+
           case 'QuoteMark': {
             // Use line-level check: cursor anywhere on the blockquote line reveals >
             const line = state.doc.lineAt(node.from)
@@ -222,17 +301,56 @@ function buildInlineDecos(view: EditorView): DecorationSet {
           }
 
           case 'WikiLink': {
+            if (selOverlaps) return false
+            const c = node.node.cursor()
+            if (!c.firstChild()) return false
+            const children: { name: string; from: number; to: number }[] = []
+            do { children.push({ name: c.name, from: c.from, to: c.to }) } while (c.nextSibling())
+            const hasAlias = children.some(ch => ch.name === 'WikiLinkAlias')
+            for (const ch of children) {
+              if (ch.name === 'WikiLinkMark') {
+                builder.add(ch.from, ch.to, hide)
+              } else if (ch.name === 'WikiLinkTarget') {
+                if (!hasAlias) builder.add(ch.from, ch.to, wikiLinkMark)
+                else builder.add(ch.from, ch.to, hide)
+              } else if (ch.name === 'WikiLinkAlias') {
+                builder.add(ch.from, ch.to, wikiLinkMark)
+              }
+            }
+            return false
+          }
+
+          case 'Autolink': {
+            if (selOverlaps) return false
+            const text = state.doc.sliceString(node.from, node.to)
+            if (text.startsWith('<') && text.endsWith('>')) {
+              builder.add(node.from, node.from + 1, hide)
+              builder.add(node.from + 1, node.to - 1, mdLinkMark)
+              builder.add(node.to - 1, node.to, hide)
+            } else {
+              builder.add(node.from, node.to, mdLinkMark)
+            }
+            return false
+          }
+
+          case 'Link':
+          case 'Image': {
             if (selOverlaps) return
             const c = node.node.cursor()
-            if (!c.firstChild()) return
-            do {
-              if (c.name === 'WikiLinkMark') {
-                builder.add(c.from, c.to, hide)
-              } else if (c.name === 'WikiLinkTarget') {
-                builder.add(c.from, c.to, wikiLinkMark)
-              }
-            } while (c.nextSibling())
-            break
+            let urlFrom = -1
+            if (c.firstChild()) {
+              do {
+                if (c.name === 'URL') { urlFrom = c.from; break }
+              } while (c.nextSibling())
+            }
+            if (urlFrom < 0) return false
+            const prefixLen = node.name === 'Image' ? 2 : 1  // `![` vs `[`
+            const labelStart = node.from + prefixLen
+            const labelEnd = urlFrom - 2  // position of `](`
+            builder.add(node.from, labelStart, hide)
+            if (labelEnd > labelStart) builder.add(labelStart, labelEnd, mdLinkMark)
+            builder.add(labelEnd, node.to, hide)
+            return false
           }
         }
       },

@@ -10,23 +10,23 @@ export function TabBar() {
   }
 
   return (
-    <div class="h-8 bg-[#0d0d1a] border-b border-[#1e1e35] flex items-stretch shrink-0 overflow-y-hidden">
+    <div class="h-8 bg-[var(--bg-base)] border-b border-[var(--border)] flex items-stretch shrink-0 overflow-y-hidden">
       <div class="flex flex-1 overflow-x-auto overflow-y-hidden">
         <For each={fileSystemStore.openFilePaths}>
           {(path) => {
             const isActive = () => fileSystemStore.activeFilePath === path
             return (
               <div
-                class={`flex items-center gap-1.5 px-3 border-r border-[#1e1e35] cursor-pointer text-[11px] shrink-0
+                class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
                   ${isActive()
-                    ? 'bg-[#0f0f1c] text-white border-b-2 border-b-[#6c63ff] -mb-px'
-                    : 'text-[#555] hover:bg-[#1a1a2e]'}`}
+                    ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
+                    : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'}`}
                 onClick={() => openFile(path)}
               >
-                <span class="text-[9px] text-[#6c63ff]">◻</span>
+                <span class="text-[9px] text-[var(--accent)]">◻</span>
                 <span class="max-w-[120px] truncate">{baseName(path)}</span>
                 <button
-                  class="text-[#333] hover:text-[#888] text-[13px] leading-none ml-0.5"
+                  class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
                   onClick={(e) => { e.stopPropagation(); closeFile(path) }}
                 >
                   ×
@@ -38,7 +38,7 @@ export function TabBar() {
       </div>
 
       <button
-        class="px-2 shrink-0 text-[#555] hover:text-[#aaa] hover:bg-[#1a1a2e] flex items-center"
+        class="px-2 shrink-0 text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg-hover)] flex items-center transition-colors"
         onClick={() => setUIStore('showRight', v => !v)}
         title="切换右侧栏"
       >
