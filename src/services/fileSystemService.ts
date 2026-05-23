@@ -62,6 +62,62 @@ async function getFileHandle(path: string): Promise<FileSystemFileHandle> {
   return dir.getFileHandle(parts[parts.length - 1])
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Replace [[oldTarget]] / [[oldTarget|alias]] with [[newTarget]] / [[newTarget|alias]].
+// Handles both bare stem (note) and fully-qualified (folder/note) forms, with or
+// without the .md extension, so all four common variants are covered in one pass.
+function replaceWikiLinks(content: string, oldPath: string, newPath: string): string {
+  const oldBase = oldPath.replace(/\.md$/, '')   // folder/note
+  const newBase = newPath.replace(/\.md$/, '')   // folder/newname
+  const oldStem = oldBase.split('/').pop()!      // note
+  const newStem = newBase.split('/').pop()!      // newname
+
+  // Build (old, new) pairs from most-specific to least-specific so a longer
+  // match is replaced before its substring can match again.
+  const pairs: [string, string][] = []
+  if (oldBase !== oldStem) {
+    pairs.push([`${oldBase}.md`, `${newBase}.md`])
+    pairs.push([oldBase, newBase])
+  }
+  pairs.push([`${oldStem}.md`, `${newStem}.md`])
+  pairs.push([oldStem, newStem])
+
+  let result = content
+  for (const [old, next] of pairs) {
+    result = result.replace(
+      new RegExp(`\\[\\[${escapeRegex(old)}(\\|[^\\]]*)?\\]\\]`, 'g'),
+      (_, alias) => `[[${next}${alias ?? ''}]]`,
+    )
+  }
+  return result
+}
+
+async function updateBacklinks(
+  backlinks: string[],
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
+  await Promise.all(
+    backlinks.map(async (blPath) => {
+      try {
+        const handle = await getFileHandle(blPath)
+        const content = await (await handle.getFile()).text()
+        const updated = replaceWikiLinks(content, oldPath, newPath)
+        if (updated === content) return
+        const writable = await handle.createWritable()
+        await writable.write(updated)
+        await writable.close()
+        await reindexFile(blPath, updated)
+      } catch {
+        // non-fatal: skip files we can't update
+      }
+    }),
+  )
+}
+
 export async function createFile(name: string, dirPath?: string): Promise<void> {
   const { rootHandle } = fileSystemStore
   if (!rootHandle) return
@@ -150,6 +206,10 @@ export async function renameFile(oldPath: string, newBaseName: string): Promise<
     }
   }
 
+  // Capture backlinks before mutating the store (backlinkMap[oldPath] lists
+  // every file that currently contains [[oldName]] / [[folder/oldName]]).
+  const backlinks = [...(knowledgeStore.backlinkMap[oldPath] ?? [])]
+
   // Update open tab list and active path
   setFileSystemStore(
     'openFilePaths',
@@ -168,6 +228,19 @@ export async function renameFile(oldPath: string, newBaseName: string): Promise<
       applyFileMeta({ ...oldMeta, path: newPath }, undefined)
       removeFileMeta(oldPath)
     })
+  }
+
+  // Prompt to update backlinks only when some exist
+  if (backlinks.length > 0) {
+    const preview = backlinks.slice(0, 5).map(p => `  • ${p}`).join('\n')
+    const extra = backlinks.length > 5 ? `\n  ...还有 ${backlinks.length - 5} 个` : ''
+    const confirmed = window.confirm(
+      `有 ${backlinks.length} 个文件引用了「${oldFileName}」：\n${preview}${extra}\n\n` +
+      `是否将链接同步更新为「${newFileName}」？`,
+    )
+    if (confirmed) {
+      await updateBacklinks(backlinks, oldPath, newPath)
+    }
   }
 }
 
