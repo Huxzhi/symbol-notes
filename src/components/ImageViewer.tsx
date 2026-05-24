@@ -1,6 +1,6 @@
 import { createResource, Match, Switch } from 'solid-js'
-import { fileSystemStore } from '../stores/fileSystemStore'
-import { uiStore } from '../stores/uiStore'
+import { runtimeStore } from '../stores/runtimeStore'
+import type { ViewComponentProps } from '../stores/types'
 
 async function readImageDataUrl(
   path: string,
@@ -21,13 +21,13 @@ async function readImageDataUrl(
   })
 }
 
-export function ImageViewer(props: { tabId: string; isActive: boolean }) {
-  const path = () => uiStore.tabs[props.tabId]?.path ?? null
+export function ImageViewer(props: ViewComponentProps) {
+  const path = () => props.viewState.file as string | undefined
 
   const [dataUrl] = createResource(
     () => {
       const p = path()
-      const root = fileSystemStore.rootHandle
+      const root = runtimeStore.rootHandle
       return p && root ? { path: p, root } : null
     },
     ({ path, root }) => readImageDataUrl(path, root),
@@ -36,17 +36,17 @@ export function ImageViewer(props: { tabId: string; isActive: boolean }) {
   const fileName = () => path()?.split('/').pop() ?? ''
 
   return (
-    <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]">
-      <div class="h-9 px-4 flex items-center border-b border-[var(--border)] shrink-0">
-        <span class="text-[12px] text-[var(--text-2)] truncate">{fileName()}</span>
+    <div class="flex-1 flex flex-col overflow-hidden bg-(--bg-base)">
+      <div class="h-9 px-4 flex items-center border-b border-(--border) shrink-0">
+        <span class="text-[12px] text-(--text-2) truncate">{fileName()}</span>
       </div>
       <div class="flex-1 flex items-center justify-center overflow-auto p-6">
         <Switch>
           <Match when={dataUrl.error}>
-            <div class="text-[12px] text-[var(--text-4)]">无法加载图片</div>
+            <div class="text-[12px] text-(--text-4)">无法加载图片</div>
           </Match>
           <Match when={dataUrl.loading}>
-            <div class="text-[12px] text-[var(--text-4)]">加载中…</div>
+            <div class="text-[12px] text-(--text-4)">加载中…</div>
           </Match>
           <Match when={dataUrl()}>
             <img

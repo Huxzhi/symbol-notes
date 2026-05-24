@@ -1,16 +1,46 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { knowledgeStore } from '../stores/knowledgeStore'
-import { openFile } from '../services/workspaceService'
+import { globalStore, findLeafInTree, ROOT_TABS_ID } from '../stores/globalStore'
+import { workspaceActions } from '../actions/workspaceActions'
+import { getFileViewForExt } from '../lib/viewRegistry'
 import { toIsoDate, buildCalendarGrid, buildDayData, WEEKDAYS_LONG } from '../lib/calendarUtils'
+import type { ViewComponentProps, ViewState, WorkspaceLeaf, WorkspaceNode } from '../stores/types'
 
-export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
+function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | null {
+  if (root.type === 'leaf' && root.viewState.state.file === path) return root
+  if (root.type === 'tabs') return root.children.find(l => l.viewState.state.file === path) ?? null
+  if (root.type === 'split') {
+    for (const child of root.children) {
+      const found = findLeafWithFile(child, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function openFileInWorkspace(path: string): void {
+  const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
+  const def = getFileViewForExt(ext)
+  if (!def) return
+  const viewState: ViewState = { type: def.type, state: { file: path } }
+  const existing = findLeafWithFile(globalStore.workspace.main, path)
+  if (existing) { workspaceActions.activateLeaf(existing.id); return }
+  const { activeLeafId } = globalStore.workspace
+  const activeLeaf = activeLeafId ? findLeafInTree(globalStore.workspace.main, activeLeafId) : null
+  if (activeLeaf && !activeLeaf.pinned && activeLeaf.viewState.type !== 'calendar') {
+    workspaceActions.setLeafViewState(activeLeafId!, viewState)
+    return
+  }
+  workspaceActions.createLeaf(ROOT_TABS_ID, viewState)
+}
+
+export function CalendarPage(_props: ViewComponentProps) {
   const now = new Date()
   const todayStr = toIsoDate(now.getFullYear(), now.getMonth(), now.getDate())
 
   const [viewYear, setViewYear] = createSignal(now.getFullYear())
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
 
-  const dayData = createMemo(() => buildDayData(knowledgeStore.index))
+  const dayData = createMemo(() => buildDayData(globalStore.knowledge.index))
   const calendarGrid = createMemo(() => buildCalendarGrid(viewYear(), viewMonth()))
 
   const prevMonth = () => batch(() => {
@@ -25,8 +55,6 @@ export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
     setViewYear(now.getFullYear())
     setViewMonth(now.getMonth())
   })
-
-  const openAndEdit = (path: string) => { openFile(path) }
 
   return (
     <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]">
@@ -74,7 +102,7 @@ export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
         </For>
       </div>
 
-      {/* Calendar grid — equal-height rows via grid-auto-rows:1fr */}
+      {/* Calendar grid */}
       <div
         class="flex-1 grid grid-cols-7 border-l border-t border-[var(--border)] overflow-hidden"
         style={{ 'grid-auto-rows': '1fr' }}
@@ -103,7 +131,6 @@ export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
                   ${isLastCol() ? '' : 'border-r border-[var(--border)]'}
                   ${isToday() ? 'bg-[var(--accent-bg)]' : 'bg-[var(--bg-base)]'}`}
               >
-                {/* Day number */}
                 <div class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none
                   ${isToday()
                     ? 'bg-[var(--accent)] text-white'
@@ -111,14 +138,12 @@ export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
                 >
                   {day}
                 </div>
-
-                {/* File chips */}
                 <div class="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0.5">
                   <For each={dated()}>
                     {(path) => (
                       <button
                         class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
-                        onClick={() => openAndEdit(path)}
+                        onClick={() => openFileInWorkspace(path)}
                         title={path}
                       >
                         {path.split('/').pop()?.replace(/\.md$/, '')}
@@ -129,7 +154,7 @@ export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
                     {(path) => (
                       <button
                         class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--accent-bg)] text-[var(--accent)] truncate w-full cursor-pointer hover:bg-[var(--accent)] hover:text-white transition-colors"
-                        onClick={() => openAndEdit(path)}
+                        onClick={() => openFileInWorkspace(path)}
                         title={path}
                       >
                         {path.split('/').pop()?.replace(/\.md$/, '')}
@@ -140,7 +165,7 @@ export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
                     {(path) => (
                       <button
                         class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
-                        onClick={() => openAndEdit(path)}
+                        onClick={() => openFileInWorkspace(path)}
                         title={path}
                       >
                         {path.split('/').pop()?.replace(/\.md$/, '')}
