@@ -135,7 +135,7 @@ resizeSidebar(side: 'left' | 'right', width: number): void
 // Add a panel leaf to a specific tabs group in a sidebar
 addSidebarLeaf(side: 'left' | 'right', tabsId: string, type: string): void
 
-// Split a sidebar tabs group vertically (stacks panels)
+// Split a sidebar tabs group — always vertical direction (stacks panels top-to-bottom)
 splitSidebarLeaf(side: 'left' | 'right', leafId: string): void
 ```
 
@@ -171,11 +171,9 @@ The hardcoded `LeftContent` / `RightContent` components are deleted. The right s
 
 ### `WorkspaceTabsView` — sidebar context
 
-Add a `context?: 'main' | 'sidebar'` prop. When `context === 'sidebar'`:
-- Hide close (×) button on tabs
-- Disable pin double-click
-
-Detection can also be done inside by checking `getView(type)?.kind === 'panel'` per leaf, which avoids prop drilling.
+No new prop needed. Per-leaf, check `getView(leaf.viewState.type)?.kind === 'panel'`:
+- `true` → hide close (×) button, disable pin double-click
+- `false` → existing behavior unchanged
 
 ### `App.tsx`
 
