@@ -5,12 +5,12 @@ import { wikiLinkParser } from '../lib/wikiLinkParser'
 import { outLinksField } from '../lib/outLinksField'
 import { inlineTagsField } from '../lib/inlineTagsField'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { fileSystemStore } from '../stores/fileSystemStore'
-import { knowledgeStore } from '../stores/knowledgeStore'
+import { globalStore, setGlobalStore } from '../stores/globalStore'
+import { runtimeStore } from '../stores/runtimeStore'
+import { knowledgeActions } from '../actions/knowledgeActions'
 import { hashContent, getCachedMeta, setCachedMeta } from './fileCacheService'
-import { extractTags, extractAliases, mergeTagsWithBody, applyFileMeta } from './knowledgeService'
-import { setKnowledgeStore } from '../stores/knowledgeStore'
-import type { FileNode } from '../stores/fileSystemStore'
+import { extractTags, extractAliases, mergeTagsWithBody } from '../lib/knowledgeUtils'
+import type { FileNode } from '../stores/types'
 
 interface Session {
   cancelled: boolean
@@ -18,7 +18,6 @@ interface Session {
 
 let currentSession: Session | null = null
 
-// Headless CM6: language + data fields only, no view-dependent extensions
 function createHeadlessState(content: string): EditorState {
   return EditorState.create({
     doc: content,
@@ -66,7 +65,7 @@ async function runSession(
   rootHandle: FileSystemDirectoryHandle,
   paths: string[],
 ): Promise<void> {
-  setKnowledgeStore('isIndexing', true)
+  setGlobalStore('knowledge', 'isIndexing', true)
   for (const path of paths) {
     if (session.cancelled) break
     await idle()
@@ -76,11 +75,9 @@ async function runSession(
       const content = await readContent(path, rootHandle)
       const hash = hashContent(content)
 
-      // Cache hit + already indexed → nothing to do
       const cached = await getCachedMeta(hash)
-      if (cached && knowledgeStore.index[path]) continue
+      if (cached && globalStore.knowledge.index[path]) continue
 
-      // Parse with headless CM6
       const state = createHeadlessState(content)
       const { frontmatter } = parseFrontmatter(content)
       const inlineTags = state.field(inlineTagsField).map(m => m.tag)
@@ -97,23 +94,21 @@ async function runSession(
 
       await setCachedMeta(hash, parsed)
 
-      // Incremental update — no full rebuild, backlinkMap grows file-by-file
-      applyFileMeta({ path, ...parsed }, knowledgeStore.index[path])
+      knowledgeActions._applyFileMeta({ path, ...parsed }, globalStore.knowledge.index[path])
     } catch {
       // Individual file errors are non-fatal
     }
   }
-  // Only the latest session clears the flag; a cancelled session leaves it
-  // for the newer session to clear when it finishes.
   if (currentSession === session) {
-    setKnowledgeStore('isIndexing', false)
+    setGlobalStore('knowledge', 'isIndexing', false)
   }
 }
 
 export function startBackgroundParsing(skipPath: string): void {
   if (currentSession) currentSession.cancelled = true
 
-  const { rootHandle, tree } = fileSystemStore
+  const { rootHandle } = runtimeStore
+  const { tree } = globalStore.fs
   if (!rootHandle || !tree.length) return
 
   const paths = collectFilePaths(tree).filter(p => p !== skipPath)

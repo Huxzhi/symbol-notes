@@ -1,13 +1,22 @@
 import { For, Show, createSignal } from 'solid-js'
 import { FolderOpen } from 'lucide-solid'
-import { fileSystemStore } from '../stores/fileSystemStore'
-import { uiStore, activeFilePath } from '../stores/uiStore'
-import { openDirectory, createFile, createDirectory } from '../services/fileSystemService'
-import { openFile } from '../services/workspaceService'
-import type { FileNode } from '../stores/fileSystemStore'
+import { globalStore, activeFilePath, findLeafInTree, ROOT_TABS_ID } from '../stores/globalStore'
+import { runtimeStore } from '../stores/runtimeStore'
+import { fsActions } from '../actions/fsActions'
+import { workspaceActions } from '../actions/workspaceActions'
+import { getFileViewForExt } from '../lib/viewRegistry'
+import type { FileNode, ViewState, WorkspaceLeaf, WorkspaceNode } from '../stores/types'
 
 const IMAGE_EXTS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.avif',
 ])
 const MD_EXT = '.md'
 
@@ -30,13 +39,50 @@ function canOpen(name: string): boolean {
   return name.endsWith(MD_EXT) || IMAGE_EXTS.has(ext)
 }
 
+function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | null {
+  if (root.type === 'leaf' && root.viewState.state.file === path) return root
+  if (root.type === 'tabs') return root.children.find(l => l.viewState.state.file === path) ?? null
+  if (root.type === 'split') {
+    for (const child of root.children) {
+      const found = findLeafWithFile(child, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function openFileInWorkspace(path: string, options?: { newTab?: boolean; pin?: boolean }): void {
+  const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
+  const def = getFileViewForExt(ext)
+  if (!def) return
+  const viewState: ViewState = { type: def.type, state: { file: path } }
+
+  const existing = findLeafWithFile(globalStore.workspace.main, path)
+  if (existing) { workspaceActions.activateLeaf(existing.id); return }
+
+  if (!options?.newTab) {
+    const { activeLeafId } = globalStore.workspace
+    const activeLeaf = activeLeafId ? findLeafInTree(globalStore.workspace.main, activeLeafId) : null
+    if (activeLeaf && !activeLeaf.pinned) {
+      workspaceActions.setLeafViewState(activeLeafId!, viewState)
+      return
+    }
+  }
+
+  const leafId = workspaceActions.createLeaf(ROOT_TABS_ID, viewState)
+  if (options?.pin) {
+    workspaceActions.setLeafPinned(leafId, true)
+  }
+}
+
 function FileTreeNode(props: { node: FileNode; depth: number }) {
   const isActive = () => activeFilePath() === props.node.path
-  const isOther = () => props.node.kind === 'file' && isOtherFile(props.node.name)
+  const isOther = () =>
+    props.node.kind === 'file' && isOtherFile(props.node.name)
   const show = () =>
     props.node.kind === 'directory' ||
     !isOtherFile(props.node.name) ||
-    uiStore.showOtherFiles
+    globalStore.workspace.showOtherFiles
 
   return (
     <Show when={show()}>
@@ -54,12 +100,12 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
           onClick={() => {
             if (props.node.kind !== 'file') return
             if (!canOpen(props.node.name)) return
-            void openFile(props.node.path)
+            openFileInWorkspace(props.node.path)
           }}
           onDblClick={() => {
             if (props.node.kind !== 'file') return
             if (!canOpen(props.node.name)) return
-            void openFile(props.node.path, { newTab: true, pin: true })
+            openFileInWorkspace(props.node.path, { newTab: true, pin: true })
           }}
         >
           <span class="text-[9px] text-[var(--text-3)]">
@@ -71,7 +117,12 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
         </div>
         <Show when={props.node.kind === 'directory'}>
           <For each={props.node.children ?? []}>
-            {child => <FileTreeNode node={child} depth={props.depth + 1} />}
+            {(child) => (
+              <FileTreeNode
+                node={child}
+                depth={props.depth + 1}
+              />
+            )}
           </For>
         </Show>
       </div>
@@ -95,14 +146,17 @@ export function Sidebar() {
   }
   const confirm = async () => {
     const name = newName().trim()
-    if (!name) { cancel(); return }
+    if (!name) {
+      cancel()
+      return
+    }
     const mode = createMode()
     cancel()
     if (mode === 'file') {
-      const path = await createFile(name)
-      if (path) await openFile(path, { newTab: true, pin: true })
+      const path = await fsActions.createFile(name)
+      if (path) openFileInWorkspace(path, { newTab: true, pin: true })
     } else if (mode === 'folder') {
-      await createDirectory(name)
+      await fsActions.createDirectory(name)
     }
   }
   const onKeyDown = (e: KeyboardEvent) => {
@@ -115,47 +169,63 @@ export function Sidebar() {
       <div class="border-b border-[var(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
           class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors min-w-0 group"
-          onClick={openDirectory}
-          title={fileSystemStore.rootHandle ? '切换文件夹' : '打开文件夹'}
+          onClick={fsActions.openDirectory}
+          title={runtimeStore.rootHandle ? '切换文件夹' : '打开文件夹'}
         >
-          <FolderOpen size={12} class="shrink-0 text-[var(--accent)] group-hover:text-[var(--accent-2)]" />
+          <FolderOpen
+            size={12}
+            class="shrink-0 text-[var(--accent)] group-hover:text-[var(--accent-2)]"
+          />
           <span class="truncate text-[10px] text-[var(--accent)] font-bold tracking-widest uppercase group-hover:text-[var(--accent-2)]">
-            {fileSystemStore.rootHandle?.name ?? '打开文件夹'}
+            {runtimeStore.rootHandle?.name ?? '打开文件夹'}
           </span>
         </button>
-        <Show when={fileSystemStore.rootHandle}>
+        <Show when={runtimeStore.rootHandle}>
           <button
             class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors text-[13px]"
             title="新建文件夹"
             onClick={() => startCreate('folder')}
-          >⊞</button>
+          >
+            ⊞
+          </button>
           <button
             class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors"
             title="新建文件"
             onClick={() => startCreate('file')}
-          >+</button>
+          >
+            +
+          </button>
         </Show>
       </div>
 
       <div class="overflow-y-auto flex-1 py-1">
         <Show when={createMode() !== null}>
           <div class="flex items-center gap-1 px-2 py-1">
-            <span class="text-[9px] text-[var(--text-3)]">
+            <span class="text-[9px] text-(--text-3)">
               {createMode() === 'folder' ? '▸' : '◻'}
             </span>
             <input
-              class="flex-1 bg-[var(--bg-hover)] border border-[var(--accent)] rounded px-1.5 py-0.5 text-[11px] text-[var(--text)] outline-none min-w-0"
-              placeholder={createMode() === 'folder' ? '文件夹 或 父/子/文件夹' : '文件名 或 目录/文件名'}
+              class="flex-1 bg-(--bg-hover) border border-(--accent) rounded px-1.5 py-0.5 text-[11px] text-(--text) outline-none min-w-0"
+              placeholder={
+                createMode() === 'folder'
+                  ? '文件夹 或 父/子/文件夹'
+                  : '文件名 或 目录/文件名'
+              }
               value={newName()}
-              onInput={e => setNewName(e.currentTarget.value)}
+              onInput={(e) => setNewName(e.currentTarget.value)}
               onKeyDown={onKeyDown}
               onBlur={() => void confirm()}
-              ref={el => setTimeout(() => el?.focus(), 0)}
+              ref={(el) => setTimeout(() => el?.focus(), 0)}
             />
           </div>
         </Show>
-        <For each={fileSystemStore.tree}>
-          {node => <FileTreeNode node={node} depth={0} />}
+        <For each={globalStore.fs.tree}>
+          {(node) => (
+            <FileTreeNode
+              node={node}
+              depth={0}
+            />
+          )}
         </For>
       </div>
     </div>
