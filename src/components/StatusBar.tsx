@@ -5,7 +5,9 @@ import { parseFrontmatter } from '../lib/parseFrontmatter'
 
 export function StatusBar() {
   const stats = createMemo(() => {
-    const { body } = parseFrontmatter(editorStore.content)
+    // cmView is reactive (store prop); re-runs on tab switch.
+    const text = editorStore.cmView?.state.doc.toString() ?? ''
+    const { body } = parseFrontmatter(text)
     const words = body.trim() ? body.trim().split(/\s+/).length : 0
     const lines = editorStore.cmView?.state.doc.lines ?? 0
     return { words, lines }

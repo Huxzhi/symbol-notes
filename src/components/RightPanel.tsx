@@ -1,6 +1,6 @@
 import { createSignal, createMemo, For, Show } from 'solid-js'
 import { EditorView } from '@codemirror/view'
-import { fileSystemStore } from '../stores/fileSystemStore'
+import { activeFilePath } from '../stores/uiStore'
 import { knowledgeStore } from '../stores/knowledgeStore'
 import { editorStore } from '../stores/editorStore'
 
@@ -10,14 +10,14 @@ export function RightPanel() {
   const [activeTab, setActiveTab] = createSignal<Tab>('links')
 
   const currentMeta = createMemo(() => {
-    const path = fileSystemStore.activeFilePath
+    const path = activeFilePath()
     return path ? (knowledgeStore.index[path] ?? null) : null
   })
 
   const outLinks = createMemo(() => editorStore.outLinks)
 
   const backlinks = createMemo(() => {
-    const path = fileSystemStore.activeFilePath
+    const path = activeFilePath()
     if (!path) return []
     const aliases = knowledgeStore.index[path]?.aliases ?? []
     const keys = [path, ...aliases, ...aliases.map(a => `${a}.md`)]
