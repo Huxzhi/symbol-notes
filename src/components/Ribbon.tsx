@@ -6,33 +6,55 @@ import {
   CalendarRange,
   PanelLeft,
 } from 'lucide-solid'
-import { globalStore, setGlobalStore, findLeafInTree } from '../stores/globalStore'
+import { activeRoot, activeLayout, findLeafInTree } from '../stores/globalStore'
 import { workspaceActions } from '../actions/workspaceActions'
 import { appActions } from '../actions/appActions'
 
 export function Ribbon() {
-  const leftOpen = () => !globalStore.workspace.left.collapsed
+  const leftSidebar = () => activeRoot().left
+  const leftOpen = () => !leftSidebar().collapsed
 
-  const switchLeftPanel = (view: string) => {
-    if (globalStore.workspace.leftPanelView === view && leftOpen()) {
-      workspaceActions.toggleLeft()
-    } else {
-      workspaceActions.setLeftPanelView(view)
-      setGlobalStore('workspace', 'left', 'collapsed', false)
+  // Returns the viewState.type of the active leaf in the first left tabs group, or null
+  const leftActiveType = (): string | null => {
+    if (!leftOpen()) return null
+    for (const node of leftSidebar().children) {
+      if (node.type === 'tabs' && node.activeLeafId) {
+        const leaf = node.children.find(l => l.id === node.activeLeafId)
+        if (leaf) return leaf.viewState.type
+      }
     }
+    return null
+  }
+
+  // Toggle to a panel type: open + activate, or close if already active
+  const switchLeftPanel = (viewType: string) => {
+    if (leftActiveType() === viewType && leftOpen()) {
+      workspaceActions.toggleSidebar('left')
+      return
+    }
+    for (const node of leftSidebar().children) {
+      if (node.type === 'tabs') {
+        const leaf = node.children.find(l => l.viewState.type === viewType)
+        if (leaf) {
+          workspaceActions.activateSidebarLeaf('left', leaf.id)
+          break
+        }
+      }
+    }
+    if (!leftOpen()) workspaceActions.toggleSidebar('left')
   }
 
   const calendarPageActive = () => {
-    const { activeLeafId } = globalStore.workspace
+    const { activeLeafId } = activeLayout()
     if (!activeLeafId) return false
-    const leaf = findLeafInTree(globalStore.workspace.main, activeLeafId)
+    const leaf = findLeafInTree(activeRoot().main, activeLeafId)
     return leaf?.viewState.type === 'calendar'
   }
 
   return (
     <div class="w-9 bg-(--bg-base) border-r border-(--border) flex flex-col items-center py-2 gap-1.5 shrink-0">
       <button
-        onClick={() => workspaceActions.toggleLeft()}
+        onClick={() => workspaceActions.toggleSidebar('left')}
         class="p-1.5 text-(--text-3) hover:bg-(--bg-hover) hover:text-(--text) rounded cursor-pointer transition-colors"
         title="切换左侧栏"
       >
@@ -41,7 +63,7 @@ export function Ribbon() {
 
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
-          ${globalStore.workspace.leftPanelView === 'files' && leftOpen() ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
+          ${leftActiveType() === 'files' ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
         title="文件列表"
         onClick={() => switchLeftPanel('files')}
       >
@@ -49,7 +71,7 @@ export function Ribbon() {
       </button>
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
-          ${globalStore.workspace.leftPanelView === 'calendar-panel' && leftOpen() ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
+          ${leftActiveType() === 'calendar-panel' ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
         title="日历"
         onClick={() => switchLeftPanel('calendar-panel')}
       >
