@@ -222,7 +222,13 @@ On mount:
   1. Read tab.path from uiStore.tabs[tabId]
   2. fileSystemService.readFile(path) → initial content
   3. Create CM6 EditorView with that content
-  4. Register updateListener: updates own isDirty, triggers reindex debounce
+
+createEffect on tab.path (preview replacement — path changes without unmount):
+  1. fileSystemService.readFile(newPath) → new content
+  2. const newState = EditorState.create({ doc: newContent, selection: { anchor: 0 }, extensions })
+     view.setState(newState)   // replaces doc + clears undo history + resets cursor
+  3. view.scrollDOM.scrollTop = 0   // reset scroll to top
+  4. setEditorStore('isDirty', false)
 
 createEffect on isActive → true:
   setEditorStore({ cmView: view, outLinks, headings, isDirty })
@@ -235,6 +241,8 @@ onCleanup:
   view.destroy()
   if this was active: setEditorStore({ cmView: null })
 ```
+
+**Preview replacement CM6 state reset:** `view.setState(newState)` replaces doc, clears undo history, and resets cursor in one call. Scroll is reset via `view.scrollDOM.scrollTop = 0`. The `EditorView` DOM node is reused — no unmount/remount.
 
 `FileTitle` is rendered inside `EditorPane` (it already knows the path from the tab).
 
