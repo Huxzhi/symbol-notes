@@ -151,6 +151,10 @@ export const workspaceActions = {
     setGlobalStore('workspace', side, 'width', width)
   },
 
+  setRightPanelView(type: string): void {
+    setGlobalStore('workspace', 'rightPanelView', type)
+  },
+
   clearAllLeaves(): void {
     setGlobalStore('workspace', 'main', {
       type: 'tabs',

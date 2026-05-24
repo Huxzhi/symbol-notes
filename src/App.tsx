@@ -14,6 +14,9 @@ import { registerView } from './lib/viewRegistry'
 import { EditorPane } from './components/EditorPane'
 import { ImageViewer } from './components/ImageViewer'
 import { CalendarPage } from './components/CalendarPage'
+import { LinksPanel } from './components/panels/LinksPanel'
+import { OutlinePanel } from './components/panels/OutlinePanel'
+import { TagsPanel } from './components/panels/TagsPanel'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
@@ -45,6 +48,10 @@ registerView({
   getIcon: () => <CalendarRange size={11} />,
   component: CalendarPage,
 })
+
+registerView({ kind: 'panel', type: 'links',   getDisplayText: () => '链接', component: LinksPanel })
+registerView({ kind: 'panel', type: 'outline',  getDisplayText: () => '大纲', component: OutlinePanel })
+registerView({ kind: 'panel', type: 'tags',     getDisplayText: () => '标签', component: TagsPanel })
 
 export default function App() {
   createEffect(() => {

@@ -19,7 +19,15 @@ export interface PageViewDef {
   component: Component<ViewComponentProps>
 }
 
-export type ViewDef = FileViewDef | PageViewDef
+export interface PanelViewDef {
+  kind: 'panel'
+  type: string
+  getDisplayText(): string
+  getIcon?(): JSX.Element
+  component: Component
+}
+
+export type ViewDef = FileViewDef | PageViewDef | PanelViewDef
 
 const registry = new Map<string, ViewDef>()
 
@@ -36,6 +44,10 @@ export function getFileViewForExt(ext: string): FileViewDef | undefined {
     if (def.kind === 'file' && def.canAcceptFile(ext)) return def as FileViewDef
   }
   return undefined
+}
+
+export function getPanelViews(): PanelViewDef[] {
+  return [...registry.values()].filter((d): d is PanelViewDef => d.kind === 'panel')
 }
 
 export function _clearRegistryForTest(): void {

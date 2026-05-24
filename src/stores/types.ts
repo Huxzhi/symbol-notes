@@ -84,6 +84,7 @@ export interface WorkspaceState {
   right: SidebarSplit
   activeLeafId: string | null
   sidebarView: SidebarView
+  rightPanelView: string
   theme: ThemeId
   customCSS: string
   showSettings: boolean
