@@ -1,7 +1,11 @@
 import { createResource, Match, Switch } from 'solid-js'
 import { fileSystemStore } from '../stores/fileSystemStore'
+import { uiStore } from '../stores/uiStore'
 
-async function readImageDataUrl(path: string, root: FileSystemDirectoryHandle): Promise<string> {
+async function readImageDataUrl(
+  path: string,
+  root: FileSystemDirectoryHandle,
+): Promise<string> {
   const parts = path.split('/')
   let dir: FileSystemDirectoryHandle = root
   for (let i = 0; i < parts.length - 1; i++) {
@@ -17,16 +21,19 @@ async function readImageDataUrl(path: string, root: FileSystemDirectoryHandle): 
   })
 }
 
-export function ImageViewer(props: { path: string }) {
+export function ImageViewer(props: { tabId: string; isActive: boolean }) {
+  const path = () => uiStore.tabs[props.tabId]?.path ?? null
+
   const [dataUrl] = createResource(
-    () => ({ path: props.path, root: fileSystemStore.rootHandle }),
-    ({ path, root }) => {
-      if (!root) return Promise.reject(new Error('no root'))
-      return readImageDataUrl(path, root)
+    () => {
+      const p = path()
+      const root = fileSystemStore.rootHandle
+      return p && root ? { path: p, root } : null
     },
+    ({ path, root }) => readImageDataUrl(path, root),
   )
 
-  const fileName = () => props.path.split('/').pop() ?? props.path
+  const fileName = () => path()?.split('/').pop() ?? ''
 
   return (
     <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]">
