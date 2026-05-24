@@ -32,13 +32,27 @@ export interface WorkspaceLeaf {
 
 export type WorkspaceNode = WorkspaceSplit | WorkspaceTabs | WorkspaceLeaf
 
-// Sidebar panels (top-level split with width + collapsed)
+// Sidebar container (not in WorkspaceNode union — carries width/collapsed)
 export interface SidebarSplit {
-  type: 'split'
-  direction: 'horizontal'
+  id: string
   width: number
   collapsed: boolean
-  children: WorkspaceNode[]
+  children: WorkspaceNode[]  // flat list of tabs groups (stacked vertically)
+}
+
+// Root of the entire workspace tree
+export interface WorkspaceRoot {
+  left: SidebarSplit
+  main: WorkspaceNode
+  right: SidebarSplit
+}
+
+// One switchable workspace snapshot
+export interface WorkspaceLayout {
+  id: string
+  name: string
+  root: WorkspaceRoot
+  activeLeafId: string | null
 }
 
 // ── Theme ───────────────────────────────────────────────────────────────────
@@ -78,12 +92,8 @@ export interface KnowledgeState {
 }
 
 export interface WorkspaceState {
-  main: WorkspaceNode
-  left: SidebarSplit
-  right: SidebarSplit
-  activeLeafId: string | null
-  leftPanelView: string
-  rightPanelView: string
+  layouts: WorkspaceLayout[]
+  activeLayoutId: string
   theme: ThemeId
   customCSS: string
   showSettings: boolean
