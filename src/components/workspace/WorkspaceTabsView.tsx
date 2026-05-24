@@ -11,6 +11,7 @@ function getTabLabel(leaf: WorkspaceLeaf): string {
   const file = leaf.viewState.state.file as string | undefined
   if (def.kind === 'file' && file) return def.getDisplayText(file)
   if (def.kind === 'page') return def.getDisplayText()
+  if (def.kind === 'panel') return def.getDisplayText()
   return leaf.viewState.type
 }
 
@@ -25,6 +26,7 @@ export function WorkspaceTabsView(props: { node: WorkspaceTabs; isRoot?: boolean
               const isActive = createMemo(() => leaf.id === props.node.activeLeafId)
               const isPinned = () => leaf.pinned
               const def = () => getView(leaf.viewState.type)
+              const isPanelLeaf = () => def()?.kind === 'panel'
               return (
                 <div
                   class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
@@ -32,19 +34,27 @@ export function WorkspaceTabsView(props: { node: WorkspaceTabs; isRoot?: boolean
                       ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
                       : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
                     }`}
-                  onClick={() => workspaceActions.activateLeaf(leaf.id)}
-                  onDblClick={() => workspaceActions.setLeafPinned(leaf.id, true)}
+                  onClick={() => {
+                    if (isPanelLeaf()) {
+                      workspaceActions.activateSidebarLeafById(leaf.id)
+                    } else {
+                      workspaceActions.activateLeaf(leaf.id)
+                    }
+                  }}
+                  onDblClick={() => { if (!isPanelLeaf()) workspaceActions.setLeafPinned(leaf.id, true) }}
                 >
                   {def()?.getIcon?.()}
-                  <span class={`max-w-[120px] truncate ${!isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}>
+                  <span class={`max-w-[120px] truncate ${!isPanelLeaf() && !isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}>
                     {getTabLabel(leaf)}
                   </span>
-                  <button
-                    class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
-                    onClick={e => { e.stopPropagation(); workspaceActions.closeLeaf(leaf.id) }}
-                  >
-                    ×
-                  </button>
+                  {!isPanelLeaf() && (
+                    <button
+                      class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
+                      onClick={e => { e.stopPropagation(); workspaceActions.closeLeaf(leaf.id) }}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               )
             }}
@@ -53,7 +63,7 @@ export function WorkspaceTabsView(props: { node: WorkspaceTabs; isRoot?: boolean
         {props.isRoot && (
           <button
             class="px-2 shrink-0 text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg-hover)] flex items-center transition-colors"
-            onClick={() => workspaceActions.toggleRight()}
+            onClick={() => workspaceActions.toggleSidebar('right')}
             title="切换右侧栏"
           >
             <PanelRight size={15} />
