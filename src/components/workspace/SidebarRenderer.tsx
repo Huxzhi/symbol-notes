@@ -1,14 +1,13 @@
 import { For } from 'solid-js'
-import { activeRoot } from '../../stores/globalStore'
 import { WorkspaceNodeRenderer } from './WorkspaceNodeRenderer'
 
-export function SidebarRenderer(props: { side: 'left' | 'right' }) {
-  const sidebar = () => activeRoot()[props.side]
+export function SidebarRenderer(props: { node: any }) {
+  const sidebar = () => props.node
 
   return (
     <div
-      class={`transition-all duration-200 overflow-hidden shrink-0 h-full bg-[var(--bg-surface)] flex flex-col
-        ${props.side === 'left' ? 'border-r' : 'border-l'} border-[var(--border)]`}
+      class={`transition-all duration-200 overflow-hidden shrink-0 h-full bg-(--bg-surface) flex flex-col
+        border-(--border)`}
       style={{ width: sidebar().collapsed ? '0px' : `${sidebar().width}px` }}
     >
       <For each={sidebar().children}>

@@ -1,5 +1,5 @@
-import { createMemo, For, Show } from 'solid-js'
 import { EditorView } from '@codemirror/view'
+import { createMemo, For, Show } from 'solid-js'
 import { activeLayout } from '../../stores/globalStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 
@@ -26,7 +26,7 @@ export function OutlinePanel() {
       <For each={outline()}>
         {(h) => (
           <div
-            class="py-0.5 text-[var(--text-2)] hover:text-[var(--accent)] cursor-pointer truncate transition-colors leading-snug"
+            class="py-0.5 text-(--text-2) hover:text-(--accent) cursor-pointer truncate transition-colors leading-snug"
             style={{
               'padding-left': `${(h.level - 1) * 10 + 2}px`,
               'font-size': h.level === 1 ? '12px' : '11px',
@@ -35,7 +35,10 @@ export function OutlinePanel() {
             onClick={() => jumpToHeading(h.from)}
             title={h.text}
           >
-            <span class="text-[var(--text-4)] mr-1" style={{ 'font-size': '9px' }}>
+            <span
+              class="text-(--text-4) mr-1"
+              style={{ 'font-size': '9px' }}
+            >
               {'H' + h.level}
             </span>
             {h.text}
@@ -43,7 +46,7 @@ export function OutlinePanel() {
         )}
       </For>
       <Show when={outline().length === 0}>
-        <div class="text-[var(--text-4)] italic">暂无标题</div>
+        <div class="text-(--text-4) italic">暂无标题</div>
       </Show>
     </div>
   )
