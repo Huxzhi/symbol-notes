@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { extractLinks, extractTags, buildBacklinkMap } from '../services/knowledgeService'
+import { extractLinks, extractTags, buildBacklinkMap } from '../lib/knowledgeUtils'
 
 describe('extractLinks', () => {
-  it('extracts [[wikilinks]]', () => {
-    expect(extractLinks('See [[符号与象征]] and [[索引]]')).toEqual(['符号与象征', '索引'])
+  it('extracts [[wikilinks]] and normalizes to .md', () => {
+    expect(extractLinks('See [[符号与象征]] and [[索引]]')).toEqual(['符号与象征.md', '索引.md'])
   })
 
   it('extracts [[link|alias]] target only', () => {
-    expect(extractLinks('[[target|显示名]]')).toEqual(['target'])
+    expect(extractLinks('[[target|显示名]]')).toEqual(['target.md'])
   })
 
   it('deduplicates repeated links', () => {
-    expect(extractLinks('[[a]] and [[a]]')).toEqual(['a'])
+    expect(extractLinks('[[a]] and [[a]]')).toEqual(['a.md'])
   })
 
   it('returns empty array when no links', () => {
