@@ -100,6 +100,47 @@ async function getFileHandle(path: string): Promise<FileSystemFileHandle> {
   return dir.getFileHandle(parts[parts.length - 1])
 }
 
+/** Pure file read — no side effects. */
+export async function readFile(path: string): Promise<string> {
+  const handle = await getFileHandle(path)
+  const file = await handle.getFile()
+  return file.text()
+}
+
+/** Pure file write — no side effects. */
+export async function writeFile(path: string, content: string): Promise<void> {
+  const handle = await getFileHandle(path)
+  const writable = await handle.createWritable()
+  await writable.write(content)
+  await writable.close()
+}
+
+/**
+ * Read a file and apply auto-timestamps on first open (created/updated fields).
+ * Used by EditorPane on mount and on preview-tab replacement.
+ */
+export async function loadFileContent(path: string): Promise<string> {
+  const handle = await getFileHandle(path)
+  const file = await handle.getFile()
+  let content = await file.text()
+
+  if (uiStore.autoTimestamps) {
+    const { frontmatter } = parseFrontmatter(content)
+    const ts = formatTimestamp(file.lastModified)
+    let updated = content
+    if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
+    if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
+    if (updated !== content) {
+      const writable = await handle.createWritable()
+      await writable.write(updated)
+      await writable.close()
+      content = updated
+    }
+  }
+
+  return content
+}
+
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
