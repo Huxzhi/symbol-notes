@@ -32,13 +32,11 @@ function resolveEmbedTarget(target: string): string | null {
   return searchTree(fileSystemStore.tree, searchName)
 }
 
-// ── Image URL cache — keyed by path, valid for the session ───────────────────
-// Avoids the object URL being revoked when cursor enters/exits the embed range.
+// ── Data URL cache — keyed by path, no revocation needed ─────────────────────
 
 const imageUrlCache = new Map<string, string>()
 
 export function clearEmbedUrlCache() {
-  for (const url of imageUrlCache.values()) URL.revokeObjectURL(url)
   imageUrlCache.clear()
 }
 
@@ -53,12 +51,18 @@ async function getFile(path: string, root: FileSystemDirectoryHandle): Promise<F
   return (await dir.getFileHandle(parts[parts.length - 1])).getFile()
 }
 
-async function getImageUrl(path: string, root: FileSystemDirectoryHandle): Promise<string> {
+async function getImageDataUrl(path: string, root: FileSystemDirectoryHandle): Promise<string> {
   const cached = imageUrlCache.get(path)
   if (cached) return cached
-  const url = URL.createObjectURL(await getFile(path, root))
-  imageUrlCache.set(path, url)
-  return url
+  const file = await getFile(path, root)
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+  imageUrlCache.set(path, dataUrl)
+  return dataUrl
 }
 
 // ── Markdown → safe HTML ──────────────────────────────────────────────────────
@@ -146,7 +150,7 @@ class EmbedWidget extends WidgetType {
       img.className = 'cm-embed-img'
       img.alt = this.target
       el.appendChild(img)
-      getImageUrl(this.resolved, root)
+      getImageDataUrl(this.resolved, root)
         .then(url => { img.src = url })
         .catch(() => { el.textContent = `[图片加载失败: ${this.target}]` })
     } else {
