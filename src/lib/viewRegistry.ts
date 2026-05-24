@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js'
 import type { JSX } from 'solid-js'
+import type { ViewComponentProps } from '../stores/types'
 
 export interface FileViewDef {
   kind: 'file'
@@ -7,7 +8,7 @@ export interface FileViewDef {
   getDisplayText(path: string): string
   getIcon?(): JSX.Element
   canAcceptFile(ext: string): boolean
-  component: Component<{ tabId: string; isActive: boolean }>
+  component: Component<ViewComponentProps>
 }
 
 export interface PageViewDef {
@@ -15,7 +16,7 @@ export interface PageViewDef {
   type: string
   getDisplayText(): string
   getIcon?(): JSX.Element
-  component: Component<{ tabId: string; isActive: boolean }>
+  component: Component<ViewComponentProps>
 }
 
 export type ViewDef = FileViewDef | PageViewDef
@@ -37,7 +38,6 @@ export function getFileViewForExt(ext: string): FileViewDef | undefined {
   return undefined
 }
 
-/** Only for use in tests. */
 export function _clearRegistryForTest(): void {
   registry.clear()
 }
