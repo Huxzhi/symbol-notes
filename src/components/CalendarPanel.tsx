@@ -1,6 +1,6 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
 import { knowledgeStore } from '../stores/knowledgeStore'
-import { openFile } from '../services/fileSystemService'
+import { openFile } from '../services/workspaceService'
 import { toIsoDate, buildCalendarGrid, buildDayData, WEEKDAYS_SHORT } from '../lib/calendarUtils'
 
 export function CalendarPanel() {

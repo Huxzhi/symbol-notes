@@ -1,28 +1,41 @@
 import { For, Show, createSignal } from 'solid-js'
 import { FolderOpen } from 'lucide-solid'
 import { fileSystemStore } from '../stores/fileSystemStore'
-import { uiStore } from '../stores/uiStore'
-import { openFile, openImageFile, openDirectory, createFile, createDirectory } from '../services/fileSystemService'
+import { uiStore, activeFilePath } from '../stores/uiStore'
+import { openDirectory, createFile, createDirectory } from '../services/fileSystemService'
+import { openFile } from '../services/workspaceService'
 import type { FileNode } from '../stores/fileSystemStore'
-import { isImagePath, isMdPath, IMAGE_EXTS } from '../lib/fileTypes'
+
+const IMAGE_EXTS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif',
+])
+const MD_EXT = '.md'
 
 function fileIcon(name: string): string {
-  if (name.endsWith('.md')) return '◻'
+  if (name.endsWith(MD_EXT)) return '◻'
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
-  if (IMAGE_EXTS.has(ext)) return '⊡'
-  return '◫'
+  return IMAGE_EXTS.has(ext) ? '⊡' : '◫'
 }
 
 function displayName(name: string): string {
-  return name.endsWith('.md') ? name.slice(0, -3) : name
+  return name.endsWith(MD_EXT) ? name.slice(0, -3) : name
+}
+
+function isOtherFile(name: string): boolean {
+  return !name.endsWith(MD_EXT)
+}
+
+function canOpen(name: string): boolean {
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
+  return name.endsWith(MD_EXT) || IMAGE_EXTS.has(ext)
 }
 
 function FileTreeNode(props: { node: FileNode; depth: number }) {
-  const isActive = () => fileSystemStore.activeFilePath === props.node.path
-  const isOther = () => props.node.kind === 'file' && !isMdPath(props.node.name)
+  const isActive = () => activeFilePath() === props.node.path
+  const isOther = () => props.node.kind === 'file' && isOtherFile(props.node.name)
   const show = () =>
     props.node.kind === 'directory' ||
-    isMdPath(props.node.name) ||
+    !isOtherFile(props.node.name) ||
     uiStore.showOtherFiles
 
   return (
@@ -30,16 +43,23 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
       <div>
         <div
           class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-[var(--bg-hover)] select-none
-            ${isActive()
-              ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
-              : isOther()
-                ? 'text-[var(--text-4)] border-l-2 border-transparent'
-                : 'text-[var(--text-2)] border-l-2 border-transparent'}`}
+            ${
+              isActive()
+                ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
+                : isOther()
+                  ? 'text-[var(--text-4)] border-l-2 border-transparent'
+                  : 'text-[var(--text-2)] border-l-2 border-transparent'
+            }`}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
             if (props.node.kind !== 'file') return
-            if (isMdPath(props.node.name)) openFile(props.node.path)
-            else if (isImagePath(props.node.path)) openImageFile(props.node.path)
+            if (!canOpen(props.node.name)) return
+            void openFile(props.node.path)
+          }}
+          onDblClick={() => {
+            if (props.node.kind !== 'file') return
+            if (!canOpen(props.node.name)) return
+            void openFile(props.node.path, { newTab: true, pin: true })
           }}
         >
           <span class="text-[9px] text-[var(--text-3)]">
@@ -51,7 +71,7 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
         </div>
         <Show when={props.node.kind === 'directory'}>
           <For each={props.node.children ?? []}>
-            {(child) => <FileTreeNode node={child} depth={props.depth + 1} />}
+            {child => <FileTreeNode node={child} depth={props.depth + 1} />}
           </For>
         </Show>
       </div>
@@ -69,29 +89,29 @@ export function Sidebar() {
     setNewName('')
     setCreateMode(mode)
   }
-
   const cancel = () => {
     setCreateMode(null)
     setNewName('')
   }
-
   const confirm = async () => {
     const name = newName().trim()
     if (!name) { cancel(); return }
     const mode = createMode()
     cancel()
-    if (mode === 'file') await createFile(name)
-    else if (mode === 'folder') await createDirectory(name)
+    if (mode === 'file') {
+      const path = await createFile(name)
+      if (path) await openFile(path, { newTab: true, pin: true })
+    } else if (mode === 'folder') {
+      await createDirectory(name)
+    }
   }
-
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') confirm()
+    if (e.key === 'Enter') void confirm()
     else if (e.key === 'Escape') cancel()
   }
 
   return (
     <div class="w-[190px] h-full bg-[var(--bg-surface)] border-r border-[var(--border)] flex flex-col">
-      {/* Header: left part opens/switches folder, right part has new-folder/new-file */}
       <div class="border-b border-[var(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
           class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors min-w-0 group"
@@ -108,16 +128,12 @@ export function Sidebar() {
             class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors text-[13px]"
             title="新建文件夹"
             onClick={() => startCreate('folder')}
-          >
-            ⊞
-          </button>
+          >⊞</button>
           <button
             class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors"
             title="新建文件"
             onClick={() => startCreate('file')}
-          >
-            +
-          </button>
+          >+</button>
         </Show>
       </div>
 
@@ -133,13 +149,13 @@ export function Sidebar() {
               value={newName()}
               onInput={e => setNewName(e.currentTarget.value)}
               onKeyDown={onKeyDown}
-              onBlur={confirm}
+              onBlur={() => void confirm()}
               ref={el => setTimeout(() => el?.focus(), 0)}
             />
           </div>
         </Show>
         <For each={fileSystemStore.tree}>
-          {(node) => <FileTreeNode node={node} depth={0} />}
+          {node => <FileTreeNode node={node} depth={0} />}
         </For>
       </div>
     </div>

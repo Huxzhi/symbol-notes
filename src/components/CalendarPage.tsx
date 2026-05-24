@@ -1,10 +1,9 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
 import { knowledgeStore } from '../stores/knowledgeStore'
-import { openFile } from '../services/fileSystemService'
-import { setUIStore } from '../stores/uiStore'
+import { openFile } from '../services/workspaceService'
 import { toIsoDate, buildCalendarGrid, buildDayData, WEEKDAYS_LONG } from '../lib/calendarUtils'
 
-export function CalendarPage() {
+export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
   const now = new Date()
   const todayStr = toIsoDate(now.getFullYear(), now.getMonth(), now.getDate())
 

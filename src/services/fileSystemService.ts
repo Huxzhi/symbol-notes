@@ -215,9 +215,9 @@ export async function createDirectory(path: string): Promise<void> {
 export async function createFile(
   name: string,
   dirPath?: string,
-): Promise<void> {
+): Promise<string> {
   const { rootHandle } = fileSystemStore
-  if (!rootHandle) return
+  if (!rootHandle) return ''
   // Support path/to/note syntax in name (auto-create intermediate dirs)
   const combined = dirPath ? `${dirPath}/${name}` : name
   const parts = combined.split('/').filter(Boolean)
@@ -236,7 +236,7 @@ export async function createFile(
   await writable.write('')
   await writable.close()
   setFileSystemStore('tree', await buildTree(rootHandle))
-  await openFile(filePath)
+  return filePath
 }
 
 export async function openImageFile(path: string): Promise<void> {
