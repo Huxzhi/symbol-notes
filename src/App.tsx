@@ -3,13 +3,13 @@ import { CalendarRange } from 'lucide-solid'
 import { Ribbon } from './components/Ribbon'
 import { Sidebar } from './components/Sidebar'
 import { CalendarPanel } from './components/CalendarPanel'
-import { TabBar } from './components/TabBar'
-import { ContentPane } from './components/ContentPane'
 import { RightPanel } from './components/RightPanel'
 import { StatusBar } from './components/StatusBar'
 import { Settings } from './components/Settings'
-import { restoreDirectory } from './services/fileSystemService'
-import { uiStore } from './stores/uiStore'
+import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
+import { SidebarRenderer } from './components/workspace/SidebarRenderer'
+import { fsActions } from './actions/fsActions'
+import { globalStore } from './stores/globalStore'
 import { registerView } from './lib/viewRegistry'
 import { EditorPane } from './components/EditorPane'
 import { ImageViewer } from './components/ImageViewer'
@@ -48,40 +48,35 @@ registerView({
 
 export default function App() {
   createEffect(() => {
-    document.documentElement.setAttribute('data-theme', uiStore.theme)
+    document.documentElement.setAttribute('data-theme', globalStore.workspace.theme)
   })
 
   createEffect(() => {
-    customStyleEl.textContent = uiStore.customCSS
+    customStyleEl.textContent = globalStore.workspace.customCSS
   })
 
   onMount(async () => {
-    await restoreDirectory()
+    await fsActions.restoreDirectory()
   })
 
   return (
     <div class="h-full flex flex-col bg-[var(--bg-base)] text-[var(--text)] overflow-hidden">
       <div class="flex flex-1 overflow-hidden">
         <Ribbon />
-        <div
-          class={`transition-all duration-200 overflow-hidden ${uiStore.showLeft ? 'w-47.5' : 'w-0'}`}
-        >
-          <Show when={uiStore.sidebarView === 'calendar'} fallback={<Sidebar />}>
+        <SidebarRenderer sidebar={globalStore.workspace.left}>
+          <Show when={globalStore.workspace.sidebarView === 'calendar'} fallback={<Sidebar />}>
             <CalendarPanel />
           </Show>
-        </div>
+        </SidebarRenderer>
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-          <TabBar />
-          <ContentPane />
+          <WorkspaceNodeRenderer node={globalStore.workspace.main} />
         </div>
-        <div
-          class={`transition-all duration-200 overflow-hidden ${uiStore.showRight ? 'w-50' : 'w-0'}`}
-        >
+        <SidebarRenderer sidebar={globalStore.workspace.right}>
           <RightPanel />
-        </div>
+        </SidebarRenderer>
       </div>
       <StatusBar />
-      <Show when={uiStore.showSettings}>
+      <Show when={globalStore.workspace.showSettings}>
         <Settings />
       </Show>
     </div>
