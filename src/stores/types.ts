@@ -44,7 +44,6 @@ export interface SidebarSplit {
 // ── Theme ───────────────────────────────────────────────────────────────────
 
 export type ThemeId = 'dark' | 'light' | 'nord'
-export type SidebarView = 'files' | 'calendar'
 
 // ── File system ─────────────────────────────────────────────────────────────
 
@@ -83,7 +82,7 @@ export interface WorkspaceState {
   left: SidebarSplit
   right: SidebarSplit
   activeLeafId: string | null
-  sidebarView: SidebarView
+  leftPanelView: string
   rightPanelView: string
   theme: ThemeId
   customCSS: string

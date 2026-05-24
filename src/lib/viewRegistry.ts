@@ -21,6 +21,7 @@ export interface PageViewDef {
 
 export interface PanelViewDef {
   kind: 'panel'
+  position: 'left' | 'right'
   type: string
   getDisplayText(): string
   getIcon?(): JSX.Element
@@ -46,8 +47,12 @@ export function getFileViewForExt(ext: string): FileViewDef | undefined {
   return undefined
 }
 
-export function getPanelViews(): PanelViewDef[] {
-  return [...registry.values()].filter((d): d is PanelViewDef => d.kind === 'panel')
+export function getLeftPanelViews(): PanelViewDef[] {
+  return [...registry.values()].filter((d): d is PanelViewDef => d.kind === 'panel' && d.position === 'left')
+}
+
+export function getRightPanelViews(): PanelViewDef[] {
+  return [...registry.values()].filter((d): d is PanelViewDef => d.kind === 'panel' && d.position === 'right')
 }
 
 export function _clearRegistryForTest(): void {

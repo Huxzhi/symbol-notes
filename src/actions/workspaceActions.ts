@@ -151,6 +151,10 @@ export const workspaceActions = {
     setGlobalStore('workspace', side, 'width', width)
   },
 
+  setLeftPanelView(type: string): void {
+    setGlobalStore('workspace', 'leftPanelView', type)
+  },
+
   setRightPanelView(type: string): void {
     setGlobalStore('workspace', 'rightPanelView', type)
   },

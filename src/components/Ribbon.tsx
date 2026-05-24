@@ -13,11 +13,11 @@ import { appActions } from '../actions/appActions'
 export function Ribbon() {
   const leftOpen = () => !globalStore.workspace.left.collapsed
 
-  const switchView = (view: 'files' | 'calendar') => {
-    if (globalStore.workspace.sidebarView === view && leftOpen()) {
+  const switchLeftPanel = (view: string) => {
+    if (globalStore.workspace.leftPanelView === view && leftOpen()) {
       workspaceActions.toggleLeft()
     } else {
-      setGlobalStore('workspace', 'sidebarView', view)
+      workspaceActions.setLeftPanelView(view)
       setGlobalStore('workspace', 'left', 'collapsed', false)
     }
   }
@@ -41,17 +41,17 @@ export function Ribbon() {
 
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
-          ${globalStore.workspace.sidebarView === 'files' && leftOpen() ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
+          ${globalStore.workspace.leftPanelView === 'files' && leftOpen() ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
         title="文件列表"
-        onClick={() => switchView('files')}
+        onClick={() => switchLeftPanel('files')}
       >
         <Search size={18} />
       </button>
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
-          ${globalStore.workspace.sidebarView === 'calendar' && leftOpen() ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
+          ${globalStore.workspace.leftPanelView === 'calendar-panel' && leftOpen() ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
         title="日历"
-        onClick={() => switchView('calendar')}
+        onClick={() => switchLeftPanel('calendar-panel')}
       >
         <CalendarDays size={18} />
       </button>

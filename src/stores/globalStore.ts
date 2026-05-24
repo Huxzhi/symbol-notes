@@ -46,7 +46,7 @@ const [globalStore, setGlobalStore] = createStore<GlobalState>({
       children: [],
     },
     activeLeafId: null,
-    sidebarView: 'files',
+    leftPanelView: 'files',
     rightPanelView: 'links',
     theme: saved<ThemeId>('sn-theme', 'dark'),
     customCSS: saved<string>('sn-customCSS', ''),

@@ -3,7 +3,6 @@ import { CalendarRange } from 'lucide-solid'
 import { Ribbon } from './components/Ribbon'
 import { Sidebar } from './components/Sidebar'
 import { CalendarPanel } from './components/CalendarPanel'
-import { RightPanel } from './components/RightPanel'
 import { StatusBar } from './components/StatusBar'
 import { Settings } from './components/Settings'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
@@ -25,6 +24,7 @@ const IMAGE_EXTS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif',
 ])
 
+// ── File views ────────────────────────────────────────────────────────────────
 registerView({
   kind: 'file',
   type: 'markdown',
@@ -41,6 +41,7 @@ registerView({
   component: ImageViewer,
 })
 
+// ── Page views (full-tab) ─────────────────────────────────────────────────────
 registerView({
   kind: 'page',
   type: 'calendar',
@@ -49,9 +50,14 @@ registerView({
   component: CalendarPage,
 })
 
-registerView({ kind: 'panel', type: 'links',   getDisplayText: () => '链接', component: LinksPanel })
-registerView({ kind: 'panel', type: 'outline',  getDisplayText: () => '大纲', component: OutlinePanel })
-registerView({ kind: 'panel', type: 'tags',     getDisplayText: () => '标签', component: TagsPanel })
+// ── Left sidebar panels ───────────────────────────────────────────────────────
+registerView({ kind: 'panel', position: 'left', type: 'files',           getDisplayText: () => '文件', component: Sidebar })
+registerView({ kind: 'panel', position: 'left', type: 'calendar-panel',  getDisplayText: () => '日历', component: CalendarPanel })
+
+// ── Right sidebar panels ──────────────────────────────────────────────────────
+registerView({ kind: 'panel', position: 'right', type: 'links',   getDisplayText: () => '链接', component: LinksPanel })
+registerView({ kind: 'panel', position: 'right', type: 'outline', getDisplayText: () => '大纲', component: OutlinePanel })
+registerView({ kind: 'panel', position: 'right', type: 'tags',    getDisplayText: () => '标签', component: TagsPanel })
 
 export default function App() {
   createEffect(() => {
@@ -70,17 +76,11 @@ export default function App() {
     <div class="h-full flex flex-col bg-[var(--bg-base)] text-[var(--text)] overflow-hidden">
       <div class="flex flex-1 overflow-hidden">
         <Ribbon />
-        <SidebarRenderer sidebar={globalStore.workspace.left}>
-          <Show when={globalStore.workspace.sidebarView === 'calendar'} fallback={<Sidebar />}>
-            <CalendarPanel />
-          </Show>
-        </SidebarRenderer>
+        <SidebarRenderer side="left" />
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
           <WorkspaceNodeRenderer node={globalStore.workspace.main} />
         </div>
-        <SidebarRenderer sidebar={globalStore.workspace.right}>
-          <RightPanel />
-        </SidebarRenderer>
+        <SidebarRenderer side="right" />
       </div>
       <StatusBar />
       <Show when={globalStore.workspace.showSettings}>
