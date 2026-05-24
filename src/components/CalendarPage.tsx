@@ -1,5 +1,5 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { globalStore, findLeafInTree, ROOT_TABS_ID } from '../stores/globalStore'
+import { globalStore, findLeafInTree, activeRoot, activeLayout, ROOT_TABS_ID } from '../stores/globalStore'
 import { workspaceActions } from '../actions/workspaceActions'
 import { getFileViewForExt } from '../lib/viewRegistry'
 import { toIsoDate, buildCalendarGrid, buildDayData, WEEKDAYS_LONG } from '../lib/calendarUtils'
@@ -22,10 +22,10 @@ function openFileInWorkspace(path: string): void {
   const def = getFileViewForExt(ext)
   if (!def) return
   const viewState: ViewState = { type: def.type, state: { file: path } }
-  const existing = findLeafWithFile(globalStore.workspace.main, path)
+  const existing = findLeafWithFile(activeRoot().main, path)
   if (existing) { workspaceActions.activateLeaf(existing.id); return }
-  const { activeLeafId } = globalStore.workspace
-  const activeLeaf = activeLeafId ? findLeafInTree(globalStore.workspace.main, activeLeafId) : null
+  const { activeLeafId } = activeLayout()
+  const activeLeaf = activeLeafId ? findLeafInTree(activeRoot().main, activeLeafId) : null
   if (activeLeaf && !activeLeaf.pinned && activeLeaf.viewState.type !== 'calendar') {
     workspaceActions.setLeafViewState(activeLeafId!, viewState)
     return

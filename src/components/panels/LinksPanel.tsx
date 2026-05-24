@@ -1,10 +1,10 @@
 import { createMemo, For, Show } from 'solid-js'
-import { globalStore, activeFilePath } from '../../stores/globalStore'
+import { globalStore, activeFilePath, activeLayout } from '../../stores/globalStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 
 export function LinksPanel() {
   const activeLeafRuntime = () => {
-    const { activeLeafId } = globalStore.workspace
+    const { activeLeafId } = activeLayout()
     return activeLeafId ? runtimeStore.leafInstances[activeLeafId] : null
   }
 

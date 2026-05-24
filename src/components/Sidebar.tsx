@@ -1,6 +1,6 @@
 import { For, Show, createSignal } from 'solid-js'
 import { FolderOpen } from 'lucide-solid'
-import { globalStore, activeFilePath, findLeafInTree, ROOT_TABS_ID } from '../stores/globalStore'
+import { globalStore, activeFilePath, findLeafInTree, activeRoot, activeLayout, ROOT_TABS_ID } from '../stores/globalStore'
 import { runtimeStore } from '../stores/runtimeStore'
 import { fsActions } from '../actions/fsActions'
 import { workspaceActions } from '../actions/workspaceActions'
@@ -57,12 +57,12 @@ function openFileInWorkspace(path: string, options?: { newTab?: boolean; pin?: b
   if (!def) return
   const viewState: ViewState = { type: def.type, state: { file: path } }
 
-  const existing = findLeafWithFile(globalStore.workspace.main, path)
+  const existing = findLeafWithFile(activeRoot().main, path)
   if (existing) { workspaceActions.activateLeaf(existing.id); return }
 
   if (!options?.newTab) {
-    const { activeLeafId } = globalStore.workspace
-    const activeLeaf = activeLeafId ? findLeafInTree(globalStore.workspace.main, activeLeafId) : null
+    const { activeLeafId } = activeLayout()
+    const activeLeaf = activeLeafId ? findLeafInTree(activeRoot().main, activeLeafId) : null
     if (activeLeaf && !activeLeaf.pinned) {
       workspaceActions.setLeafViewState(activeLeafId!, viewState)
       return
