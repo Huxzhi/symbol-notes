@@ -1,7 +1,7 @@
 import { createEffect, onMount, Show } from 'solid-js'
 import { CalendarRange } from 'lucide-solid'
 import { Ribbon } from './components/Ribbon'
-import { Sidebar } from './components/Sidebar'
+import { FilesPanel } from './components/FilesPanel'
 import { CalendarPanel } from './components/CalendarPanel'
 import { StatusBar } from './components/StatusBar'
 import { Settings } from './components/Settings'
@@ -64,7 +64,7 @@ registerView({
   position: 'left',
   type: 'files',
   getDisplayText: () => '文件',
-  component: Sidebar,
+  component: FilesPanel,
 })
 registerView({
   kind: 'panel',
