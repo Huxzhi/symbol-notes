@@ -1,5 +1,8 @@
 import { createStore } from 'solid-js/store'
-import type { GlobalState, ThemeId, WorkspaceNode, WorkspaceLeaf } from './types'
+import type {
+  GlobalState, ThemeId, WorkspaceNode, WorkspaceLeaf,
+  WorkspaceLayout, WorkspaceRoot,
+} from './types'
 
 function saved<T>(key: string, fallback: T): T {
   try {
@@ -11,18 +14,48 @@ function saved<T>(key: string, fallback: T): T {
 }
 
 export const ROOT_TABS_ID = 'root-tabs'
+export const DEFAULT_LAYOUT_ID = 'default'
 
-const initialMain: WorkspaceNode = {
-  type: 'tabs',
-  id: ROOT_TABS_ID,
+const initialLayout: WorkspaceLayout = {
+  id: DEFAULT_LAYOUT_ID,
+  name: '默认',
+  root: {
+    left: {
+      id: 'left-root',
+      width: 190,
+      collapsed: false,
+      children: [{
+        type: 'tabs',
+        id: 'left-tabs',
+        activeLeafId: 'leaf-files',
+        children: [
+          { type: 'leaf', id: 'leaf-files', viewState: { type: 'files', state: {} }, pinned: false },
+          { type: 'leaf', id: 'leaf-calendar-panel', viewState: { type: 'calendar-panel', state: {} }, pinned: false },
+        ],
+      }],
+    },
+    main: { type: 'tabs', id: ROOT_TABS_ID, activeLeafId: null, children: [] },
+    right: {
+      id: 'right-root',
+      width: 200,
+      collapsed: false,
+      children: [{
+        type: 'tabs',
+        id: 'right-tabs',
+        activeLeafId: 'leaf-links',
+        children: [
+          { type: 'leaf', id: 'leaf-links',   viewState: { type: 'links',   state: {} }, pinned: false },
+          { type: 'leaf', id: 'leaf-outline', viewState: { type: 'outline', state: {} }, pinned: false },
+          { type: 'leaf', id: 'leaf-tags',    viewState: { type: 'tags',    state: {} }, pinned: false },
+        ],
+      }],
+    },
+  },
   activeLeafId: null,
-  children: [],
 }
 
 const [globalStore, setGlobalStore] = createStore<GlobalState>({
-  fs: {
-    tree: [],
-  },
+  fs: { tree: [] },
   knowledge: {
     index: {},
     backlinkMap: {},
@@ -30,24 +63,8 @@ const [globalStore, setGlobalStore] = createStore<GlobalState>({
     isIndexing: false,
   },
   workspace: {
-    main: initialMain,
-    left: {
-      type: 'split',
-      direction: 'horizontal',
-      width: 190,
-      collapsed: false,
-      children: [],
-    },
-    right: {
-      type: 'split',
-      direction: 'horizontal',
-      width: 200,
-      collapsed: false,
-      children: [],
-    },
-    activeLeafId: null,
-    leftPanelView: 'files',
-    rightPanelView: 'links',
+    layouts: [initialLayout],
+    activeLayoutId: DEFAULT_LAYOUT_ID,
     theme: saved<ThemeId>('sn-theme', 'dark'),
     customCSS: saved<string>('sn-customCSS', ''),
     showSettings: false,
@@ -56,15 +73,17 @@ const [globalStore, setGlobalStore] = createStore<GlobalState>({
   },
 })
 
-/** Derived: path of the active file leaf, or null. */
-export function activeFilePath(): string | null {
-  const { activeLeafId } = globalStore.workspace
-  if (!activeLeafId) return null
-  const leaf = findLeafInTree(globalStore.workspace.main, activeLeafId)
-  return (leaf?.viewState.state.file as string | undefined) ?? null
+export function activeLayout(): WorkspaceLayout {
+  return globalStore.workspace.layouts.find(
+    l => l.id === globalStore.workspace.activeLayoutId,
+  )!
 }
 
-/** Find a WorkspaceLeaf by id anywhere in the main tree. */
+export function activeRoot(): WorkspaceRoot {
+  return activeLayout().root
+}
+
+/** Find a WorkspaceLeaf by id anywhere in a WorkspaceNode tree. */
 export function findLeafInTree(
   node: WorkspaceNode,
   leafId: string,
@@ -78,6 +97,32 @@ export function findLeafInTree(
     if (found) return found
   }
   return null
+}
+
+/** Find a WorkspaceLeaf across the entire root (left + main + right). */
+export function findLeafInRoot(
+  root: WorkspaceRoot,
+  leafId: string,
+): WorkspaceLeaf | null {
+  for (const child of root.left.children) {
+    const found = findLeafInTree(child, leafId)
+    if (found) return found
+  }
+  const mainFound = findLeafInTree(root.main, leafId)
+  if (mainFound) return mainFound
+  for (const child of root.right.children) {
+    const found = findLeafInTree(child, leafId)
+    if (found) return found
+  }
+  return null
+}
+
+/** Derived: path of the active file leaf in main, or null. */
+export function activeFilePath(): string | null {
+  const layout = activeLayout()
+  if (!layout.activeLeafId) return null
+  const leaf = findLeafInTree(layout.root.main, layout.activeLeafId)
+  return (leaf?.viewState.state.file as string | undefined) ?? null
 }
 
 export { globalStore, setGlobalStore }
