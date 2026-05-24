@@ -1,8 +1,8 @@
-import { createResource, Match, Switch } from 'solid-js'
+import { createEffect, createResource, Match, onCleanup, Switch } from 'solid-js'
 import { runtimeStore } from '../stores/runtimeStore'
 import type { ViewComponentProps } from '../stores/types'
 
-async function readImageDataUrl(
+async function getObjectUrl(
   path: string,
   root: FileSystemDirectoryHandle,
 ): Promise<string> {
@@ -13,25 +13,25 @@ async function readImageDataUrl(
   }
   const handle = await dir.getFileHandle(parts[parts.length - 1])
   const file = await handle.getFile()
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
+  return URL.createObjectURL(file)
 }
 
 export function ImageViewer(props: ViewComponentProps) {
   const path = () => props.viewState.file as string | undefined
 
-  const [dataUrl] = createResource(
+  const [objectUrl] = createResource(
     () => {
       const p = path()
       const root = runtimeStore.rootHandle
       return p && root ? { path: p, root } : null
     },
-    ({ path, root }) => readImageDataUrl(path, root),
+    ({ path, root }) => getObjectUrl(path, root),
   )
+
+  createEffect(() => {
+    const url = objectUrl()
+    if (url) onCleanup(() => URL.revokeObjectURL(url))
+  })
 
   const fileName = () => path()?.split('/').pop() ?? ''
 
@@ -42,15 +42,15 @@ export function ImageViewer(props: ViewComponentProps) {
       </div>
       <div class="flex-1 flex items-center justify-center overflow-auto p-6">
         <Switch>
-          <Match when={dataUrl.error}>
+          <Match when={objectUrl.error}>
             <div class="text-[12px] text-(--text-4)">无法加载图片</div>
           </Match>
-          <Match when={dataUrl.loading}>
+          <Match when={objectUrl.loading}>
             <div class="text-[12px] text-(--text-4)">加载中…</div>
           </Match>
-          <Match when={dataUrl()}>
+          <Match when={objectUrl()}>
             <img
-              src={dataUrl()!}
+              src={objectUrl()!}
               alt={fileName()}
               class="max-w-full max-h-full object-contain rounded shadow-sm select-none"
               draggable={false}
