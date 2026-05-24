@@ -1,17 +1,22 @@
 import { createStore } from 'solid-js/store'
-import { PAGE_MAP } from '../lib/pageRegistry'
 
 export type ThemeId = 'dark' | 'light' | 'nord'
 export type SidebarView = 'files' | 'calendar'
+
+export interface Tab {
+  id: string
+  type: string       // matches a ViewDef.type in viewRegistry
+  path?: string      // present for file tabs, absent for page tabs
+  pinned: boolean
+}
 
 interface UIState {
   showLeft: boolean
   showRight: boolean
   sidebarView: SidebarView
-  /** Insertion-ordered list of all open tab IDs (file paths + page IDs). */
-  tabOrder: string[]
-  /** Which page is active; null means a file tab is active. */
-  activePageId: string | null
+  tabs: Record<string, Tab>
+  tabOrder: string[]         // ordered list of tab IDs
+  activeTabId: string | null
   theme: ThemeId
   customCSS: string
   showSettings: boolean
@@ -32,8 +37,9 @@ const [uiStore, setUIStore] = createStore<UIState>({
   showLeft: true,
   showRight: true,
   sidebarView: 'files',
+  tabs: {},
   tabOrder: [],
-  activePageId: null,
+  activeTabId: null,
   showSettings: false,
   theme: saved<ThemeId>('sn-theme', 'dark'),
   customCSS: saved<string>('sn-customCSS', ''),
@@ -41,23 +47,24 @@ const [uiStore, setUIStore] = createStore<UIState>({
   showOtherFiles: saved<boolean>('sn-showOtherFiles', true),
 })
 
-/** Open a page tab (if not already open) and make it active. */
-export function openPage(id: string): void {
-  if (!uiStore.tabOrder.includes(id)) {
-    setUIStore('tabOrder', [...uiStore.tabOrder, id])
+/** Derived helper: path of the active file tab, or null. */
+export function activeFilePath(): string | null {
+  const { tabs, activeTabId } = uiStore
+  return activeTabId ? (tabs[activeTabId]?.path ?? null) : null
+}
+
+/** Update every tab whose path matches oldPath. Called by fileSystemService.renameFile. */
+export function renameTabPath(oldPath: string, newPath: string): void {
+  for (const id of uiStore.tabOrder) {
+    if (uiStore.tabs[id]?.path === oldPath) {
+      setUIStore('tabs', id, 'path', newPath)
+    }
   }
-  setUIStore('activePageId', id)
 }
 
-/** Close a page tab and fall back to file view. */
-export function closePage(id: string): void {
-  setUIStore('tabOrder', uiStore.tabOrder.filter(t => t !== id))
-  if (uiStore.activePageId === id) setUIStore('activePageId', null)
-}
-
-/** Whether a tab ID is a page (vs a file path). */
-export function isPageTab(id: string): boolean {
-  return !!PAGE_MAP[id]
+/** Reset all workspace tab state. Called when opening a new directory. */
+export function clearTabs(): void {
+  setUIStore({ tabs: {}, tabOrder: [], activeTabId: null })
 }
 
 export { uiStore, setUIStore }
