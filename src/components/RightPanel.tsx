@@ -1,30 +1,34 @@
 import { createSignal, createMemo, For, Show } from 'solid-js'
 import { EditorView } from '@codemirror/view'
-import { activeFilePath } from '../stores/uiStore'
-import { knowledgeStore } from '../stores/knowledgeStore'
-import { editorStore } from '../stores/editorStore'
+import { globalStore, activeFilePath } from '../stores/globalStore'
+import { runtimeStore } from '../stores/runtimeStore'
 
 type Tab = 'links' | 'outline' | 'tags'
 
 export function RightPanel() {
   const [activeTab, setActiveTab] = createSignal<Tab>('links')
 
+  const activeLeafRuntime = () => {
+    const { activeLeafId } = globalStore.workspace
+    return activeLeafId ? runtimeStore.leafInstances[activeLeafId] : null
+  }
+
   const currentMeta = createMemo(() => {
     const path = activeFilePath()
-    return path ? (knowledgeStore.index[path] ?? null) : null
+    return path ? (globalStore.knowledge.index[path] ?? null) : null
   })
 
-  const outLinks = createMemo(() => editorStore.outLinks)
+  const outLinks = createMemo(() => activeLeafRuntime()?.outLinks ?? [])
 
   const backlinks = createMemo(() => {
     const path = activeFilePath()
     if (!path) return []
-    const aliases = knowledgeStore.index[path]?.aliases ?? []
+    const aliases = globalStore.knowledge.index[path]?.aliases ?? []
     const keys = [path, ...aliases, ...aliases.map(a => `${a}.md`)]
     const seen = new Set<string>()
     const result: string[] = []
     for (const key of keys) {
-      for (const bl of knowledgeStore.backlinkMap[key] ?? []) {
+      for (const bl of globalStore.knowledge.backlinkMap[key] ?? []) {
         if (!seen.has(bl)) { seen.add(bl); result.push(bl) }
       }
     }
@@ -32,10 +36,10 @@ export function RightPanel() {
   })
 
   const tags = createMemo(() => currentMeta()?.tags ?? [])
-  const outline = createMemo(() => editorStore.headings)
+  const outline = createMemo(() => activeLeafRuntime()?.headings ?? [])
 
   const jumpToHeading = (pos: number) => {
-    const view = editorStore.cmView
+    const view = activeLeafRuntime()?.cmView
     if (!view) return
     view.dispatch({
       selection: { anchor: pos },

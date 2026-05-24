@@ -1,6 +1,7 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
-import { uiStore, setUIStore } from '../stores/uiStore'
-import type { ThemeId } from '../stores/uiStore'
+import { globalStore, setGlobalStore } from '../stores/globalStore'
+import { appActions } from '../actions/appActions'
+import type { ThemeId } from '../stores/types'
 
 type Section = 'appearance' | 'files' | 'shortcuts'
 
@@ -24,28 +25,20 @@ const SHORTCUTS = [
   { keys: 'Ctrl / ⌘  I',       desc: '斜体' },
 ]
 
-function persist(key: string, value: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
-}
-
 export function Settings() {
   const [section, setSection] = createSignal<Section>('appearance')
-  const [draftTheme, setDraftTheme] = createSignal<ThemeId>(uiStore.theme)
-  const [draftCSS, setDraftCSS] = createSignal(uiStore.customCSS)
-  const [draftAutoTs, setDraftAutoTs] = createSignal(uiStore.autoTimestamps)
-  const [draftShowOtherFiles, setDraftShowOtherFiles] = createSignal(uiStore.showOtherFiles)
+  const [draftTheme, setDraftTheme] = createSignal<ThemeId>(globalStore.workspace.theme)
+  const [draftCSS, setDraftCSS] = createSignal(globalStore.workspace.customCSS)
+  const [draftAutoTs, setDraftAutoTs] = createSignal(globalStore.workspace.autoTimestamps)
+  const [draftShowOtherFiles, setDraftShowOtherFiles] = createSignal(globalStore.workspace.showOtherFiles)
 
-  const close = () => setUIStore('showSettings', false)
+  const close = () => setGlobalStore('workspace', 'showSettings', false)
 
   const apply = () => {
-    setUIStore('theme', draftTheme())
-    setUIStore('customCSS', draftCSS())
-    setUIStore('autoTimestamps', draftAutoTs())
-    setUIStore('showOtherFiles', draftShowOtherFiles())
-    persist('sn-theme', draftTheme())
-    persist('sn-customCSS', draftCSS())
-    persist('sn-autoTimestamps', draftAutoTs())
-    persist('sn-showOtherFiles', draftShowOtherFiles())
+    appActions.setTheme(draftTheme())
+    appActions.setCustomCSS(draftCSS())
+    appActions.setAutoTimestamps(draftAutoTs())
+    appActions.setShowOtherFiles(draftShowOtherFiles())
     close()
   }
 

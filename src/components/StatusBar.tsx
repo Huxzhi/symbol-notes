@@ -1,15 +1,19 @@
 import { createMemo, Show } from 'solid-js'
-import { editorStore } from '../stores/editorStore'
-import { knowledgeStore } from '../stores/knowledgeStore'
+import { globalStore } from '../stores/globalStore'
+import { runtimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 
 export function StatusBar() {
+  const activeRuntime = () => {
+    const { activeLeafId } = globalStore.workspace
+    return activeLeafId ? runtimeStore.leafInstances[activeLeafId] : null
+  }
+
   const stats = createMemo(() => {
-    // cmView is reactive (store prop); re-runs on tab switch.
-    const text = editorStore.cmView?.state.doc.toString() ?? ''
+    const text = activeRuntime()?.cmView?.state.doc.toString() ?? ''
     const { body } = parseFrontmatter(text)
     const words = body.trim() ? body.trim().split(/\s+/).length : 0
-    const lines = editorStore.cmView?.state.doc.lines ?? 0
+    const lines = activeRuntime()?.cmView?.state.doc.lines ?? 0
     return { words, lines }
   })
 
@@ -18,14 +22,14 @@ export function StatusBar() {
       <span>{stats().words} 字</span>
       <span>{stats().lines} 行</span>
       <div class="flex-1" />
-      <Show when={knowledgeStore.isIndexing}>
+      <Show when={globalStore.knowledge.isIndexing}>
         <span class="flex items-center gap-1 text-[var(--text-3)]">
           <span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
           后台检测中
         </span>
       </Show>
-      <span class={editorStore.isDirty ? 'text-[var(--accent)]' : ''}>
-        {editorStore.isDirty ? '未保存' : '已保存'}
+      <span class={activeRuntime()?.isDirty ? 'text-[var(--accent)]' : ''}>
+        {activeRuntime()?.isDirty ? '未保存' : '已保存'}
       </span>
     </div>
   )
