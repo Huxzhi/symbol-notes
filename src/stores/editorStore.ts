@@ -4,7 +4,6 @@ import type { OutLink } from '../lib/outLinksField'
 import type { Heading } from '../lib/headingsField'
 
 export interface EditorState {
-  content: string
   isDirty: boolean
   cmView: EditorView | null
   outLinks: OutLink[]
@@ -12,7 +11,6 @@ export interface EditorState {
 }
 
 const [editorStore, setEditorStore] = createStore<EditorState>({
-  content: '',
   isDirty: false,
   cmView: null,
   outLinks: [],

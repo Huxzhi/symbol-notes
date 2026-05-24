@@ -10,15 +10,11 @@ export interface FileNode {
 export interface FileSystemState {
   rootHandle: FileSystemDirectoryHandle | null
   tree: FileNode[]
-  activeFilePath: string | null
-  openFilePaths: string[]
 }
 
 const [fileSystemStore, setFileSystemStore] = createStore<FileSystemState>({
   rootHandle: null,
   tree: [],
-  activeFilePath: null,
-  openFilePaths: [],
 })
 
 export { fileSystemStore, setFileSystemStore }
