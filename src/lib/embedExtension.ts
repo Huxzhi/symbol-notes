@@ -8,7 +8,9 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
-import { fileSystemStore, type FileNode } from '../stores/fileSystemStore'
+import { globalStore } from '../stores/globalStore'
+import { runtimeStore } from '../stores/runtimeStore'
+import type { FileNode } from '../stores/types'
 import { IMAGE_EXTS } from './fileTypes'
 import { parseFrontmatter } from './parseFrontmatter'
 
@@ -29,7 +31,7 @@ function resolveEmbedTarget(target: string): string | null {
   const stem = target.split('/').pop()!
   const hasExt = stem.includes('.')
   const searchName = hasExt ? stem : `${stem}.md`
-  return searchTree(fileSystemStore.tree, searchName)
+  return searchTree(globalStore.fs.tree, searchName)
 }
 
 // ── Data URL cache — keyed by path, no revocation needed ─────────────────────
@@ -140,7 +142,7 @@ class EmbedWidget extends WidgetType {
   }
 
   toDOM() {
-    const root = fileSystemStore.rootHandle!
+    const root = runtimeStore.rootHandle!
     const el = document.createElement('div')
     el.className = 'cm-embed'
 
@@ -179,7 +181,7 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { state } = view
   const sel = state.selection.main
-  const root = fileSystemStore.rootHandle
+  const root = runtimeStore.rootHandle
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({

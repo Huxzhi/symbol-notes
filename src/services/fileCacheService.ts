@@ -1,5 +1,5 @@
 import { get, set, del, keys, createStore } from 'idb-keyval'
-import type { FileMetadata } from '../stores/knowledgeStore'
+import type { FileMetadata } from '../stores/types'
 
 export type CachedFields = Pick<FileMetadata, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'>
 

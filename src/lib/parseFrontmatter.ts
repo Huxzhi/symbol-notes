@@ -19,9 +19,15 @@ export function parseYamlSubset(yaml: string): Record<string, unknown> {
   while (i < lines.length) {
     const line = lines[i]
     const colonIdx = line.indexOf(':')
-    if (colonIdx === -1) { i++; continue }
+    if (colonIdx === -1) {
+      i++
+      continue
+    }
     const key = line.slice(0, colonIdx).trim()
-    if (!key) { i++; continue }
+    if (!key) {
+      i++
+      continue
+    }
     const rest = line.slice(colonIdx + 1).trim()
     if (rest === '') {
       const items: string[] = []
@@ -32,7 +38,11 @@ export function parseYamlSubset(yaml: string): Record<string, unknown> {
       }
       result[key] = items
     } else if (rest.startsWith('[') && rest.endsWith(']')) {
-      result[key] = rest.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean)
+      result[key] = rest
+        .slice(1, -1)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
       i++
     } else {
       result[key] = parseScalar(rest)
@@ -48,8 +58,10 @@ function parseScalar(value: string): unknown {
   if (value === 'null' || value === '~') return null
   const num = Number(value)
   if (value !== '' && !isNaN(num)) return num
-  if ((value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
     return value.slice(1, -1)
   }
   return value
@@ -58,12 +70,16 @@ function parseScalar(value: string): unknown {
 export function formatTimestamp(ms: number): string {
   const d = new Date(ms)
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
 // Set or add a single frontmatter field in-place, preserving all other content.
 // Creates a frontmatter block if the file has none.
-export function setFrontmatterField(content: string, key: string, value: string): string {
+export function setFrontmatterField(
+  content: string,
+  key: string,
+  value: string,
+): string {
   if (!content.startsWith('---')) {
     return `---\n${key}: ${value}\n---\n\n${content}`
   }
@@ -72,7 +88,7 @@ export function setFrontmatterField(content: string, key: string, value: string)
     return `---\n${key}: ${value}\n---\n\n${content}`
   }
   const yaml = content.slice(4, fmEnd)
-  const rest = content.slice(fmEnd + 4)          // everything after closing ---
+  const rest = content.slice(fmEnd + 4) // everything after closing ---
   const fieldRe = new RegExp(`^(${key}:[ \\t]*).*$`, 'm')
   if (fieldRe.test(yaml)) {
     return `---\n${yaml.replace(fieldRe, `$1${value}`)}\n---${rest}`
@@ -89,10 +105,11 @@ export function serializeFrontmatter(
     .map(([k, v]) => {
       if (Array.isArray(v)) {
         if (v.length === 0) return `${k}: []`
-        return `${k}:\n${v.map(item => `  - ${item}`).join('\n')}`
+        return `${k}:\n${v.map((item) => `  - ${item}`).join('\n')}`
       }
       const s = String(v)
-      if (s.includes(':') || s.includes('#')) return `${k}: "${s.replace(/"/g, '\\"')}"`
+      if (s.includes(':') || s.includes('#'))
+        return `${k}: "${s.replace(/"/g, '\\"')}"`
       return `${k}: ${s}`
     })
     .join('\n')

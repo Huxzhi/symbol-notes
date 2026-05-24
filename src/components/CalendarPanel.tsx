@@ -1,7 +1,37 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { knowledgeStore } from '../stores/knowledgeStore'
-import { openFile } from '../services/workspaceService'
+import { globalStore, findLeafInTree, ROOT_TABS_ID } from '../stores/globalStore'
+import { workspaceActions } from '../actions/workspaceActions'
+import { getFileViewForExt } from '../lib/viewRegistry'
 import { toIsoDate, buildCalendarGrid, buildDayData, WEEKDAYS_SHORT } from '../lib/calendarUtils'
+import type { ViewState, WorkspaceLeaf, WorkspaceNode } from '../stores/types'
+
+function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | null {
+  if (root.type === 'leaf' && root.viewState.state.file === path) return root
+  if (root.type === 'tabs') return root.children.find(l => l.viewState.state.file === path) ?? null
+  if (root.type === 'split') {
+    for (const child of root.children) {
+      const found = findLeafWithFile(child, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function openFileInWorkspace(path: string): void {
+  const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
+  const def = getFileViewForExt(ext)
+  if (!def) return
+  const viewState: ViewState = { type: def.type, state: { file: path } }
+  const existing = findLeafWithFile(globalStore.workspace.main, path)
+  if (existing) { workspaceActions.activateLeaf(existing.id); return }
+  const { activeLeafId } = globalStore.workspace
+  const activeLeaf = activeLeafId ? findLeafInTree(globalStore.workspace.main, activeLeafId) : null
+  if (activeLeaf && !activeLeaf.pinned && activeLeaf.viewState.type !== 'calendar') {
+    workspaceActions.setLeafViewState(activeLeafId!, viewState)
+    return
+  }
+  workspaceActions.createLeaf(ROOT_TABS_ID, viewState)
+}
 
 export function CalendarPanel() {
   const now = new Date()
@@ -11,7 +41,7 @@ export function CalendarPanel() {
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
   const [selectedDay, setSelectedDay] = createSignal<string | null>(todayStr)
 
-  const dayData = createMemo(() => buildDayData(knowledgeStore.index))
+  const dayData = createMemo(() => buildDayData(globalStore.knowledge.index))
   const calendarGrid = createMemo(() => buildCalendarGrid(viewYear(), viewMonth()))
 
   const prevMonth = () => batch(() => {
@@ -136,7 +166,7 @@ export function CalendarPanel() {
                 {(path) => (
                   <button
                     class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors truncate block cursor-pointer"
-                    onClick={() => openFile(path)}
+                    onClick={() => openFileInWorkspace(path)}
                     title={path}
                   >
                     {path.split('/').pop()?.replace(/\.md$/, '')}
@@ -152,7 +182,7 @@ export function CalendarPanel() {
                 {(path) => (
                   <button
                     class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)] transition-colors truncate block cursor-pointer"
-                    onClick={() => openFile(path)}
+                    onClick={() => openFileInWorkspace(path)}
                     title={path}
                   >
                     {path.split('/').pop()?.replace(/\.md$/, '')}
@@ -168,7 +198,7 @@ export function CalendarPanel() {
                 {(path) => (
                   <button
                     class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--link-2)] transition-colors truncate block cursor-pointer"
-                    onClick={() => openFile(path)}
+                    onClick={() => openFileInWorkspace(path)}
                     title={path}
                   >
                     {path.split('/').pop()?.replace(/\.md$/, '')}
