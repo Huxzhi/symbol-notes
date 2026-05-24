@@ -1,4 +1,3 @@
-import { Transaction } from '@codemirror/state'
 import { get, set } from 'idb-keyval'
 import { batch } from 'solid-js'
 import {
@@ -6,15 +5,14 @@ import {
   parseFrontmatter,
   setFrontmatterField,
 } from '../lib/parseFrontmatter'
-import { editorStore, setEditorStore } from '../stores/editorStore'
+import { editorStore } from '../stores/editorStore'
 import {
   fileSystemStore,
   setFileSystemStore,
   type FileNode,
 } from '../stores/fileSystemStore'
 import { knowledgeStore } from '../stores/knowledgeStore'
-import { setUIStore, uiStore } from '../stores/uiStore'
-import { startBackgroundParsing } from './backgroundParser'
+import { uiStore, clearTabs, renameTabPath } from '../stores/uiStore'
 import {
   applyFileMeta,
   reindexFile,
@@ -42,11 +40,8 @@ export async function openDirectory(): Promise<void> {
   clearEmbedUrlCache()
   const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
   await set(DB_KEY, handle)
-  setFileSystemStore({
-    rootHandle: handle,
-    activeFilePath: null,
-    openFilePaths: [],
-  })
+  setFileSystemStore({ rootHandle: handle })
+  clearTabs()
   setFileSystemStore('tree', await buildTree(handle))
   await scanDirectory()
 }
@@ -239,94 +234,6 @@ export async function createFile(
   return filePath
 }
 
-export async function openImageFile(path: string): Promise<void> {
-  setFileSystemStore('activeFilePath', path)
-  if (!fileSystemStore.openFilePaths.includes(path)) {
-    setFileSystemStore('openFilePaths', [...fileSystemStore.openFilePaths, path])
-    setUIStore('tabOrder', [...uiStore.tabOrder, path])
-  }
-  setUIStore('activePageId', null)
-}
-
-export async function openFile(path: string): Promise<void> {
-  const handle = await getFileHandle(path)
-  const file = await handle.getFile()
-  let content = await file.text()
-
-  if (uiStore.autoTimestamps) {
-    const { frontmatter } = parseFrontmatter(content)
-    const ts = formatTimestamp(file.lastModified)
-    let updated = content
-    if (!frontmatter.created)
-      updated = setFrontmatterField(updated, 'created', ts)
-    if (!frontmatter.updated)
-      updated = setFrontmatterField(updated, 'updated', ts)
-    if (updated !== content) {
-      const writable = await handle.createWritable()
-      await writable.write(updated)
-      await writable.close()
-      content = updated
-    }
-  }
-
-  setEditorStore({ content, isDirty: false })
-  setFileSystemStore('activeFilePath', path)
-  if (!fileSystemStore.openFilePaths.includes(path)) {
-    setFileSystemStore('openFilePaths', [
-      ...fileSystemStore.openFilePaths,
-      path,
-    ])
-    setUIStore('tabOrder', [...uiStore.tabOrder, path])
-  }
-  setUIStore('activePageId', null)
-  startBackgroundParsing(path)
-}
-
-export async function saveCurrentFile(): Promise<void> {
-  const { rootHandle, activeFilePath } = fileSystemStore
-  const { cmView } = editorStore
-  if (!rootHandle || !activeFilePath || !cmView) return
-
-  let newContent = cmView.state.doc.toString()
-
-  if (uiStore.autoTimestamps) {
-    const ts = formatTimestamp(Date.now())
-    const withUpdated = setFrontmatterField(newContent, 'updated', ts)
-    if (withUpdated !== newContent) {
-      let from = 0
-      while (
-        from < newContent.length &&
-        from < withUpdated.length &&
-        newContent[from] === withUpdated[from]
-      )
-        from++
-      let toOld = newContent.length,
-        toNew = withUpdated.length
-      while (
-        toOld > from &&
-        toNew > from &&
-        newContent[toOld - 1] === withUpdated[toNew - 1]
-      ) {
-        toOld--
-        toNew--
-      }
-      cmView.dispatch({
-        changes: { from, to: toOld, insert: withUpdated.slice(from, toNew) },
-        annotations: Transaction.remote.of(true),
-      })
-      newContent = withUpdated
-    }
-  }
-
-  const handle = await getFileHandle(activeFilePath)
-  const writable = await handle.createWritable()
-  await writable.write(newContent)
-  await writable.close()
-
-  setEditorStore({ content: newContent, isDirty: false })
-  await reindexFile(activeFilePath, newContent)
-}
-
 export async function renameFile(
   oldPath: string,
   newBaseName: string,
@@ -350,8 +257,8 @@ export async function renameFile(
     parentDir = await parentDir.getDirectoryHandle(part)
   }
 
-  // Write new file — use editor content to preserve any unsaved changes
-  const content = editorStore.content
+  // Write new file — use live CM6 content to preserve any unsaved changes
+  const content = editorStore.cmView?.state.doc.toString() ?? ''
   const newHandle = await parentDir.getFileHandle(newFileName, { create: true })
   const writable = await newHandle.createWritable()
   await writable.write(content)
@@ -380,18 +287,8 @@ export async function renameFile(
   // every file that currently contains [[oldName]] / [[folder/oldName]]).
   const backlinks = [...(knowledgeStore.backlinkMap[oldPath] ?? [])]
 
-  // Update open tab list and active path
-  setFileSystemStore(
-    'openFilePaths',
-    fileSystemStore.openFilePaths.map((p) => (p === oldPath ? newPath : p)),
-  )
-  setUIStore(
-    'tabOrder',
-    uiStore.tabOrder.map((t) => (t === oldPath ? newPath : t)),
-  )
-  setFileSystemStore('activeFilePath', newPath)
-  setEditorStore({ isDirty: false })
-
+  // Update workspace tab paths and file tree
+  renameTabPath(oldPath, newPath)
   setFileSystemStore('tree', await buildTree(rootHandle))
 
   // Incremental knowledge index update — O(links+tags), no full vault scan.
@@ -422,17 +319,3 @@ export async function renameFile(
   }
 }
 
-export function closeFile(path: string): void {
-  const paths = fileSystemStore.openFilePaths.filter((p) => p !== path)
-  setFileSystemStore('openFilePaths', paths)
-  setUIStore(
-    'tabOrder',
-    uiStore.tabOrder.filter((t) => t !== path),
-  )
-  if (fileSystemStore.activeFilePath === path) {
-    const next = paths[paths.length - 1] ?? null
-    setFileSystemStore('activeFilePath', next)
-    if (next) openFile(next)
-    else setEditorStore({ content: '', isDirty: false })
-  }
-}
