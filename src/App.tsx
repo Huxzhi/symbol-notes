@@ -8,7 +8,7 @@ import { Settings } from './components/Settings'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { fsActions } from './actions/fsActions'
-import { globalStore } from './stores/globalStore'
+import { globalStore, activeRoot } from './stores/globalStore'
 import { registerView } from './lib/viewRegistry'
 import { EditorPane } from './components/EditorPane'
 import { ImageViewer } from './components/ImageViewer'
@@ -78,7 +78,7 @@ export default function App() {
         <Ribbon />
         <SidebarRenderer side="left" />
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-          <WorkspaceNodeRenderer node={globalStore.workspace.main} />
+          <WorkspaceNodeRenderer node={activeRoot().main} />
         </div>
         <SidebarRenderer side="right" />
       </div>
