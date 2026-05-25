@@ -1,6 +1,12 @@
-import { createEffect, createResource, Match, onCleanup, Switch } from 'solid-js'
-import { runtimeStore } from '../stores/runtimeStore'
-import type { ViewComponentProps } from '../stores/types'
+import {
+  createEffect,
+  createResource,
+  Match,
+  onCleanup,
+  Switch,
+} from 'solid-js'
+import { runtimeStore } from '../../stores/runtimeStore'
+import type { ViewComponentProps } from '../../stores/types'
 
 async function getObjectUrl(
   path: string,

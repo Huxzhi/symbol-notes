@@ -102,7 +102,7 @@ function openFileInWorkspace(
 
 function childrenOf(parentPath: string | null): FileMapEntry[] {
   return Object.values(globalStore.fs.fileMap)
-    .filter(e => e.parent === parentPath)
+    .filter((e) => e.parent === parentPath)
     .sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
       return a.name.localeCompare(b.name)
@@ -111,7 +111,8 @@ function childrenOf(parentPath: string | null): FileMapEntry[] {
 
 function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
   const isActive = () => activeFilePath() === props.entry.path
-  const isOther = () => props.entry.kind === 'file' && isOtherFile(props.entry.name)
+  const isOther = () =>
+    props.entry.kind === 'file' && isOtherFile(props.entry.name)
   const show = () =>
     props.entry.kind === 'directory' ||
     !isOtherFile(props.entry.name) ||
@@ -142,7 +143,9 @@ function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
           }}
         >
           <span class="text-[9px] text-(--text-3)">
-            {props.entry.kind === 'directory' ? '▸' : fileIcon(props.entry.name)}
+            {props.entry.kind === 'directory'
+              ? '▸'
+              : fileIcon(props.entry.name)}
           </span>
           <span class={isActive() ? 'text-(--accent)' : ''}>
             {displayName(props.entry.name)}
@@ -150,7 +153,12 @@ function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
         </div>
         <Show when={props.entry.kind === 'directory'}>
           <For each={childrenOf(props.entry.path)}>
-            {(child) => <FileTreeNode entry={child} depth={props.depth + 1} />}
+            {(child) => (
+              <FileTreeNode
+                entry={child}
+                depth={props.depth + 1}
+              />
+            )}
           </For>
         </Show>
       </div>
@@ -248,7 +256,12 @@ export function FilesPanel() {
           </div>
         </Show>
         <For each={childrenOf(null)}>
-          {(entry) => <FileTreeNode entry={entry} depth={0} />}
+          {(entry) => (
+            <FileTreeNode
+              entry={entry}
+              depth={0}
+            />
+          )}
         </For>
       </div>
     </div>

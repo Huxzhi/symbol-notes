@@ -1,17 +1,17 @@
 import { CalendarRange } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
 import { appActions } from './actions/appActions'
-import { CalendarPage } from './components/CalendarPage'
-import { EditorPane } from './components/EditorPane'
-import { ImageViewer } from './components/ImageViewer'
-import { Ribbon } from './components/Ribbon'
-import { Settings } from './components/Settings'
-import { StatusBar } from './components/StatusBar'
 import { CalendarPanel } from './components/panels/CalendarPanel'
 import { FilesPanel } from './components/panels/FilesPanel'
 import { LinksPanel } from './components/panels/LinksPanel'
 import { OutlinePanel } from './components/panels/OutlinePanel'
 import { TagsPanel } from './components/panels/TagsPanel'
+import { Ribbon } from './components/Ribbon'
+import { Settings } from './components/Settings'
+import { StatusBar } from './components/StatusBar'
+import { CalendarViewer } from './components/viewer/CalendarViewer'
+import { EditorViewer } from './components/viewer/EditorViewer'
+import { ImageViewer } from './components/viewer/ImageViewer'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
 import { registerView } from './lib/viewRegistry'
@@ -20,45 +20,7 @@ import { activeRoot, globalStore } from './stores/globalStore'
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
 
-const IMAGE_EXTS = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.svg',
-  '.ico',
-  '.bmp',
-  '.avif',
-])
-
-// ── File views ────────────────────────────────────────────────────────────────
-registerView({
-  kind: 'file',
-  type: 'markdown',
-  getDisplayText: (path) => path.split('/').pop()!,
-  canAcceptFile: (ext) => ext === '.md',
-  component: EditorPane,
-})
-
-registerView({
-  kind: 'file',
-  type: 'image',
-  getDisplayText: (path) => path.split('/').pop()!,
-  canAcceptFile: (ext) => IMAGE_EXTS.has(ext),
-  component: ImageViewer,
-})
-
-// ── Page views (full-tab) ─────────────────────────────────────────────────────
-registerView({
-  kind: 'page',
-  type: 'calendar',
-  getDisplayText: () => '日历',
-  getIcon: () => <CalendarRange size={11} />,
-  component: CalendarPage,
-})
-
-// ── Left sidebar panels ───────────────────────────────────────────────────────
+// ── View registration ─────────────────────────────────────────────────────────
 registerView({
   kind: 'panel',
   position: 'left',
@@ -73,8 +35,6 @@ registerView({
   getDisplayText: () => '日历',
   component: CalendarPanel,
 })
-
-// ── Right sidebar panels ──────────────────────────────────────────────────────
 registerView({
   kind: 'panel',
   position: 'right',
@@ -96,6 +56,39 @@ registerView({
   getDisplayText: () => '标签',
   component: TagsPanel,
 })
+registerView({
+  kind: 'file',
+  type: 'markdown',
+  getDisplayText: (p) => p.split('/').pop()!,
+  canAcceptFile: (ext) => ext === '.md',
+  component: EditorViewer,
+})
+registerView({
+  kind: 'file',
+  type: 'image',
+  getDisplayText: (p) => p.split('/').pop()!,
+  canAcceptFile: (ext) => IMAGE_EXTS.has(ext),
+  component: ImageViewer,
+})
+registerView({
+  kind: 'page',
+  type: 'calendar',
+  getDisplayText: () => '日历',
+  getIcon: () => <CalendarRange size={11} />,
+  component: CalendarViewer,
+})
+
+export const IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.avif',
+])
 
 export default function App() {
   createEffect(() => {

@@ -14,26 +14,27 @@
 
 ## File Map
 
-| File | Action | Responsibility |
-|---|---|---|
-| `src/stores/types.ts` | Modify | Add `SidebarSplit`, `WorkspaceRoot`, `WorkspaceLayout`; rewrite `WorkspaceState` |
-| `src/stores/globalStore.ts` | Modify | New initial state, `activeLayout()`, `activeRoot()`, `findLeafInRoot()` |
-| `src/actions/workspaceActions.ts` | Modify | Path prefix via `layoutIdx()`, new sidebar/layout actions, remove old sidebar actions |
-| `src/components/workspace/SidebarRenderer.tsx` | Modify | Delegate to `WorkspaceNodeRenderer`, delete `LeftContent`/`RightContent` |
-| `src/components/workspace/WorkspaceTabsView.tsx` | Modify | Hide close button and pin for `kind === 'panel'` leaves |
-| `src/components/Ribbon.tsx` | Modify | Use `activeRoot()`, replace `leftPanelView` with sidebar leaf lookup |
-| `src/components/StatusBar.tsx` | Modify | Use `activeLayout()` for `activeLeafId`; add workspace switcher UI |
-| `src/components/Sidebar.tsx` | Modify | `workspace.main` → `activeRoot().main`; `workspace.activeLeafId` → `activeLayout().activeLeafId` |
-| `src/components/CalendarPage.tsx` | Modify | Same two field path fixes as Sidebar.tsx |
-| `src/components/CalendarPanel.tsx` | Modify | Same two field path fixes as Sidebar.tsx |
-| `src/App.tsx` | Modify | `globalStore.workspace.main` → `activeRoot().main` |
-| `src/__tests__/workspaceHelpers.test.ts` | Create | Unit tests for `findLeafInTree` and `findLeafInRoot` |
+| File                                             | Action | Responsibility                                                                                   |
+| ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------ |
+| `src/stores/types.ts`                            | Modify | Add `SidebarSplit`, `WorkspaceRoot`, `WorkspaceLayout`; rewrite `WorkspaceState`                 |
+| `src/stores/globalStore.ts`                      | Modify | New initial state, `activeLayout()`, `activeRoot()`, `findLeafInRoot()`                          |
+| `src/actions/workspaceActions.ts`                | Modify | Path prefix via `layoutIdx()`, new sidebar/layout actions, remove old sidebar actions            |
+| `src/components/workspace/SidebarRenderer.tsx`   | Modify | Delegate to `WorkspaceNodeRenderer`, delete `LeftContent`/`RightContent`                         |
+| `src/components/workspace/WorkspaceTabsView.tsx` | Modify | Hide close button and pin for `kind === 'panel'` leaves                                          |
+| `src/components/Ribbon.tsx`                      | Modify | Use `activeRoot()`, replace `leftPanelView` with sidebar leaf lookup                             |
+| `src/components/StatusBar.tsx`                   | Modify | Use `activeLayout()` for `activeLeafId`; add workspace switcher UI                               |
+| `src/components/Sidebar.tsx`                     | Modify | `workspace.main` → `activeRoot().main`; `workspace.activeLeafId` → `activeLayout().activeLeafId` |
+| `src/components/CalendarPage.tsx`                | Modify | Same two field path fixes as Sidebar.tsx                                                         |
+| `src/components/CalendarPanel.tsx`               | Modify | Same two field path fixes as Sidebar.tsx                                                         |
+| `src/App.tsx`                                    | Modify | `globalStore.workspace.main` → `activeRoot().main`                                               |
+| `src/__tests__/workspaceHelpers.test.ts`         | Create | Unit tests for `findLeafInTree` and `findLeafInRoot`                                             |
 
 ---
 
 ## Task 1: Rewrite `src/stores/types.ts`
 
 **Files:**
+
 - Modify: `src/stores/types.ts`
 
 - [ ] **Step 1: Replace the file contents**
@@ -78,7 +79,7 @@ export interface SidebarSplit {
   id: string
   width: number
   collapsed: boolean
-  children: WorkspaceNode[]  // flat list of tabs groups (stacked vertically)
+  children: WorkspaceNode[] // flat list of tabs groups (stacked vertically)
 }
 
 // Root of the entire workspace tree
@@ -185,6 +186,7 @@ git commit -m "refactor: rewrite WorkspaceState types for multi-layout tree"
 ## Task 2: Rewrite `src/stores/globalStore.ts`
 
 **Files:**
+
 - Modify: `src/stores/globalStore.ts`
 
 - [ ] **Step 1: Replace the file contents**
@@ -192,8 +194,12 @@ git commit -m "refactor: rewrite WorkspaceState types for multi-layout tree"
 ```typescript
 import { createStore } from 'solid-js/store'
 import type {
-  GlobalState, ThemeId, WorkspaceNode, WorkspaceLeaf,
-  WorkspaceLayout, WorkspaceRoot,
+  GlobalState,
+  ThemeId,
+  WorkspaceNode,
+  WorkspaceLeaf,
+  WorkspaceLayout,
+  WorkspaceRoot,
 } from './types'
 
 function saved<T>(key: string, fallback: T): T {
@@ -216,31 +222,60 @@ const initialLayout: WorkspaceLayout = {
       id: 'left-root',
       width: 190,
       collapsed: false,
-      children: [{
-        type: 'tabs',
-        id: 'left-tabs',
-        activeLeafId: 'leaf-files',
-        children: [
-          { type: 'leaf', id: 'leaf-files', viewState: { type: 'files', state: {} }, pinned: false },
-          { type: 'leaf', id: 'leaf-calendar-panel', viewState: { type: 'calendar-panel', state: {} }, pinned: false },
-        ],
-      }],
+      children: [
+        {
+          type: 'tabs',
+          id: 'left-tabs',
+          activeLeafId: 'leaf-files',
+          children: [
+            {
+              type: 'leaf',
+              id: 'leaf-files',
+              viewState: { type: 'files', state: {} },
+              pinned: false,
+            },
+            {
+              type: 'leaf',
+              id: 'leaf-calendar-panel',
+              viewState: { type: 'calendar-panel', state: {} },
+              pinned: false,
+            },
+          ],
+        },
+      ],
     },
     main: { type: 'tabs', id: ROOT_TABS_ID, activeLeafId: null, children: [] },
     right: {
       id: 'right-root',
       width: 200,
       collapsed: false,
-      children: [{
-        type: 'tabs',
-        id: 'right-tabs',
-        activeLeafId: 'leaf-links',
-        children: [
-          { type: 'leaf', id: 'leaf-links',   viewState: { type: 'links',   state: {} }, pinned: false },
-          { type: 'leaf', id: 'leaf-outline', viewState: { type: 'outline', state: {} }, pinned: false },
-          { type: 'leaf', id: 'leaf-tags',    viewState: { type: 'tags',    state: {} }, pinned: false },
-        ],
-      }],
+      children: [
+        {
+          type: 'tabs',
+          id: 'right-tabs',
+          activeLeafId: 'leaf-links',
+          children: [
+            {
+              type: 'leaf',
+              id: 'leaf-links',
+              viewState: { type: 'links', state: {} },
+              pinned: false,
+            },
+            {
+              type: 'leaf',
+              id: 'leaf-outline',
+              viewState: { type: 'outline', state: {} },
+              pinned: false,
+            },
+            {
+              type: 'leaf',
+              id: 'leaf-tags',
+              viewState: { type: 'tags', state: {} },
+              pinned: false,
+            },
+          ],
+        },
+      ],
     },
   },
   activeLeafId: null,
@@ -267,7 +302,7 @@ const [globalStore, setGlobalStore] = createStore<GlobalState>({
 
 export function activeLayout(): WorkspaceLayout {
   return globalStore.workspace.layouts.find(
-    l => l.id === globalStore.workspace.activeLayoutId,
+    (l) => l.id === globalStore.workspace.activeLayoutId,
   )!
 }
 
@@ -282,7 +317,7 @@ export function findLeafInTree(
 ): WorkspaceLeaf | null {
   if (node.type === 'leaf') return node.id === leafId ? node : null
   if (node.type === 'tabs') {
-    return node.children.find(l => l.id === leafId) ?? null
+    return node.children.find((l) => l.id === leafId) ?? null
   }
   for (const child of node.children) {
     const found = findLeafInTree(child, leafId)
@@ -332,6 +367,7 @@ git commit -m "refactor: rewrite globalStore for WorkspaceLayout[] + activeLayou
 ## Task 3: Write tests for `findLeafInTree` and `findLeafInRoot`
 
 **Files:**
+
 - Create: `src/__tests__/workspaceHelpers.test.ts`
 
 - [ ] **Step 1: Write the tests**
@@ -339,18 +375,35 @@ git commit -m "refactor: rewrite globalStore for WorkspaceLayout[] + activeLayou
 ```typescript
 import { describe, it, expect } from 'vitest'
 import { findLeafInTree, findLeafInRoot } from '../stores/globalStore'
-import type { WorkspaceRoot, WorkspaceLeaf, WorkspaceTabs, WorkspaceSplit } from '../stores/types'
+import type {
+  WorkspaceRoot,
+  WorkspaceLeaf,
+  WorkspaceTabs,
+  WorkspaceSplit,
+} from '../stores/types'
 
 const makeLeaf = (id: string, type = 'markdown'): WorkspaceLeaf => ({
-  type: 'leaf', id, viewState: { type, state: {} }, pinned: false,
+  type: 'leaf',
+  id,
+  viewState: { type, state: {} },
+  pinned: false,
 })
 
 const makeTabs = (id: string, leaves: WorkspaceLeaf[]): WorkspaceTabs => ({
-  type: 'tabs', id, activeLeafId: leaves[0]?.id ?? null, children: leaves,
+  type: 'tabs',
+  id,
+  activeLeafId: leaves[0]?.id ?? null,
+  children: leaves,
 })
 
-const makeSplit = (id: string, children: (WorkspaceTabs | WorkspaceSplit)[]): WorkspaceSplit => ({
-  type: 'split', id, direction: 'vertical', children,
+const makeSplit = (
+  id: string,
+  children: (WorkspaceTabs | WorkspaceSplit)[],
+): WorkspaceSplit => ({
+  type: 'split',
+  id,
+  direction: 'vertical',
+  children,
 })
 
 describe('findLeafInTree', () => {
@@ -388,9 +441,19 @@ describe('findLeafInRoot', () => {
   const rightLeaf = makeLeaf('right-1', 'links')
 
   const root: WorkspaceRoot = {
-    left:  { id: 'l', width: 190, collapsed: false, children: [makeTabs('lt', [leftLeaf])] },
-    main:  makeTabs('mt', [mainLeaf]),
-    right: { id: 'r', width: 200, collapsed: false, children: [makeTabs('rt', [rightLeaf])] },
+    left: {
+      id: 'l',
+      width: 190,
+      collapsed: false,
+      children: [makeTabs('lt', [leftLeaf])],
+    },
+    main: makeTabs('mt', [mainLeaf]),
+    right: {
+      id: 'r',
+      width: 200,
+      collapsed: false,
+      children: [makeTabs('rt', [rightLeaf])],
+    },
   }
 
   it('finds a leaf in the left sidebar', () => {
@@ -431,6 +494,7 @@ git commit -m "test: add findLeafInTree and findLeafInRoot unit tests"
 ## Task 4: Rewrite `src/actions/workspaceActions.ts`
 
 **Files:**
+
 - Modify: `src/actions/workspaceActions.ts`
 
 - [ ] **Step 1: Replace the file contents**
@@ -438,25 +502,35 @@ git commit -m "test: add findLeafInTree and findLeafInRoot unit tests"
 ```typescript
 import { produce } from 'solid-js/store'
 import {
-  globalStore, setGlobalStore, ROOT_TABS_ID, activeLayout,
+  globalStore,
+  setGlobalStore,
+  ROOT_TABS_ID,
+  activeLayout,
 } from '../stores/globalStore'
 import { setRuntimeStore } from '../stores/runtimeStore'
 import { getView, getFileViewForExt } from '../lib/viewRegistry'
 import type {
-  WorkspaceNode, WorkspaceTabs, WorkspaceLeaf, ViewState, WorkspaceLayout,
+  WorkspaceNode,
+  WorkspaceTabs,
+  WorkspaceLeaf,
+  ViewState,
+  WorkspaceLayout,
 } from '../stores/types'
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
 function layoutIdx(): number {
   return globalStore.workspace.layouts.findIndex(
-    l => l.id === globalStore.workspace.activeLayoutId,
+    (l) => l.id === globalStore.workspace.activeLayoutId,
   )
 }
 
-function findParentTabs(root: WorkspaceNode, leafId: string): WorkspaceTabs | null {
+function findParentTabs(
+  root: WorkspaceNode,
+  leafId: string,
+): WorkspaceTabs | null {
   if (root.type === 'tabs') {
-    if (root.children.some(l => l.id === leafId)) return root
+    if (root.children.some((l) => l.id === leafId)) return root
     return null
   }
   if (root.type === 'split') {
@@ -475,13 +549,16 @@ function mapNode(
 ): WorkspaceNode {
   if ((root as { id: string }).id === id) return updater(root)
   if (root.type === 'split') {
-    return { ...root, children: root.children.map(c => mapNode(c, id, updater)) }
+    return {
+      ...root,
+      children: root.children.map((c) => mapNode(c, id, updater)),
+    }
   }
   if (root.type === 'tabs') {
     return {
       ...root,
-      children: root.children.map(c =>
-        c.id === id ? updater(c) as WorkspaceLeaf : c,
+      children: root.children.map((c) =>
+        c.id === id ? (updater(c) as WorkspaceLeaf) : c,
       ),
     }
   }
@@ -491,17 +568,25 @@ function mapNode(
 // ── Actions ──────────────────────────────────────────────────────────────────
 
 export const workspaceActions = {
-
   // ── Main area leaf operations ──────────────────────────────────────────────
 
   createLeaf(tabsId: string, viewState: ViewState): string {
     const idx = layoutIdx()
     const leafId = crypto.randomUUID()
-    const leaf: WorkspaceLeaf = { type: 'leaf', id: leafId, viewState, pinned: false }
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-      mapNode(root, tabsId, node => {
+    const leaf: WorkspaceLeaf = {
+      type: 'leaf',
+      id: leafId,
+      viewState,
+      pinned: false,
+    }
+    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', (root) =>
+      mapNode(root, tabsId, (node) => {
         const tabs = node as WorkspaceTabs
-        return { ...tabs, children: [...tabs.children, leaf], activeLeafId: leafId }
+        return {
+          ...tabs,
+          children: [...tabs.children, leaf],
+          activeLeafId: leafId,
+        }
       }),
     )
     setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', leafId)
@@ -513,13 +598,13 @@ export const workspaceActions = {
     const main = activeLayout().root.main
     const parentTabs = findParentTabs(main, leafId)
     if (!parentTabs) return
-    const remaining = parentTabs.children.filter(l => l.id !== leafId)
+    const remaining = parentTabs.children.filter((l) => l.id !== leafId)
     const nextActiveId =
       parentTabs.activeLeafId === leafId
         ? (remaining[remaining.length - 1]?.id ?? null)
         : parentTabs.activeLeafId
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-      mapNode(root, parentTabs.id, node => ({
+    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', (root) =>
+      mapNode(root, parentTabs.id, (node) => ({
         ...(node as WorkspaceTabs),
         children: remaining,
         activeLeafId: nextActiveId,
@@ -528,7 +613,12 @@ export const workspaceActions = {
     if (activeLayout().activeLeafId === leafId) {
       setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', nextActiveId)
     }
-    setRuntimeStore('leafInstances', produce(s => { delete s[leafId] }))
+    setRuntimeStore(
+      'leafInstances',
+      produce((s) => {
+        delete s[leafId]
+      }),
+    )
   },
 
   activateLeaf(leafId: string): void {
@@ -536,8 +626,8 @@ export const workspaceActions = {
     setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', leafId)
     const parentTabs = findParentTabs(activeLayout().root.main, leafId)
     if (parentTabs) {
-      setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-        mapNode(root, parentTabs.id, node => ({
+      setGlobalStore('workspace', 'layouts', idx, 'root', 'main', (root) =>
+        mapNode(root, parentTabs.id, (node) => ({
           ...(node as WorkspaceTabs),
           activeLeafId: leafId,
         })),
@@ -547,15 +637,18 @@ export const workspaceActions = {
 
   setLeafViewState(leafId: string, viewState: ViewState): void {
     const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-      mapNode(root, leafId, node => ({ ...(node as WorkspaceLeaf), viewState })),
+    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', (root) =>
+      mapNode(root, leafId, (node) => ({
+        ...(node as WorkspaceLeaf),
+        viewState,
+      })),
     )
   },
 
   setLeafPinned(leafId: string, pinned: boolean): void {
     const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-      mapNode(root, leafId, node => ({ ...(node as WorkspaceLeaf), pinned })),
+    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', (root) =>
+      mapNode(root, leafId, (node) => ({ ...(node as WorkspaceLeaf), pinned })),
     )
   },
 
@@ -570,7 +663,14 @@ export const workspaceActions = {
       type: 'tabs',
       id: newTabsId,
       activeLeafId: newLeafId,
-      children: [{ type: 'leaf', id: newLeafId, viewState: { type: '', state: {} }, pinned: false }],
+      children: [
+        {
+          type: 'leaf',
+          id: newLeafId,
+          viewState: { type: '', state: {} },
+          pinned: false,
+        },
+      ],
     }
     const splitNode: WorkspaceNode = {
       type: 'split',
@@ -578,7 +678,7 @@ export const workspaceActions = {
       direction,
       children: [parentTabs, newTabs],
     }
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
+    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', (root) =>
       mapNode(root, parentTabs.id, () => splitNode),
     )
     setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', newLeafId)
@@ -590,8 +690,11 @@ export const workspaceActions = {
     if (!def || def.kind !== 'page') return
     const main = activeLayout().root.main
     if (main.type === 'tabs') {
-      const existing = main.children.find(l => l.viewState.type === type)
-      if (existing) { workspaceActions.activateLeaf(existing.id); return }
+      const existing = main.children.find((l) => l.viewState.type === type)
+      if (existing) {
+        workspaceActions.activateLeaf(existing.id)
+        return
+      }
     }
     workspaceActions.createLeaf(ROOT_TABS_ID, { type, state: {} })
   },
@@ -613,13 +716,19 @@ export const workspaceActions = {
     const ext = newPath.slice(newPath.lastIndexOf('.')).toLowerCase()
     const def = getFileViewForExt(ext)
     const newType = def?.type ?? 'markdown'
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root => {
+    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', (root) => {
       function walk(node: WorkspaceNode): WorkspaceNode {
         if (node.type === 'leaf' && node.viewState.state.file === oldPath) {
-          return { ...node, viewState: { type: newType, state: { file: newPath } } }
+          return {
+            ...node,
+            viewState: { type: newType, state: { file: newPath } },
+          }
         }
         if (node.type === 'tabs') {
-          return { ...node, children: node.children.map(walk) as WorkspaceLeaf[] }
+          return {
+            ...node,
+            children: node.children.map(walk) as WorkspaceLeaf[],
+          }
         }
         if (node.type === 'split') {
           return { ...node, children: node.children.map(walk) }
@@ -634,7 +743,15 @@ export const workspaceActions = {
 
   toggleSidebar(side: 'left' | 'right'): void {
     const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'root', side, 'collapsed', (v: boolean) => !v)
+    setGlobalStore(
+      'workspace',
+      'layouts',
+      idx,
+      'root',
+      side,
+      'collapsed',
+      (v: boolean) => !v,
+    )
   },
 
   resizeSidebar(side: 'left' | 'right', width: number): void {
@@ -647,9 +764,17 @@ export const workspaceActions = {
     const idx = layoutIdx()
     const children = activeLayout().root[side].children
     setGlobalStore(
-      'workspace', 'layouts', idx, 'root', side, 'children',
-      children.map(node => {
-        if (node.type === 'tabs' && node.children.some(l => l.id === leafId)) {
+      'workspace',
+      'layouts',
+      idx,
+      'root',
+      side,
+      'children',
+      children.map((node) => {
+        if (
+          node.type === 'tabs' &&
+          node.children.some((l) => l.id === leafId)
+        ) {
           return { ...node, activeLeafId: leafId }
         }
         return node
@@ -664,13 +789,22 @@ export const workspaceActions = {
     for (const side of ['left', 'right'] as const) {
       const children = root[side].children
       const hasLeaf = children.some(
-        node => node.type === 'tabs' && node.children.some(l => l.id === leafId),
+        (node) =>
+          node.type === 'tabs' && node.children.some((l) => l.id === leafId),
       )
       if (hasLeaf) {
         setGlobalStore(
-          'workspace', 'layouts', idx, 'root', side, 'children',
-          children.map(node => {
-            if (node.type === 'tabs' && node.children.some(l => l.id === leafId)) {
+          'workspace',
+          'layouts',
+          idx,
+          'root',
+          side,
+          'children',
+          children.map((node) => {
+            if (
+              node.type === 'tabs' &&
+              node.children.some((l) => l.id === leafId)
+            ) {
               return { ...node, activeLeafId: leafId }
             }
             return node
@@ -689,13 +823,28 @@ export const workspaceActions = {
       type: 'tabs',
       id: crypto.randomUUID(),
       activeLeafId: newLeafId,
-      children: [{ type: 'leaf', id: newLeafId, viewState: { type: '', state: {} }, pinned: false }],
+      children: [
+        {
+          type: 'leaf',
+          id: newLeafId,
+          viewState: { type: '', state: {} },
+          pinned: false,
+        },
+      ],
     }
     const children = activeLayout().root[side].children
     setGlobalStore(
-      'workspace', 'layouts', idx, 'root', side, 'children',
-      children.flatMap(node => {
-        if (node.type === 'tabs' && node.children.some(l => l.id === leafId)) {
+      'workspace',
+      'layouts',
+      idx,
+      'root',
+      side,
+      'children',
+      children.flatMap((node) => {
+        if (
+          node.type === 'tabs' &&
+          node.children.some((l) => l.id === leafId)
+        ) {
           return [node, newTabs]
         }
         return [node]
@@ -716,18 +865,26 @@ export const workspaceActions = {
         left: {
           ...current.root.left,
           id: crypto.randomUUID(),
-          children: current.root.left.children.map(n => ({ ...n })),
+          children: current.root.left.children.map((n) => ({ ...n })),
         },
-        main: { type: 'tabs', id: ROOT_TABS_ID, activeLeafId: null, children: [] },
+        main: {
+          type: 'tabs',
+          id: ROOT_TABS_ID,
+          activeLeafId: null,
+          children: [],
+        },
         right: {
           ...current.root.right,
           id: crypto.randomUUID(),
-          children: current.root.right.children.map(n => ({ ...n })),
+          children: current.root.right.children.map((n) => ({ ...n })),
         },
       },
       activeLeafId: null,
     }
-    setGlobalStore('workspace', 'layouts', (ls: WorkspaceLayout[]) => [...ls, newLayout])
+    setGlobalStore('workspace', 'layouts', (ls: WorkspaceLayout[]) => [
+      ...ls,
+      newLayout,
+    ])
     setGlobalStore('workspace', 'activeLayoutId', newId)
     return newId
   },
@@ -737,14 +894,14 @@ export const workspaceActions = {
   },
 
   renameLayout(id: string, name: string): void {
-    const idx = globalStore.workspace.layouts.findIndex(l => l.id === id)
+    const idx = globalStore.workspace.layouts.findIndex((l) => l.id === id)
     if (idx === -1) return
     setGlobalStore('workspace', 'layouts', idx, 'name', name)
   },
 
   deleteLayout(id: string): void {
     if (globalStore.workspace.layouts.length <= 1) return
-    const remaining = globalStore.workspace.layouts.filter(l => l.id !== id)
+    const remaining = globalStore.workspace.layouts.filter((l) => l.id !== id)
     const newActiveId =
       globalStore.workspace.activeLayoutId === id
         ? remaining[0].id
@@ -767,6 +924,7 @@ git commit -m "refactor: update workspaceActions to use layouts[layoutIdx()] pat
 ## Task 5: Rewrite `src/components/workspace/SidebarRenderer.tsx`
 
 **Files:**
+
 - Modify: `src/components/workspace/SidebarRenderer.tsx`
 
 - [ ] **Step 1: Replace the file contents**
@@ -782,7 +940,7 @@ export function SidebarRenderer(props: { side: 'left' | 'right' }) {
   return (
     <div
       class={`transition-all duration-200 overflow-hidden shrink-0 h-full bg-[var(--bg-surface)] flex flex-col
-        ${props.side === 'left' ? 'border-r' : 'border-l'} border-[var(--border)]`}
+        ${props.side === 'left' ? 'border-r' : 'border-l'} border-(--border)]`}
       style={{ width: sidebar().collapsed ? '0px' : `${sidebar().width}px` }}
     >
       <For each={sidebar().children}>
@@ -809,6 +967,7 @@ git commit -m "refactor: SidebarRenderer delegates to WorkspaceNodeRenderer; rem
 ## Task 6: Update `src/components/workspace/WorkspaceTabsView.tsx`
 
 **Files:**
+
 - Modify: `src/components/workspace/WorkspaceTabsView.tsx`
 
 - [ ] **Step 1: Add panel leaf detection — hide close button and skip pin for panel leaves**
@@ -816,23 +975,30 @@ git commit -m "refactor: SidebarRenderer delegates to WorkspaceNodeRenderer; rem
 Find the tab item render block (inside `<For each={props.node.children}>`). Add `isPanelLeaf` and conditionally render the close button and `onDblClick`:
 
 Replace this section:
+
 ```tsx
 <div
-  class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
-    ${isActive()
-      ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
-      : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
+  class={`flex items-center gap-1.5 px-3 border-r border-(--border)] cursor-pointer text-[11px] shrink-0
+    ${
+      isActive()
+        ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-(--accent) -mb-px'
+        : 'text-[var(--text-3)] hover:bg-(--bg-hover)'
     }`}
   onClick={() => workspaceActions.activateLeaf(leaf.id)}
   onDblClick={() => workspaceActions.setLeafPinned(leaf.id, true)}
 >
   {def()?.getIcon?.()}
-  <span class={`max-w-[120px] truncate ${!isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}>
+  <span
+    class={`max-w-[120px] truncate ${!isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}
+  >
     {getTabLabel(leaf)}
   </span>
   <button
     class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
-    onClick={e => { e.stopPropagation(); workspaceActions.closeLeaf(leaf.id) }}
+    onClick={(e) => {
+      e.stopPropagation()
+      workspaceActions.closeLeaf(leaf.id)
+    }}
   >
     ×
   </button>
@@ -840,12 +1006,14 @@ Replace this section:
 ```
 
 With:
+
 ```tsx
 <div
-  class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
-    ${isActive()
-      ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
-      : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
+  class={`flex items-center gap-1.5 px-3 border-r border-(--border)] cursor-pointer text-[11px] shrink-0
+    ${
+      isActive()
+        ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-(--accent) -mb-px'
+        : 'text-[var(--text-3)] hover:bg-(--bg-hover)'
     }`}
   onClick={() => {
     if (isPanelLeaf()) {
@@ -854,16 +1022,23 @@ With:
       workspaceActions.activateLeaf(leaf.id)
     }
   }}
-  onDblClick={() => { if (!isPanelLeaf()) workspaceActions.setLeafPinned(leaf.id, true) }}
+  onDblClick={() => {
+    if (!isPanelLeaf()) workspaceActions.setLeafPinned(leaf.id, true)
+  }}
 >
   {def()?.getIcon?.()}
-  <span class={`max-w-[120px] truncate ${!isPanelLeaf() && !isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}>
+  <span
+    class={`max-w-[120px] truncate ${!isPanelLeaf() && !isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}
+  >
     {getTabLabel(leaf)}
   </span>
   {!isPanelLeaf() && (
     <button
       class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
-      onClick={e => { e.stopPropagation(); workspaceActions.closeLeaf(leaf.id) }}
+      onClick={(e) => {
+        e.stopPropagation()
+        workspaceActions.closeLeaf(leaf.id)
+      }}
     >
       ×
     </button>
@@ -891,6 +1066,7 @@ git commit -m "feat: hide close button and pin for panel leaves in WorkspaceTabs
 ## Task 7: Update `src/components/Ribbon.tsx`
 
 **Files:**
+
 - Modify: `src/components/Ribbon.tsx`
 
 The Ribbon's `switchLeftPanel` uses `leftPanelView` (removed) and `toggleLeft` (renamed). Replace with sidebar leaf lookup via `activeRoot()`.
@@ -919,7 +1095,7 @@ export function Ribbon() {
     if (!leftOpen()) return null
     for (const node of leftSidebar().children) {
       if (node.type === 'tabs' && node.activeLeafId) {
-        const leaf = node.children.find(l => l.id === node.activeLeafId)
+        const leaf = node.children.find((l) => l.id === node.activeLeafId)
         if (leaf) return leaf.viewState.type
       }
     }
@@ -935,7 +1111,7 @@ export function Ribbon() {
     // Find leaf by viewState.type in sidebar children
     for (const node of leftSidebar().children) {
       if (node.type === 'tabs') {
-        const leaf = node.children.find(l => l.viewState.type === viewType)
+        const leaf = node.children.find((l) => l.viewState.type === viewType)
         if (leaf) {
           workspaceActions.activateSidebarLeaf('left', leaf.id)
           break
@@ -1017,6 +1193,7 @@ git commit -m "refactor: update Ribbon to use activeRoot/activeLayout and new to
 ## Task 8: Fix `workspace.main` and `workspace.activeLeafId` in three panel files
 
 **Files:**
+
 - Modify: `src/components/Sidebar.tsx`
 - Modify: `src/components/CalendarPage.tsx`
 - Modify: `src/components/CalendarPanel.tsx`
@@ -1032,8 +1209,14 @@ head -5 src/components/Sidebar.tsx src/components/CalendarPage.tsx src/component
 - [ ] **Step 2: Update `src/components/Sidebar.tsx`**
 
 Add `activeRoot, activeLayout` to the import from `globalStore`:
+
 ```tsx
-import { globalStore, findLeafInTree, activeRoot, activeLayout } from '../stores/globalStore'
+import {
+  globalStore,
+  findLeafInTree,
+  activeRoot,
+  activeLayout,
+} from '../stores/globalStore'
 ```
 
 Replace every `globalStore.workspace.main` with `activeRoot().main`.
@@ -1041,13 +1224,16 @@ Replace every `globalStore.workspace.main` with `activeRoot().main`.
 Replace every `globalStore.workspace.activeLeafId` with `activeLayout().activeLeafId`.
 
 The two changed lines are near lines 60 and 64-65:
+
 ```tsx
 // line ~60 (findLeafWithFile)
 const existing = findLeafWithFile(activeRoot().main, path)
 
 // line ~64-65 (activeLeaf)
 const { activeLeafId } = activeLayout()
-const activeLeaf = activeLeafId ? findLeafInTree(activeRoot().main, activeLeafId) : null
+const activeLeaf = activeLeafId
+  ? findLeafInTree(activeRoot().main, activeLeafId)
+  : null
 ```
 
 - [ ] **Step 3: Update `src/components/CalendarPage.tsx`**
@@ -1070,6 +1256,7 @@ git commit -m "refactor: replace workspace.main/activeLeafId with activeRoot()/a
 ## Task 9: Update `src/components/StatusBar.tsx` — fix `activeLeafId` + add workspace switcher
 
 **Files:**
+
 - Modify: `src/components/StatusBar.tsx`
 
 - [ ] **Step 1: Replace the file contents**
@@ -1107,13 +1294,13 @@ export function StatusBar() {
       {/* Workspace switcher popover */}
       <Show when={showSwitcher()}>
         <div
-          class="absolute bottom-full left-0 mb-1 bg-[var(--bg-surface)] border border-[var(--border)] rounded shadow-lg z-50 min-w-[180px] py-1"
+          class="absolute bottom-full left-0 mb-1 bg-[var(--bg-surface)] border border-(--border)] rounded shadow-lg z-50 min-w-[180px] py-1"
           onMouseLeave={() => setShowSwitcher(false)}
         >
           <For each={layouts()}>
             {(layout) => (
-              <div class="flex items-center gap-1 px-2 py-1 hover:bg-[var(--bg-hover)] group">
-                <span class="w-3 text-[var(--accent)] text-[10px]">
+              <div class="flex items-center gap-1 px-2 py-1 hover:bg-(--bg-hover) group">
+                <span class="w-3 text-(--accent) text-[10px]">
                   {layout.id === activeId() ? '✓' : ''}
                 </span>
                 <Show
@@ -1131,11 +1318,14 @@ export function StatusBar() {
                     class="flex-1 text-[11px] bg-[var(--bg-input)] text-[var(--text)] px-1 rounded outline-none"
                     value={layout.name}
                     autofocus
-                    onBlur={e => {
-                      workspaceActions.renameLayout(layout.id, e.currentTarget.value.trim() || layout.name)
+                    onBlur={(e) => {
+                      workspaceActions.renameLayout(
+                        layout.id,
+                        e.currentTarget.value.trim() || layout.name,
+                      )
                       setRenamingId(null)
                     }}
-                    onKeyDown={e => {
+                    onKeyDown={(e) => {
                       if (e.key === 'Enter') e.currentTarget.blur()
                       if (e.key === 'Escape') setRenamingId(null)
                     }}
@@ -1160,9 +1350,9 @@ export function StatusBar() {
               </div>
             )}
           </For>
-          <div class="border-t border-[var(--border)] mt-1 pt-1">
+          <div class="border-t border-(--border)] mt-1 pt-1">
             <button
-              class="w-full text-left px-4 py-1 text-[11px] text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+              class="w-full text-left px-4 py-1 text-[11px] text-[var(--text-3)] hover:bg-(--bg-hover) hover:text-[var(--text)]"
               onClick={() => {
                 const n = layouts().length + 1
                 workspaceActions.createLayout(`工作区 ${n}`)
@@ -1175,10 +1365,10 @@ export function StatusBar() {
       </Show>
 
       {/* Status bar */}
-      <div class="h-6 bg-[var(--bg-base)] border-t border-[var(--border)] px-3 flex items-center gap-4 text-[10px] text-[var(--text-4)] shrink-0">
+      <div class="h-6 bg-[var(--bg-base)] border-t border-(--border)] px-3 flex items-center gap-4 text-[10px] text-[var(--text-4)] shrink-0">
         <button
           class="hover:text-[var(--text-2)] transition-colors"
-          onClick={() => setShowSwitcher(v => !v)}
+          onClick={() => setShowSwitcher((v) => !v)}
           title="切换工作区"
         >
           {activeLayout().name}
@@ -1188,11 +1378,11 @@ export function StatusBar() {
         <div class="flex-1" />
         <Show when={globalStore.knowledge.isIndexing}>
           <span class="flex items-center gap-1 text-[var(--text-3)]">
-            <span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" />
             后台检测中
           </span>
         </Show>
-        <span class={activeRuntime()?.isDirty ? 'text-[var(--accent)]' : ''}>
+        <span class={activeRuntime()?.isDirty ? 'text-(--accent)' : ''}>
           {activeRuntime()?.isDirty ? '未保存' : '已保存'}
         </span>
       </div>
@@ -1213,15 +1403,19 @@ git commit -m "feat: add workspace switcher to StatusBar; fix activeLeafId path"
 ## Task 10: Update `src/App.tsx`
 
 **Files:**
+
 - Modify: `src/App.tsx`
 
 - [ ] **Step 1: Add `activeRoot` to the globalStore import**
 
 Change:
+
 ```tsx
 import { globalStore } from './stores/globalStore'
 ```
+
 To:
+
 ```tsx
 import { globalStore, activeRoot } from './stores/globalStore'
 ```
@@ -1229,10 +1423,13 @@ import { globalStore, activeRoot } from './stores/globalStore'
 - [ ] **Step 2: Update the main area render**
 
 Change:
+
 ```tsx
 <WorkspaceNodeRenderer node={globalStore.workspace.main} />
 ```
+
 To:
+
 ```tsx
 <WorkspaceNodeRenderer node={activeRoot().main} />
 ```

@@ -13,21 +13,25 @@ import {
   onMount,
   Show,
 } from 'solid-js'
-import { fsActions } from '../actions/fsActions'
-import { knowledgeActions } from '../actions/knowledgeActions'
-import { readFile, writeFile } from '../services/fileCacheService'
-import { darkHighlightStyle, darkTheme } from '../lib/cmTheme'
-import { embedPreviewPlugin, embedTheme } from '../lib/embedExtension'
-import { frontmatterField } from '../lib/frontmatterField'
-import { headingsField } from '../lib/headingsField'
-import { inlineTagDecoField, inlineTagsField } from '../lib/inlineTagsField'
-import { livePreviewExtension } from '../lib/livePreviewExtension'
-import { outLinksField } from '../lib/outLinksField'
-import { parseFrontmatter, formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
-import { wikiEmbedParser, wikiLinkParser } from '../lib/wikiLinkParser'
-import { globalStore } from '../stores/globalStore'
-import { setRuntimeStore } from '../stores/runtimeStore'
-import type { ViewComponentProps } from '../stores/types'
+import { fsActions } from '../../actions/fsActions'
+import { knowledgeActions } from '../../actions/knowledgeActions'
+import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
+import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
+import { frontmatterField } from '../../lib/frontmatterField'
+import { headingsField } from '../../lib/headingsField'
+import { inlineTagDecoField, inlineTagsField } from '../../lib/inlineTagsField'
+import { livePreviewExtension } from '../../lib/livePreviewExtension'
+import { outLinksField } from '../../lib/outLinksField'
+import {
+  formatTimestamp,
+  parseFrontmatter,
+  setFrontmatterField,
+} from '../../lib/parseFrontmatter'
+import { wikiEmbedParser, wikiLinkParser } from '../../lib/wikiLinkParser'
+import { readFile, writeFile } from '../../services/fileCacheService'
+import { globalStore } from '../../stores/globalStore'
+import { setRuntimeStore } from '../../stores/runtimeStore'
+import type { ViewComponentProps } from '../../stores/types'
 
 async function loadFileContent(path: string): Promise<string> {
   let content = await readFile(path)
@@ -35,8 +39,10 @@ async function loadFileContent(path: string): Promise<string> {
     const { frontmatter } = parseFrontmatter(content)
     const ts = formatTimestamp(Date.now())
     let updated = content
-    if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
-    if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
+    if (!frontmatter.created)
+      updated = setFrontmatterField(updated, 'created', ts)
+    if (!frontmatter.updated)
+      updated = setFrontmatterField(updated, 'updated', ts)
     if (updated !== content) {
       await writeFile(path, updated)
       content = updated
@@ -75,7 +81,7 @@ function buildEditorState(
   })
 }
 
-export function EditorPane(props: ViewComponentProps) {
+export function EditorViewer(props: ViewComponentProps) {
   const filePath = () => props.viewState.file as string | undefined
 
   let container!: HTMLDivElement
@@ -111,11 +117,15 @@ export function EditorPane(props: ViewComponentProps) {
       reindexTimer = null
       const p = filePath()
       if (p && view) {
-        const outLinks = view.state.field(outLinksField)
-          .filter(l => l.type === 'wiki')
-          .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`)
-        const inlineTags = view.state.field(inlineTagsField).map(m => m.tag)
-        void knowledgeActions.reindexFile(p, view.state.doc.toString(), { outLinks, inlineTags })
+        const outLinks = view.state
+          .field(outLinksField)
+          .filter((l) => l.type === 'wiki')
+          .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
+        const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
+        void knowledgeActions.reindexFile(p, view.state.doc.toString(), {
+          outLinks,
+          inlineTags,
+        })
       }
     }, 800)
     if (props.isActive) {
@@ -168,10 +178,11 @@ export function EditorPane(props: ViewComponentProps) {
     await writeFile(p, content)
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
-    const outLinks = view.state.field(outLinksField)
-      .filter(l => l.type === 'wiki')
-      .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`)
-    const inlineTags = view.state.field(inlineTagsField).map(m => m.tag)
+    const outLinks = view.state
+      .field(outLinksField)
+      .filter((l) => l.type === 'wiki')
+      .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
+    const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
     await knowledgeActions.reindexFile(p, content, { outLinks, inlineTags })
   }
 

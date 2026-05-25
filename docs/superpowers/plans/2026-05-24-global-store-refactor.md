@@ -12,48 +12,49 @@
 
 ## File Map
 
-| Action | Path |
-|--------|------|
-| Create | `src/stores/types.ts` |
-| Create | `src/stores/globalStore.ts` |
-| Create | `src/stores/runtimeStore.ts` |
-| Create | `src/lib/knowledgeUtils.ts` |
-| Create | `src/actions/knowledgeActions.ts` |
-| Create | `src/actions/fsActions.ts` |
-| Create | `src/actions/workspaceActions.ts` |
-| Create | `src/actions/appActions.ts` |
-| Create | `src/components/workspace/WorkspaceLeafView.tsx` |
-| Create | `src/components/workspace/WorkspaceTabsView.tsx` |
-| Create | `src/components/workspace/WorkspaceSplitView.tsx` |
+| Action | Path                                                 |
+| ------ | ---------------------------------------------------- |
+| Create | `src/stores/types.ts`                                |
+| Create | `src/stores/globalStore.ts`                          |
+| Create | `src/stores/runtimeStore.ts`                         |
+| Create | `src/lib/knowledgeUtils.ts`                          |
+| Create | `src/actions/knowledgeActions.ts`                    |
+| Create | `src/actions/fsActions.ts`                           |
+| Create | `src/actions/workspaceActions.ts`                    |
+| Create | `src/actions/appActions.ts`                          |
+| Create | `src/components/workspace/WorkspaceLeafView.tsx`     |
+| Create | `src/components/workspace/WorkspaceTabsView.tsx`     |
+| Create | `src/components/workspace/WorkspaceSplitView.tsx`    |
 | Create | `src/components/workspace/WorkspaceNodeRenderer.tsx` |
-| Create | `src/components/workspace/SidebarRenderer.tsx` |
-| Modify | `src/lib/viewRegistry.ts` |
-| Modify | `src/App.tsx` |
-| Modify | `src/components/EditorPane.tsx` |
-| Modify | `src/components/ImageViewer.tsx` |
-| Modify | `src/components/CalendarPage.tsx` |
-| Modify | `src/components/Sidebar.tsx` |
-| Modify | `src/components/Ribbon.tsx` |
-| Modify | `src/components/RightPanel.tsx` |
-| Modify | `src/components/StatusBar.tsx` |
-| Modify | `src/components/Settings.tsx` |
-| Modify | `src/services/backgroundParser.ts` |
-| Modify | `src/__tests__/knowledgeService.test.ts` |
-| Delete | `src/stores/fileSystemStore.ts` |
-| Delete | `src/stores/knowledgeStore.ts` |
-| Delete | `src/stores/uiStore.ts` |
-| Delete | `src/stores/editorStore.ts` |
-| Delete | `src/services/fileSystemService.ts` |
-| Delete | `src/services/knowledgeService.ts` |
-| Delete | `src/services/workspaceService.ts` |
-| Delete | `src/components/TabBar.tsx` |
-| Delete | `src/components/ContentPane.tsx` |
+| Create | `src/components/workspace/SidebarRenderer.tsx`       |
+| Modify | `src/lib/viewRegistry.ts`                            |
+| Modify | `src/App.tsx`                                        |
+| Modify | `src/components/EditorPane.tsx`                      |
+| Modify | `src/components/ImageViewer.tsx`                     |
+| Modify | `src/components/CalendarPage.tsx`                    |
+| Modify | `src/components/Sidebar.tsx`                         |
+| Modify | `src/components/Ribbon.tsx`                          |
+| Modify | `src/components/RightPanel.tsx`                      |
+| Modify | `src/components/StatusBar.tsx`                       |
+| Modify | `src/components/Settings.tsx`                        |
+| Modify | `src/services/backgroundParser.ts`                   |
+| Modify | `src/__tests__/knowledgeService.test.ts`             |
+| Delete | `src/stores/fileSystemStore.ts`                      |
+| Delete | `src/stores/knowledgeStore.ts`                       |
+| Delete | `src/stores/uiStore.ts`                              |
+| Delete | `src/stores/editorStore.ts`                          |
+| Delete | `src/services/fileSystemService.ts`                  |
+| Delete | `src/services/knowledgeService.ts`                   |
+| Delete | `src/services/workspaceService.ts`                   |
+| Delete | `src/components/TabBar.tsx`                          |
+| Delete | `src/components/ContentPane.tsx`                     |
 
 ---
 
 ## Task 1: Define all types in `src/stores/types.ts`
 
 **Files:**
+
 - Create: `src/stores/types.ts`
 
 - [ ] **Step 1: Create the types file**
@@ -202,6 +203,7 @@ git commit -m "feat: add unified GlobalState and RuntimeState type definitions"
 ## Task 2: Create `globalStore.ts` and `runtimeStore.ts`
 
 **Files:**
+
 - Create: `src/stores/globalStore.ts`
 - Create: `src/stores/runtimeStore.ts`
 
@@ -281,7 +283,7 @@ export function findLeafInTree(
 ): import('./types').WorkspaceLeaf | null {
   if (node.type === 'leaf') return node.id === leafId ? node : null
   if (node.type === 'tabs') {
-    return node.children.find(l => l.id === leafId) ?? null
+    return node.children.find((l) => l.id === leafId) ?? null
   }
   for (const child of node.children) {
     const found = findLeafInTree(child, leafId)
@@ -328,6 +330,7 @@ git commit -m "feat: create globalStore and runtimeStore with namespaced state"
 ## Task 3: Extract pure functions to `lib/knowledgeUtils.ts`, update test
 
 **Files:**
+
 - Create: `src/lib/knowledgeUtils.ts`
 - Modify: `src/__tests__/knowledgeService.test.ts`
 
@@ -335,39 +338,49 @@ The functions `extractLinks`, `extractTags`, `extractAliases`, `extractBodyTags`
 
 - [ ] **Step 1: Create `src/lib/knowledgeUtils.ts` with the pure functions**
 
-```typescript
+````typescript
 // src/lib/knowledgeUtils.ts
 import type { FileMetadata } from '../stores/types'
 
 export function extractLinks(content: string): string[] {
   const matches = [...content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)]
-  return [...new Set(matches.map(m => {
-    const t = m[1].trim()
-    const stem = t.split('/').pop()!
-    return stem.includes('.') ? t : `${t}.md`
-  }))]
+  return [
+    ...new Set(
+      matches.map((m) => {
+        const t = m[1].trim()
+        const stem = t.split('/').pop()!
+        return stem.includes('.') ? t : `${t}.md`
+      }),
+    ),
+  ]
 }
 
 export function extractTags(raw: unknown): string[] {
   if (!raw) return []
   if (Array.isArray(raw)) return raw.map(String)
-  if (typeof raw === 'string') return raw.split(',').map(s => s.trim()).filter(Boolean)
+  if (typeof raw === 'string')
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   return []
 }
 
 export function extractAliases(raw: unknown): string[] {
   if (!raw) return []
   if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
-  if (typeof raw === 'string') return raw.split(',').map(s => s.trim()).filter(Boolean)
+  if (typeof raw === 'string')
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   return []
 }
 
 const BODY_TAG_RE = /(?<!\S)#([a-zA-Z_一-龥][a-zA-Z0-9_一-龥\/-]*)/g
 
 export function extractBodyTags(body: string): string[] {
-  const stripped = body
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`\n]+`/g, '')
+  const stripped = body.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]+`/g, '')
   const seen = new Set<string>()
   for (const m of stripped.matchAll(BODY_TAG_RE)) seen.add(m[1])
   return [...seen]
@@ -378,7 +391,10 @@ function expandEtag(etag: string): string[] {
   return parts.map((_, i) => parts.slice(0, i + 1).join('/'))
 }
 
-export function mergeTagsWithBody(fmTags: string[], bodyEtags: string[]): string[] {
+export function mergeTagsWithBody(
+  fmTags: string[],
+  bodyEtags: string[],
+): string[] {
   const set = new Set(fmTags)
   for (const etag of bodyEtags) {
     for (const t of expandEtag(etag)) set.add(t)
@@ -414,7 +430,7 @@ export function buildTagMap(
   }
   return map
 }
-```
+````
 
 - [ ] **Step 2: Update the test to import from the new location**
 
@@ -422,10 +438,18 @@ Replace the import in `src/__tests__/knowledgeService.test.ts`:
 
 ```typescript
 // Old:
-import { extractLinks, extractTags, buildBacklinkMap } from '../services/knowledgeService'
+import {
+  extractLinks,
+  extractTags,
+  buildBacklinkMap,
+} from '../services/knowledgeService'
 
 // New:
-import { extractLinks, extractTags, buildBacklinkMap } from '../lib/knowledgeUtils'
+import {
+  extractLinks,
+  extractTags,
+  buildBacklinkMap,
+} from '../lib/knowledgeUtils'
 ```
 
 - [ ] **Step 3: Run tests to confirm they still pass**
@@ -448,6 +472,7 @@ git commit -m "refactor: extract pure knowledge functions to lib/knowledgeUtils"
 ## Task 4: Create `src/actions/knowledgeActions.ts`
 
 **Files:**
+
 - Create: `src/actions/knowledgeActions.ts`
 
 This replaces the store-writing portions of `knowledgeService.ts`. Uses `globalStore`/`setGlobalStore` for the `knowledge` namespace, and `runtimeStore` (for `rootHandle`).
@@ -460,7 +485,12 @@ import { produce } from 'solid-js/store'
 import { globalStore, setGlobalStore } from '../stores/globalStore'
 import { runtimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { hashContent, getCachedMeta, setCachedMeta, pruneCache } from '../services/fileCacheService'
+import {
+  hashContent,
+  getCachedMeta,
+  setCachedMeta,
+  pruneCache,
+} from '../services/fileCacheService'
 import {
   extractLinks,
   extractTags,
@@ -481,7 +511,10 @@ async function readAllFiles(
     if (name.startsWith('.')) continue
     const nodePath = path ? `${path}/${name}` : name
     if (handle.kind === 'directory') {
-      const sub = await readAllFiles(handle as FileSystemDirectoryHandle, nodePath)
+      const sub = await readAllFiles(
+        handle as FileSystemDirectoryHandle,
+        nodePath,
+      )
       results.push(...sub)
     } else if (name.endsWith('.md')) {
       const file = await (handle as FileSystemFileHandle).getFile()
@@ -501,28 +534,39 @@ export const knowledgeActions = {
     const index: Record<string, FileMetadata> = {}
     const activeHashes = new Set<string>()
 
-    await Promise.all(files.map(async ({ path, content }) => {
-      if (content === null) {
-        index[path] = { path, frontmatter: {}, outLinks: [], tags: [], aliases: [] }
-        return
-      }
-      const hash = hashContent(content)
-      activeHashes.add(hash)
-      const cached = await getCachedMeta(hash)
-      if (cached) {
-        index[path] = { path, ...cached }
-        return
-      }
-      const { frontmatter, body } = parseFrontmatter(content)
-      const parsed = {
-        frontmatter,
-        outLinks: extractLinks(body),
-        tags: mergeTagsWithBody(extractTags(frontmatter.tags), extractBodyTags(body)),
-        aliases: extractAliases(frontmatter.aliases),
-      }
-      index[path] = { path, ...parsed }
-      await setCachedMeta(hash, parsed)
-    }))
+    await Promise.all(
+      files.map(async ({ path, content }) => {
+        if (content === null) {
+          index[path] = {
+            path,
+            frontmatter: {},
+            outLinks: [],
+            tags: [],
+            aliases: [],
+          }
+          return
+        }
+        const hash = hashContent(content)
+        activeHashes.add(hash)
+        const cached = await getCachedMeta(hash)
+        if (cached) {
+          index[path] = { path, ...cached }
+          return
+        }
+        const { frontmatter, body } = parseFrontmatter(content)
+        const parsed = {
+          frontmatter,
+          outLinks: extractLinks(body),
+          tags: mergeTagsWithBody(
+            extractTags(frontmatter.tags),
+            extractBodyTags(body),
+          ),
+          aliases: extractAliases(frontmatter.aliases),
+        }
+        index[path] = { path, ...parsed }
+        await setCachedMeta(hash, parsed)
+      }),
+    )
 
     const backlinkMap = buildBacklinkMap(index)
     const tagMap = buildTagMap(index)
@@ -541,12 +585,18 @@ export const knowledgeActions = {
       parsed = {
         frontmatter,
         outLinks: extractLinks(body),
-        tags: mergeTagsWithBody(extractTags(frontmatter.tags), extractBodyTags(body)),
+        tags: mergeTagsWithBody(
+          extractTags(frontmatter.tags),
+          extractBodyTags(body),
+        ),
         aliases: extractAliases(frontmatter.aliases),
       }
       await setCachedMeta(hash, parsed)
     }
-    knowledgeActions._applyFileMeta({ path, ...parsed }, globalStore.knowledge.index[path])
+    knowledgeActions._applyFileMeta(
+      { path, ...parsed },
+      globalStore.knowledge.index[path],
+    )
   },
 
   _applyFileMeta(newMeta: FileMetadata, prevMeta?: FileMetadata): void {
@@ -556,22 +606,36 @@ export const knowledgeActions = {
     const nextLinks = new Set(newMeta.outLinks)
     for (const t of prevLinks) {
       if (!nextLinks.has(t))
-        setGlobalStore('knowledge', 'backlinkMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
+        setGlobalStore(
+          'knowledge',
+          'backlinkMap',
+          t,
+          (list) => list?.filter((p) => p !== newMeta.path) ?? [],
+        )
     }
     for (const t of nextLinks) {
       if (!prevLinks.has(t))
-        setGlobalStore('knowledge', 'backlinkMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
+        setGlobalStore('knowledge', 'backlinkMap', t, (list) =>
+          list ? [...list, newMeta.path] : [newMeta.path],
+        )
     }
 
     const prevTags = new Set(prevMeta?.tags ?? [])
     const nextTags = new Set(newMeta.tags)
     for (const t of prevTags) {
       if (!nextTags.has(t))
-        setGlobalStore('knowledge', 'tagMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
+        setGlobalStore(
+          'knowledge',
+          'tagMap',
+          t,
+          (list) => list?.filter((p) => p !== newMeta.path) ?? [],
+        )
     }
     for (const t of nextTags) {
       if (!prevTags.has(t))
-        setGlobalStore('knowledge', 'tagMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
+        setGlobalStore('knowledge', 'tagMap', t, (list) =>
+          list ? [...list, newMeta.path] : [newMeta.path],
+        )
     }
   },
 
@@ -579,12 +643,27 @@ export const knowledgeActions = {
     const meta = globalStore.knowledge.index[path]
     if (!meta) return
     for (const t of meta.outLinks) {
-      setGlobalStore('knowledge', 'backlinkMap', t, list => list?.filter(p => p !== path) ?? [])
+      setGlobalStore(
+        'knowledge',
+        'backlinkMap',
+        t,
+        (list) => list?.filter((p) => p !== path) ?? [],
+      )
     }
     for (const t of meta.tags) {
-      setGlobalStore('knowledge', 'tagMap', t, list => list?.filter(p => p !== path) ?? [])
+      setGlobalStore(
+        'knowledge',
+        'tagMap',
+        t,
+        (list) => list?.filter((p) => p !== path) ?? [],
+      )
     }
-    setGlobalStore('knowledge', produce(s => { delete s.index[path] }))
+    setGlobalStore(
+      'knowledge',
+      produce((s) => {
+        delete s.index[path]
+      }),
+    )
   },
 }
 ```
@@ -609,6 +688,7 @@ git commit -m "feat: add knowledgeActions using globalStore knowledge namespace"
 ## Task 5: Create `src/actions/fsActions.ts`
 
 **Files:**
+
 - Create: `src/actions/fsActions.ts`
 
 Replaces `fileSystemService.ts`. Writes to `globalStore.fs.tree` and `runtimeStore.rootHandle`. The helpers `buildTree`, `getFileHandle`, `replaceWikiLinks`, `updateBacklinks` are copied from `fileSystemService.ts`. After this task, the new file is self-contained but old one is not yet deleted.
@@ -624,15 +704,23 @@ import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { knowledgeActions } from './knowledgeActions'
 import { workspaceActions } from './workspaceActions'
 import { clearEmbedUrlCache } from '../lib/embedExtension'
-import { parseFrontmatter, formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
+import {
+  parseFrontmatter,
+  formatTimestamp,
+  setFrontmatterField,
+} from '../lib/parseFrontmatter'
 import type { FileNode } from '../stores/types'
 
 declare global {
   interface Window {
-    showDirectoryPicker: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>
+    showDirectoryPicker: (options?: {
+      mode?: 'read' | 'readwrite'
+    }) => Promise<FileSystemDirectoryHandle>
   }
   interface FileSystemDirectoryHandle {
-    requestPermission: (options?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>
+    requestPermission: (options?: {
+      mode?: 'read' | 'readwrite'
+    }) => Promise<PermissionState>
   }
 }
 
@@ -647,7 +735,10 @@ async function buildTree(
     if (name.startsWith('.')) continue
     const nodePath = path ? `${path}/${name}` : name
     if (handle.kind === 'directory') {
-      const children = await buildTree(handle as FileSystemDirectoryHandle, nodePath)
+      const children = await buildTree(
+        handle as FileSystemDirectoryHandle,
+        nodePath,
+      )
       nodes.push({ name, path: nodePath, kind: 'directory', children })
     } else {
       nodes.push({ name, path: nodePath, kind: 'file' })
@@ -674,7 +765,11 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function replaceWikiLinks(content: string, oldPath: string, newPath: string): string {
+function replaceWikiLinks(
+  content: string,
+  oldPath: string,
+  newPath: string,
+): string {
   const oldBase = oldPath.replace(/\.md$/, '')
   const newBase = newPath.replace(/\.md$/, '')
   const oldStem = oldBase.split('/').pop()!
@@ -696,7 +791,11 @@ function replaceWikiLinks(content: string, oldPath: string, newPath: string): st
   return result
 }
 
-async function updateBacklinks(backlinks: string[], oldPath: string, newPath: string): Promise<void> {
+async function updateBacklinks(
+  backlinks: string[],
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
   for (const bPath of backlinks) {
     try {
       const content = await fsActions.readFile(bPath)
@@ -705,7 +804,9 @@ async function updateBacklinks(backlinks: string[], oldPath: string, newPath: st
         await fsActions.writeFile(bPath, updated)
         await knowledgeActions.reindexFile(bPath, updated)
       }
-    } catch { /* skip unreadable files */ }
+    } catch {
+      /* skip unreadable files */
+    }
   }
 }
 
@@ -732,7 +833,9 @@ export const fsActions = {
       setRuntimeStore('rootHandle', handle)
       setGlobalStore('fs', 'tree', await buildTree(handle))
       await knowledgeActions.scanDirectory()
-    } catch { /* handle invalidated */ }
+    } catch {
+      /* handle invalidated */
+    }
   },
 
   async createFile(name: string): Promise<string | null> {
@@ -746,7 +849,8 @@ export const fsActions = {
       dir = await dir.getDirectoryHandle(part, { create: true })
     }
     await dir.getFileHandle(finalName, { create: true })
-    const path = parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
+    const path =
+      parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
     setGlobalStore('fs', 'tree', await buildTree(rootHandle))
     return path
   },
@@ -825,8 +929,10 @@ export const fsActions = {
       const { frontmatter } = parseFrontmatter(content)
       const ts = formatTimestamp(file.lastModified)
       let updated = content
-      if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
-      if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
+      if (!frontmatter.created)
+        updated = setFrontmatterField(updated, 'created', ts)
+      if (!frontmatter.updated)
+        updated = setFrontmatterField(updated, 'updated', ts)
       if (updated !== content) {
         const writable = await handle.createWritable()
         await writable.write(updated)
@@ -859,6 +965,7 @@ git commit -m "feat: add fsActions using globalStore.fs and runtimeStore.rootHan
 ## Task 6: Create `src/actions/workspaceActions.ts`
 
 **Files:**
+
 - Create: `src/actions/workspaceActions.ts`
 
 Manages the recursive WorkspaceSplit tree in `globalStore.workspace`. Does NOT know about files—callers pass `viewState` directly. Also manages `runtimeStore.leafInstances` cleanup on close.
@@ -868,16 +975,28 @@ Manages the recursive WorkspaceSplit tree in `globalStore.workspace`. Does NOT k
 ```typescript
 // src/actions/workspaceActions.ts
 import { produce } from 'solid-js/store'
-import { globalStore, setGlobalStore, ROOT_TABS_ID } from '../stores/globalStore'
+import {
+  globalStore,
+  setGlobalStore,
+  ROOT_TABS_ID,
+} from '../stores/globalStore'
 import { setRuntimeStore } from '../stores/runtimeStore'
 import { getView, getFileViewForExt } from '../lib/viewRegistry'
-import type { WorkspaceNode, WorkspaceTabs, WorkspaceLeaf, ViewState } from '../stores/types'
+import type {
+  WorkspaceNode,
+  WorkspaceTabs,
+  WorkspaceLeaf,
+  ViewState,
+} from '../stores/types'
 
 // ── Tree helpers ─────────────────────────────────────────────────────────────
 
-function findParentTabs(root: WorkspaceNode, leafId: string): WorkspaceTabs | null {
+function findParentTabs(
+  root: WorkspaceNode,
+  leafId: string,
+): WorkspaceTabs | null {
   if (root.type === 'tabs') {
-    if (root.children.some(l => l.id === leafId)) return root as WorkspaceTabs
+    if (root.children.some((l) => l.id === leafId)) return root as WorkspaceTabs
     return null
   }
   if (root.type === 'split') {
@@ -897,13 +1016,16 @@ function mapNode(
 ): WorkspaceNode {
   if ((root as { id: string }).id === id) return updater(root)
   if (root.type === 'split') {
-    return { ...root, children: root.children.map(c => mapNode(c, id, updater)) }
+    return {
+      ...root,
+      children: root.children.map((c) => mapNode(c, id, updater)),
+    }
   }
   if (root.type === 'tabs') {
     return {
       ...root,
-      children: root.children.map(c =>
-        c.id === id ? updater(c) as WorkspaceLeaf : c,
+      children: root.children.map((c) =>
+        c.id === id ? (updater(c) as WorkspaceLeaf) : c,
       ),
     }
   }
@@ -911,12 +1033,15 @@ function mapNode(
 }
 
 /** Find a leaf whose viewState.state.file matches path. */
-function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | null {
+function findLeafWithFile(
+  root: WorkspaceNode,
+  path: string,
+): WorkspaceLeaf | null {
   if (root.type === 'leaf') {
     return root.viewState.state.file === path ? root : null
   }
   if (root.type === 'tabs') {
-    return root.children.find(l => l.viewState.state.file === path) ?? null
+    return root.children.find((l) => l.viewState.state.file === path) ?? null
   }
   if (root.type === 'split') {
     for (const child of root.children) {
@@ -932,11 +1057,20 @@ function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | nu
 export const workspaceActions = {
   createLeaf(tabsId: string, viewState: ViewState): string {
     const leafId = crypto.randomUUID()
-    const leaf: WorkspaceLeaf = { type: 'leaf', id: leafId, viewState, pinned: false }
-    setGlobalStore('workspace', 'main', root =>
-      mapNode(root, tabsId, node => {
+    const leaf: WorkspaceLeaf = {
+      type: 'leaf',
+      id: leafId,
+      viewState,
+      pinned: false,
+    }
+    setGlobalStore('workspace', 'main', (root) =>
+      mapNode(root, tabsId, (node) => {
         const tabs = node as WorkspaceTabs
-        return { ...tabs, children: [...tabs.children, leaf], activeLeafId: leafId }
+        return {
+          ...tabs,
+          children: [...tabs.children, leaf],
+          activeLeafId: leafId,
+        }
       }),
     )
     setGlobalStore('workspace', 'activeLeafId', leafId)
@@ -947,13 +1081,13 @@ export const workspaceActions = {
     const main = globalStore.workspace.main
     const parentTabs = findParentTabs(main, leafId)
     if (!parentTabs) return
-    const remaining = parentTabs.children.filter(l => l.id !== leafId)
+    const remaining = parentTabs.children.filter((l) => l.id !== leafId)
     const nextActiveId =
       parentTabs.activeLeafId === leafId
         ? (remaining[remaining.length - 1]?.id ?? null)
         : parentTabs.activeLeafId
-    setGlobalStore('workspace', 'main', root =>
-      mapNode(root, parentTabs.id, node => ({
+    setGlobalStore('workspace', 'main', (root) =>
+      mapNode(root, parentTabs.id, (node) => ({
         ...(node as WorkspaceTabs),
         children: remaining,
         activeLeafId: nextActiveId,
@@ -962,15 +1096,20 @@ export const workspaceActions = {
     if (globalStore.workspace.activeLeafId === leafId) {
       setGlobalStore('workspace', 'activeLeafId', nextActiveId)
     }
-    setRuntimeStore('leafInstances', produce(s => { delete s[leafId] }))
+    setRuntimeStore(
+      'leafInstances',
+      produce((s) => {
+        delete s[leafId]
+      }),
+    )
   },
 
   activateLeaf(leafId: string): void {
     setGlobalStore('workspace', 'activeLeafId', leafId)
     const parentTabs = findParentTabs(globalStore.workspace.main, leafId)
     if (parentTabs) {
-      setGlobalStore('workspace', 'main', root =>
-        mapNode(root, parentTabs.id, node => ({
+      setGlobalStore('workspace', 'main', (root) =>
+        mapNode(root, parentTabs.id, (node) => ({
           ...(node as WorkspaceTabs),
           activeLeafId: leafId,
         })),
@@ -979,14 +1118,17 @@ export const workspaceActions = {
   },
 
   setLeafViewState(leafId: string, viewState: ViewState): void {
-    setGlobalStore('workspace', 'main', root =>
-      mapNode(root, leafId, node => ({ ...(node as WorkspaceLeaf), viewState })),
+    setGlobalStore('workspace', 'main', (root) =>
+      mapNode(root, leafId, (node) => ({
+        ...(node as WorkspaceLeaf),
+        viewState,
+      })),
     )
   },
 
   setLeafPinned(leafId: string, pinned: boolean): void {
-    setGlobalStore('workspace', 'main', root =>
-      mapNode(root, leafId, node => ({ ...(node as WorkspaceLeaf), pinned })),
+    setGlobalStore('workspace', 'main', (root) =>
+      mapNode(root, leafId, (node) => ({ ...(node as WorkspaceLeaf), pinned })),
     )
   },
 
@@ -1000,7 +1142,14 @@ export const workspaceActions = {
       type: 'tabs',
       id: newTabsId,
       activeLeafId: newLeafId,
-      children: [{ type: 'leaf', id: newLeafId, viewState: { type: '', state: {} }, pinned: false }],
+      children: [
+        {
+          type: 'leaf',
+          id: newLeafId,
+          viewState: { type: '', state: {} },
+          pinned: false,
+        },
+      ],
     }
     const splitNode: WorkspaceNode = {
       type: 'split',
@@ -1008,7 +1157,7 @@ export const workspaceActions = {
       direction,
       children: [parentTabs, newTabs],
     }
-    setGlobalStore('workspace', 'main', root =>
+    setGlobalStore('workspace', 'main', (root) =>
       mapNode(root, parentTabs.id, () => splitNode),
     )
     setGlobalStore('workspace', 'activeLeafId', newLeafId)
@@ -1019,9 +1168,10 @@ export const workspaceActions = {
     const def = getView(type)
     if (!def || def.kind !== 'page') return
     const main = globalStore.workspace.main
-    const existing = main.type === 'tabs'
-      ? main.children.find(l => l.viewState.type === type)
-      : null
+    const existing =
+      main.type === 'tabs'
+        ? main.children.find((l) => l.viewState.type === type)
+        : null
     if (existing) {
       workspaceActions.activateLeaf(existing.id)
       return
@@ -1030,11 +1180,11 @@ export const workspaceActions = {
   },
 
   toggleLeft(): void {
-    setGlobalStore('workspace', 'left', 'collapsed', v => !v)
+    setGlobalStore('workspace', 'left', 'collapsed', (v) => !v)
   },
 
   toggleRight(): void {
-    setGlobalStore('workspace', 'right', 'collapsed', v => !v)
+    setGlobalStore('workspace', 'right', 'collapsed', (v) => !v)
   },
 
   resizeSidebar(side: 'left' | 'right', width: number): void {
@@ -1058,13 +1208,19 @@ export const workspaceActions = {
     const ext = newPath.slice(newPath.lastIndexOf('.')).toLowerCase()
     const def = getFileViewForExt(ext)
     const newType = def?.type ?? 'markdown'
-    setGlobalStore('workspace', 'main', root => {
+    setGlobalStore('workspace', 'main', (root) => {
       function walk(node: WorkspaceNode): WorkspaceNode {
         if (node.type === 'leaf' && node.viewState.state.file === oldPath) {
-          return { ...node, viewState: { type: newType, state: { file: newPath } } }
+          return {
+            ...node,
+            viewState: { type: newType, state: { file: newPath } },
+          }
         }
         if (node.type === 'tabs') {
-          return { ...node, children: node.children.map(walk) as WorkspaceLeaf[] }
+          return {
+            ...node,
+            children: node.children.map(walk) as WorkspaceLeaf[],
+          }
         }
         if (node.type === 'split') {
           return { ...node, children: node.children.map(walk) }
@@ -1097,6 +1253,7 @@ git commit -m "feat: add workspaceActions for WorkspaceSplit tree management"
 ## Task 7: Create `src/actions/appActions.ts`
 
 **Files:**
+
 - Create: `src/actions/appActions.ts`
 
 - [ ] **Step 1: Create the file**
@@ -1118,7 +1275,7 @@ export const appActions = {
   },
 
   toggleSettings(): void {
-    setGlobalStore('workspace', 'showSettings', v => !v)
+    setGlobalStore('workspace', 'showSettings', (v) => !v)
   },
 
   setAutoTimestamps(value: boolean): void {
@@ -1145,6 +1302,7 @@ git commit -m "feat: add appActions for theme and settings mutations"
 ## Task 8: Update `src/lib/viewRegistry.ts` — new component prop type
 
 **Files:**
+
 - Modify: `src/lib/viewRegistry.ts`
 
 Change the `component` prop type in `FileViewDef` and `PageViewDef` from `{ tabId, isActive }` to `ViewComponentProps` from the types file.
@@ -1218,6 +1376,7 @@ git commit -m "refactor: update viewRegistry component type to ViewComponentProp
 ## Task 9: Create workspace renderer components
 
 **Files:**
+
 - Create: `src/components/workspace/WorkspaceLeafView.tsx`
 - Create: `src/components/workspace/WorkspaceTabsView.tsx`
 - Create: `src/components/workspace/WorkspaceSplitView.tsx`
@@ -1234,7 +1393,10 @@ import { Dynamic } from 'solid-js/web'
 import { getView } from '../../lib/viewRegistry'
 import type { WorkspaceLeaf } from '../../stores/types'
 
-export function WorkspaceLeafView(props: { leaf: WorkspaceLeaf; isActive: boolean }) {
+export function WorkspaceLeafView(props: {
+  leaf: WorkspaceLeaf
+  isActive: boolean
+}) {
   const def = () => getView(props.leaf.viewState.type)
   return (
     <Dynamic
@@ -1263,37 +1425,52 @@ function getTabLabel(leaf: WorkspaceLeaf): string {
   const def = getView(leaf.viewState.type)
   if (!def) return leaf.viewState.type
   const file = leaf.viewState.state.file as string | undefined
-  return def.kind === 'file' && file ? def.getDisplayText(file) : def.getDisplayText()
+  return def.kind === 'file' && file
+    ? def.getDisplayText(file)
+    : def.getDisplayText()
 }
 
-export function WorkspaceTabsView(props: { node: WorkspaceTabs; isRoot?: boolean }) {
+export function WorkspaceTabsView(props: {
+  node: WorkspaceTabs
+  isRoot?: boolean
+}) {
   return (
     <div class="flex flex-col h-full">
       {/* Tab bar */}
-      <div class="h-8 bg-[var(--bg-base)] border-b border-[var(--border)] flex items-stretch shrink-0 overflow-y-hidden">
+      <div class="h-8 bg-[var(--bg-base)] border-b border-(--border)] flex items-stretch shrink-0 overflow-y-hidden">
         <div class="flex flex-1 overflow-x-auto overflow-y-hidden">
           <For each={props.node.children}>
             {(leaf) => {
-              const isActive = createMemo(() => leaf.id === props.node.activeLeafId)
+              const isActive = createMemo(
+                () => leaf.id === props.node.activeLeafId,
+              )
               const isPinned = () => leaf.pinned
               const def = () => getView(leaf.viewState.type)
               return (
                 <div
-                  class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
-                    ${isActive()
-                      ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
-                      : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
+                  class={`flex items-center gap-1.5 px-3 border-r border-(--border)] cursor-pointer text-[11px] shrink-0
+                    ${
+                      isActive()
+                        ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-(--accent) -mb-px'
+                        : 'text-[var(--text-3)] hover:bg-(--bg-hover)'
                     }`}
                   onClick={() => workspaceActions.activateLeaf(leaf.id)}
-                  onDblClick={() => workspaceActions.setLeafPinned(leaf.id, true)}
+                  onDblClick={() =>
+                    workspaceActions.setLeafPinned(leaf.id, true)
+                  }
                 >
                   {def()?.getIcon?.()}
-                  <span class={`max-w-[120px] truncate ${!isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}>
+                  <span
+                    class={`max-w-[120px] truncate ${!isPinned() && leaf.viewState.state.file ? 'italic' : ''}`}
+                  >
                     {getTabLabel(leaf)}
                   </span>
                   <button
                     class="text-[var(--text-4)] hover:text-[var(--text-2)] text-[13px] leading-none ml-0.5"
-                    onClick={e => { e.stopPropagation(); workspaceActions.closeLeaf(leaf.id) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      workspaceActions.closeLeaf(leaf.id)
+                    }}
                   >
                     ×
                   </button>
@@ -1305,7 +1482,7 @@ export function WorkspaceTabsView(props: { node: WorkspaceTabs; isRoot?: boolean
         {/* Toggle right panel button — only on root tabs */}
         {props.isRoot && (
           <button
-            class="px-2 shrink-0 text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg-hover)] flex items-center transition-colors"
+            class="px-2 shrink-0 text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-(--bg-hover) flex items-center transition-colors"
             onClick={() => workspaceActions.toggleRight()}
             title="切换右侧栏"
           >
@@ -1317,13 +1494,18 @@ export function WorkspaceTabsView(props: { node: WorkspaceTabs; isRoot?: boolean
       <div class="flex-1 relative overflow-hidden">
         <For each={props.node.children}>
           {(leaf) => {
-            const isActive = createMemo(() => leaf.id === props.node.activeLeafId)
+            const isActive = createMemo(
+              () => leaf.id === props.node.activeLeafId,
+            )
             return (
               <div
                 class="absolute inset-0 flex flex-col overflow-hidden"
                 style={{ display: isActive() ? 'flex' : 'none' }}
               >
-                <WorkspaceLeafView leaf={leaf} isActive={isActive()} />
+                <WorkspaceLeafView
+                  leaf={leaf}
+                  isActive={isActive()}
+                />
               </div>
             )
           }}
@@ -1346,7 +1528,10 @@ export function WorkspaceSplitView(props: { node: WorkspaceSplit }) {
   return (
     <div
       class="flex h-full w-full"
-      style={{ 'flex-direction': props.node.direction === 'horizontal' ? 'row' : 'column' }}
+      style={{
+        'flex-direction':
+          props.node.direction === 'horizontal' ? 'row' : 'column',
+      }}
     >
       <For each={props.node.children}>
         {(child) => (
@@ -1375,12 +1560,17 @@ export function WorkspaceNodeRenderer(props: { node: WorkspaceNode }) {
   return (
     <Switch>
       <Match when={props.node.type === 'split'}>
-        <WorkspaceSplitView node={props.node as import('../../stores/types').WorkspaceSplit} />
+        <WorkspaceSplitView
+          node={props.node as import('../../stores/types').WorkspaceSplit}
+        />
       </Match>
       <Match when={props.node.type === 'tabs'}>
         <WorkspaceTabsView
           node={props.node as import('../../stores/types').WorkspaceTabs}
-          isRoot={(props.node as import('../../stores/types').WorkspaceTabs).id === ROOT_TABS_ID}
+          isRoot={
+            (props.node as import('../../stores/types').WorkspaceTabs).id ===
+            ROOT_TABS_ID
+          }
         />
       </Match>
       <Match when={props.node.type === 'leaf'}>
@@ -1408,7 +1598,9 @@ export function SidebarRenderer(props: {
   return (
     <div
       class="transition-all duration-200 overflow-hidden shrink-0"
-      style={{ width: props.sidebar.collapsed ? '0px' : `${props.sidebar.width}px` }}
+      style={{
+        width: props.sidebar.collapsed ? '0px' : `${props.sidebar.width}px`,
+      }}
     >
       {props.children}
     </div>
@@ -1428,6 +1620,7 @@ git commit -m "feat: add WorkspaceNodeRenderer, WorkspaceTabsView, SidebarRender
 ## Task 10: Update `App.tsx`
 
 **Files:**
+
 - Modify: `src/App.tsx`
 
 Replace `TabBar` + `ContentPane` with `WorkspaceNodeRenderer`. Replace old store imports with `globalStore` + new actions. Keep `Sidebar`, `CalendarPanel`, `RightPanel`, `StatusBar`, `Settings` (they will be updated in subsequent tasks, but they still compile because old stores exist in parallel until Task 16).
@@ -1457,22 +1650,30 @@ const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
 
 const IMAGE_EXTS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.avif',
 ])
 
 registerView({
   kind: 'file',
   type: 'markdown',
-  getDisplayText: path => path.split('/').pop()!,
-  canAcceptFile: ext => ext === '.md',
+  getDisplayText: (path) => path.split('/').pop()!,
+  canAcceptFile: (ext) => ext === '.md',
   component: EditorPane,
 })
 
 registerView({
   kind: 'file',
   type: 'image',
-  getDisplayText: path => path.split('/').pop()!,
-  canAcceptFile: ext => IMAGE_EXTS.has(ext),
+  getDisplayText: (path) => path.split('/').pop()!,
+  canAcceptFile: (ext) => IMAGE_EXTS.has(ext),
   component: ImageViewer,
 })
 
@@ -1486,7 +1687,10 @@ registerView({
 
 export default function App() {
   createEffect(() => {
-    document.documentElement.setAttribute('data-theme', globalStore.workspace.theme)
+    document.documentElement.setAttribute(
+      'data-theme',
+      globalStore.workspace.theme,
+    )
   })
 
   createEffect(() => {
@@ -1502,7 +1706,10 @@ export default function App() {
       <div class="flex flex-1 overflow-hidden">
         <Ribbon />
         <SidebarRenderer sidebar={globalStore.workspace.left}>
-          <Show when={globalStore.workspace.sidebarView === 'calendar'} fallback={<Sidebar />}>
+          <Show
+            when={globalStore.workspace.sidebarView === 'calendar'}
+            fallback={<Sidebar />}
+          >
             <CalendarPanel />
           </Show>
         </SidebarRenderer>
@@ -1534,6 +1741,7 @@ git commit -m "feat: update App.tsx to use globalStore and WorkspaceNodeRenderer
 ## Task 11: Update `EditorPane.tsx`
 
 **Files:**
+
 - Modify: `src/components/EditorPane.tsx`
 
 Change props from `{ tabId, isActive }` to `ViewComponentProps` (`{ leafId, isActive, viewState }`). Read file path from `viewState.file`. Use `runtimeStore.leafInstances[leafId]` instead of global `editorStore`. Use `fsActions` and `knowledgeActions`.
@@ -1583,7 +1791,10 @@ function buildEditorState(
     doc,
     selection: { anchor: 0 },
     extensions: [
-      markdown({ codeLanguages: languages, extensions: [GFM, wikiLinkParser, wikiEmbedParser] }),
+      markdown({
+        codeLanguages: languages,
+        extensions: [GFM, wikiLinkParser, wikiEmbedParser],
+      }),
       syntaxHighlighting(darkHighlightStyle),
       darkTheme,
       livePreviewExtension,
@@ -1609,15 +1820,29 @@ export function EditorPane(props: ViewComponentProps) {
   let reindexTimer: ReturnType<typeof setTimeout> | null = null
   let localDirty = false
 
-  function setLeafRuntime(patch: Partial<{ cmView: EditorView | null; isDirty: boolean; outLinks: any[]; headings: any[] }>) {
-    setRuntimeStore('leafInstances', props.leafId, prev => ({
-      cmView: null, isDirty: false, outLinks: [], headings: [], ...prev, ...patch,
+  function setLeafRuntime(
+    patch: Partial<{
+      cmView: EditorView | null
+      isDirty: boolean
+      outLinks: any[]
+      headings: any[]
+    }>,
+  ) {
+    setRuntimeStore('leafInstances', props.leafId, (prev) => ({
+      cmView: null,
+      isDirty: false,
+      outLinks: [],
+      headings: [],
+      ...prev,
+      ...patch,
     }))
   }
 
   function handleDocChange(update: ViewUpdate) {
     if (!update.docChanged) return
-    const isRemote = update.transactions.some(tr => tr.annotation(Transaction.remote))
+    const isRemote = update.transactions.some((tr) =>
+      tr.annotation(Transaction.remote),
+    )
     if (!isRemote) {
       localDirty = true
       if (props.isActive) setLeafRuntime({ isDirty: true })
@@ -1626,7 +1851,8 @@ export function EditorPane(props: ViewComponentProps) {
     reindexTimer = setTimeout(() => {
       reindexTimer = null
       const p = filePath()
-      if (p && view) void knowledgeActions.reindexFile(p, view.state.doc.toString())
+      if (p && view)
+        void knowledgeActions.reindexFile(p, view.state.doc.toString())
     }, 800)
     if (props.isActive) {
       setLeafRuntime({
@@ -1652,10 +1878,22 @@ export function EditorPane(props: ViewComponentProps) {
       const withUpdated = setFrontmatterField(content, 'updated', ts)
       if (withUpdated !== content) {
         let from = 0
-        while (from < content.length && from < withUpdated.length && content[from] === withUpdated[from]) from++
+        while (
+          from < content.length &&
+          from < withUpdated.length &&
+          content[from] === withUpdated[from]
+        )
+          from++
         let toOld = content.length
         let toNew = withUpdated.length
-        while (toOld > from && toNew > from && content[toOld - 1] === withUpdated[toNew - 1]) { toOld--; toNew-- }
+        while (
+          toOld > from &&
+          toNew > from &&
+          content[toOld - 1] === withUpdated[toNew - 1]
+        ) {
+          toOld--
+          toNew--
+        }
         view.dispatch({
           changes: { from, to: toOld, insert: withUpdated.slice(from, toNew) },
           annotations: Transaction.remote.of(true),
@@ -1692,7 +1930,13 @@ export function EditorPane(props: ViewComponentProps) {
     if (reindexTimer !== null) clearTimeout(reindexTimer)
     view?.destroy()
     view = null
-    if (props.isActive) setLeafRuntime({ cmView: null, isDirty: false, outLinks: [], headings: [] })
+    if (props.isActive)
+      setLeafRuntime({
+        cmView: null,
+        isDirty: false,
+        outLinks: [],
+        headings: [],
+      })
   })
 
   // viewState.file changed (preview replacement): reload without unmounting
@@ -1700,7 +1944,11 @@ export function EditorPane(props: ViewComponentProps) {
     const p = filePath()
     if (!view || !p) return
     const newContent = await fsActions.loadFileContent(p)
-    const newState = buildEditorState(newContent, handleDocChange, handleKeyDown)
+    const newState = buildEditorState(
+      newContent,
+      handleDocChange,
+      handleKeyDown,
+    )
     view.setState(newState)
     view.scrollDOM.scrollTop = 0
     localDirty = false
@@ -1737,8 +1985,15 @@ export function EditorPane(props: ViewComponentProps) {
     return (p.split('/').pop() ?? p).replace(/\.md$/, '')
   })
 
-  const startEdit = () => { handled = false; setDraft(stem()); setEditing(true) }
-  const cancel = () => { handled = true; setEditing(false) }
+  const startEdit = () => {
+    handled = false
+    setDraft(stem())
+    setEditing(true)
+  }
+  const cancel = () => {
+    handled = true
+    setEditing(false)
+  }
   const confirmRename = async () => {
     if (handled) return
     handled = true
@@ -1749,8 +2004,13 @@ export function EditorPane(props: ViewComponentProps) {
     await fsActions.renameFile(p, name)
   }
   const onTitleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') { e.preventDefault(); void confirmRename() }
-    else if (e.key === 'Escape') { e.preventDefault(); cancel() }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void confirmRename()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      cancel()
+    }
   }
 
   return (
@@ -1761,7 +2021,7 @@ export function EditorPane(props: ViewComponentProps) {
             when={editing()}
             fallback={
               <h1
-                class="text-[22px] font-bold text-[var(--text)] cursor-text hover:text-[var(--accent)] transition-colors truncate leading-tight"
+                class="text-[22px] font-bold text-[var(--text)] cursor-text hover:text-(--accent) transition-colors truncate leading-tight"
                 onClick={startEdit}
                 title="点击修改文件名"
               >
@@ -1770,12 +2030,17 @@ export function EditorPane(props: ViewComponentProps) {
             }
           >
             <input
-              class="w-full bg-transparent border-b-2 border-[var(--accent)] outline-none text-[22px] font-bold text-[var(--text)] pb-0.5 leading-tight"
+              class="w-full bg-transparent border-b-2 border-(--accent) outline-none text-[22px] font-bold text-[var(--text)] pb-0.5 leading-tight"
               value={draft()}
-              onInput={e => setDraft(e.currentTarget.value)}
+              onInput={(e) => setDraft(e.currentTarget.value)}
               onKeyDown={onTitleKeyDown}
               onBlur={() => void confirmRename()}
-              ref={el => setTimeout(() => { el.focus(); el.select() }, 0)}
+              ref={(el) =>
+                setTimeout(() => {
+                  el.focus()
+                  el.select()
+                }, 0)
+              }
               spellcheck={false}
             />
           </Show>
@@ -1803,6 +2068,7 @@ git commit -m "feat: update EditorPane to use leafId/viewState props and runtime
 ## Task 12: Update `ImageViewer.tsx` and `CalendarPage.tsx`
 
 **Files:**
+
 - Modify: `src/components/ImageViewer.tsx`
 - Modify: `src/components/CalendarPage.tsx`
 
@@ -1882,10 +2148,13 @@ export function ImageViewer(props: ViewComponentProps) {
 Open `src/components/CalendarPage.tsx` and change the component signature from `(props: { tabId: string; isActive: boolean })` to `(props: ViewComponentProps)`. The body of the component does not need other changes since it doesn't use tabId.
 
 Find the line:
+
 ```tsx
 export function CalendarPage(props: { tabId: string; isActive: boolean }) {
 ```
+
 Replace with:
+
 ```tsx
 import type { ViewComponentProps } from '../stores/types'
 // ...
@@ -1904,6 +2173,7 @@ git commit -m "feat: update ImageViewer and CalendarPage to ViewComponentProps"
 ## Task 13: Update `Sidebar.tsx` and `backgroundParser.ts`
 
 **Files:**
+
 - Modify: `src/components/Sidebar.tsx`
 - Modify: `src/services/backgroundParser.ts`
 
@@ -1913,7 +2183,12 @@ git commit -m "feat: update ImageViewer and CalendarPage to ViewComponentProps"
 // src/components/Sidebar.tsx
 import { For, Show, createSignal } from 'solid-js'
 import { FolderOpen } from 'lucide-solid'
-import { globalStore, activeFilePath, findLeafInTree, ROOT_TABS_ID } from '../stores/globalStore'
+import {
+  globalStore,
+  activeFilePath,
+  findLeafInTree,
+  ROOT_TABS_ID,
+} from '../stores/globalStore'
 import { runtimeStore } from '../stores/runtimeStore'
 import { fsActions } from '../actions/fsActions'
 import { workspaceActions } from '../actions/workspaceActions'
@@ -1921,7 +2196,15 @@ import { getFileViewForExt } from '../lib/viewRegistry'
 import type { FileNode, ViewState, WorkspaceLeaf } from '../stores/types'
 
 const IMAGE_EXTS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.avif',
 ])
 const MD_EXT = '.md'
 
@@ -1944,7 +2227,10 @@ function canOpen(name: string): boolean {
   return name.endsWith(MD_EXT) || IMAGE_EXTS.has(ext)
 }
 
-function openFileInWorkspace(path: string, opts: { newTab?: boolean; pin?: boolean } = {}): void {
+function openFileInWorkspace(
+  path: string,
+  opts: { newTab?: boolean; pin?: boolean } = {},
+): void {
   const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
   const def = getFileViewForExt(ext)
   if (!def) return
@@ -1952,13 +2238,23 @@ function openFileInWorkspace(path: string, opts: { newTab?: boolean; pin?: boole
 
   // Already open? Activate it.
   const existing = findLeafWithFile(globalStore.workspace.main, path)
-  if (existing) { workspaceActions.activateLeaf(existing.id); return }
+  if (existing) {
+    workspaceActions.activateLeaf(existing.id)
+    return
+  }
 
   const { activeLeafId } = globalStore.workspace
-  const activeLeaf = activeLeafId ? findLeafInTree(globalStore.workspace.main, activeLeafId) : null
+  const activeLeaf = activeLeafId
+    ? findLeafInTree(globalStore.workspace.main, activeLeafId)
+    : null
 
   // Preview replacement: replace unpinned active leaf
-  if (!opts.newTab && activeLeaf && !activeLeaf.pinned && activeLeaf.viewState.type !== 'calendar') {
+  if (
+    !opts.newTab &&
+    activeLeaf &&
+    !activeLeaf.pinned &&
+    activeLeaf.viewState.type !== 'calendar'
+  ) {
     workspaceActions.setLeafViewState(activeLeafId!, viewState)
     if (opts.pin) workspaceActions.setLeafPinned(activeLeafId!, true)
     return
@@ -1968,9 +2264,13 @@ function openFileInWorkspace(path: string, opts: { newTab?: boolean; pin?: boole
   if (opts.pin) workspaceActions.setLeafPinned(leafId, true)
 }
 
-function findLeafWithFile(root: import('../stores/types').WorkspaceNode, path: string): WorkspaceLeaf | null {
+function findLeafWithFile(
+  root: import('../stores/types').WorkspaceNode,
+  path: string,
+): WorkspaceLeaf | null {
   if (root.type === 'leaf' && root.viewState.state.file === path) return root
-  if (root.type === 'tabs') return root.children.find(l => l.viewState.state.file === path) ?? null
+  if (root.type === 'tabs')
+    return root.children.find((l) => l.viewState.state.file === path) ?? null
   if (root.type === 'split') {
     for (const child of root.children) {
       const found = findLeafWithFile(child, path)
@@ -1982,7 +2282,8 @@ function findLeafWithFile(root: import('../stores/types').WorkspaceNode, path: s
 
 function FileTreeNode(props: { node: FileNode; depth: number }) {
   const isActive = () => activeFilePath() === props.node.path
-  const isOther = () => props.node.kind === 'file' && isOtherFile(props.node.name)
+  const isOther = () =>
+    props.node.kind === 'file' && isOtherFile(props.node.name)
   const show = () =>
     props.node.kind === 'directory' ||
     !isOtherFile(props.node.name) ||
@@ -1992,12 +2293,13 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
     <Show when={show()}>
       <div>
         <div
-          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-[var(--bg-hover)] select-none
-            ${isActive()
-              ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
-              : isOther()
-                ? 'text-[var(--text-4)] border-l-2 border-transparent'
-                : 'text-[var(--text-2)] border-l-2 border-transparent'
+          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none
+            ${
+              isActive()
+                ? 'bg-(--bg-hover) border-l-2 border-(--accent) text-[var(--text)]'
+                : isOther()
+                  ? 'text-[var(--text-4)] border-l-2 border-transparent'
+                  : 'text-[var(--text-2)] border-l-2 border-transparent'
             }`}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
@@ -2014,13 +2316,18 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
           <span class="text-[9px] text-[var(--text-3)]">
             {props.node.kind === 'directory' ? '▸' : fileIcon(props.node.name)}
           </span>
-          <span class={isActive() ? 'text-[var(--accent)]' : ''}>
+          <span class={isActive() ? 'text-(--accent)' : ''}>
             {displayName(props.node.name)}
           </span>
         </div>
         <Show when={props.node.kind === 'directory'}>
           <For each={props.node.children ?? []}>
-            {(child) => <FileTreeNode node={child} depth={props.depth + 1} />}
+            {(child) => (
+              <FileTreeNode
+                node={child}
+                depth={props.depth + 1}
+              />
+            )}
           </For>
         </Show>
       </div>
@@ -2034,11 +2341,20 @@ export function Sidebar() {
   const [createMode, setCreateMode] = createSignal<CreateMode>(null)
   const [newName, setNewName] = createSignal('')
 
-  const startCreate = (mode: CreateMode) => { setNewName(''); setCreateMode(mode) }
-  const cancel = () => { setCreateMode(null); setNewName('') }
+  const startCreate = (mode: CreateMode) => {
+    setNewName('')
+    setCreateMode(mode)
+  }
+  const cancel = () => {
+    setCreateMode(null)
+    setNewName('')
+  }
   const confirm = async () => {
     const name = newName().trim()
-    if (!name) { cancel(); return }
+    if (!name) {
+      cancel()
+      return
+    }
     const mode = createMode()
     cancel()
     if (mode === 'file') {
@@ -2054,38 +2370,51 @@ export function Sidebar() {
   }
 
   return (
-    <div class="w-[190px] h-full bg-[var(--bg-surface)] border-r border-[var(--border)] flex flex-col">
-      <div class="border-b border-[var(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
+    <div class="w-[190px] h-full bg-[var(--bg-surface)] border-r border-(--border)] flex flex-col">
+      <div class="border-b border-(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
-          class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors min-w-0 group"
+          class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-(--bg-hover) transition-colors min-w-0 group"
           onClick={fsActions.openDirectory}
           title={runtimeStore.rootHandle ? '切换文件夹' : '打开文件夹'}
         >
-          <FolderOpen size={12} class="shrink-0 text-[var(--accent)] group-hover:text-[var(--accent-2)]" />
-          <span class="truncate text-[10px] text-[var(--accent)] font-bold tracking-widest uppercase group-hover:text-[var(--accent-2)]">
+          <FolderOpen
+            size={12}
+            class="shrink-0 text-(--accent) group-hover:text-[var(--accent-2)]"
+          />
+          <span class="truncate text-[10px] text-(--accent) font-bold tracking-widest uppercase group-hover:text-[var(--accent-2)]">
             {runtimeStore.rootHandle?.name ?? '打开文件夹'}
           </span>
         </button>
         <Show when={runtimeStore.rootHandle}>
           <button
-            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors text-[13px]"
+            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors text-[13px]"
             title="新建文件夹"
             onClick={() => startCreate('folder')}
-          >⊞</button>
+          >
+            ⊞
+          </button>
           <button
-            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors"
+            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors"
             title="新建文件"
             onClick={() => startCreate('file')}
-          >+</button>
+          >
+            +
+          </button>
         </Show>
       </div>
       <div class="overflow-y-auto flex-1 py-1">
         <Show when={createMode() !== null}>
           <div class="flex items-center gap-1 px-2 py-1">
-            <span class="text-[9px] text-(--text-3)">{createMode() === 'folder' ? '▸' : '◻'}</span>
+            <span class="text-[9px] text-(--text-3)">
+              {createMode() === 'folder' ? '▸' : '◻'}
+            </span>
             <input
               class="flex-1 bg-(--bg-hover) border border-(--accent) rounded px-1.5 py-0.5 text-[11px] text-(--text) outline-none min-w-0"
-              placeholder={createMode() === 'folder' ? '文件夹 或 父/子/文件夹' : '文件名 或 目录/文件名'}
+              placeholder={
+                createMode() === 'folder'
+                  ? '文件夹 或 父/子/文件夹'
+                  : '文件名 或 目录/文件名'
+              }
               value={newName()}
               onInput={(e) => setNewName(e.currentTarget.value)}
               onKeyDown={onKeyDown}
@@ -2095,7 +2424,12 @@ export function Sidebar() {
           </div>
         </Show>
         <For each={globalStore.fs.tree}>
-          {(node) => <FileTreeNode node={node} depth={0} />}
+          {(node) => (
+            <FileTreeNode
+              node={node}
+              depth={0}
+            />
+          )}
         </For>
       </div>
     </div>
@@ -2106,10 +2440,13 @@ export function Sidebar() {
 - [ ] **Step 2: Update `backgroundParser.ts`** — change `fileSystemStore.rootHandle` to `runtimeStore.rootHandle`
 
 Open `src/services/backgroundParser.ts`. Find the import:
+
 ```ts
 import { fileSystemStore } from '../stores/fileSystemStore'
 ```
+
 Replace with:
+
 ```ts
 import { runtimeStore } from '../stores/runtimeStore'
 ```
@@ -2128,20 +2465,31 @@ git commit -m "feat: update Sidebar and backgroundParser to use globalStore and 
 ## Task 14: Update `Ribbon.tsx`
 
 **Files:**
+
 - Modify: `src/components/Ribbon.tsx`
 
 - [ ] **Step 1: Rewrite `Ribbon.tsx`**
 
 ```tsx
 // src/components/Ribbon.tsx
-import { Search, Network, Settings, CalendarDays, CalendarRange, PanelLeft } from 'lucide-solid'
+import {
+  Search,
+  Network,
+  Settings,
+  CalendarDays,
+  CalendarRange,
+  PanelLeft,
+} from 'lucide-solid'
 import { globalStore, setGlobalStore } from '../stores/globalStore'
 import { workspaceActions } from '../actions/workspaceActions'
 import { appActions } from '../actions/appActions'
 
 export function Ribbon() {
   const switchView = (view: 'files' | 'calendar') => {
-    if (globalStore.workspace.sidebarView === view && !globalStore.workspace.left.collapsed) {
+    if (
+      globalStore.workspace.sidebarView === view &&
+      !globalStore.workspace.left.collapsed
+    ) {
       workspaceActions.toggleLeft()
     } else {
       setGlobalStore('workspace', 'sidebarView', view)
@@ -2153,7 +2501,9 @@ export function Ribbon() {
     const main = globalStore.workspace.main
     if (main.type !== 'tabs') return false
     const activeId = globalStore.workspace.activeLeafId
-    return main.children.some(l => l.viewState.type === 'calendar' && l.id === activeId)
+    return main.children.some(
+      (l) => l.viewState.type === 'calendar' && l.id === activeId,
+    )
   }
 
   return (
@@ -2167,8 +2517,12 @@ export function Ribbon() {
       </button>
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
-          ${globalStore.workspace.sidebarView === 'files' && !globalStore.workspace.left.collapsed
-            ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
+          ${
+            globalStore.workspace.sidebarView === 'files' &&
+            !globalStore.workspace.left.collapsed
+              ? 'text-(--accent)'
+              : 'text-(--text-3) hover:text-(--text)'
+          }`}
         title="文件列表"
         onClick={() => switchView('files')}
       >
@@ -2176,8 +2530,12 @@ export function Ribbon() {
       </button>
       <button
         class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
-          ${globalStore.workspace.sidebarView === 'calendar' && !globalStore.workspace.left.collapsed
-            ? 'text-(--accent)' : 'text-(--text-3) hover:text-(--text)'}`}
+          ${
+            globalStore.workspace.sidebarView === 'calendar' &&
+            !globalStore.workspace.left.collapsed
+              ? 'text-(--accent)'
+              : 'text-(--text-3) hover:text-(--text)'
+          }`}
         title="日历"
         onClick={() => switchView('calendar')}
       >
@@ -2222,6 +2580,7 @@ git commit -m "feat: update Ribbon to use globalStore and workspaceActions"
 ## Task 15: Update `RightPanel.tsx`, `StatusBar.tsx`, and `Settings.tsx`
 
 **Files:**
+
 - Modify: `src/components/RightPanel.tsx`
 - Modify: `src/components/StatusBar.tsx`
 - Modify: `src/components/Settings.tsx`
@@ -2242,7 +2601,7 @@ export function RightPanel() {
 
   const activeRuntime = createMemo(() => {
     const id = globalStore.workspace.activeLeafId
-    return id ? runtimeStore.leafInstances[id] ?? null : null
+    return id ? (runtimeStore.leafInstances[id] ?? null) : null
   })
 
   const currentMeta = createMemo(() => {
@@ -2256,12 +2615,15 @@ export function RightPanel() {
     const path = activeFilePath()
     if (!path) return []
     const aliases = globalStore.knowledge.index[path]?.aliases ?? []
-    const keys = [path, ...aliases, ...aliases.map(a => `${a}.md`)]
+    const keys = [path, ...aliases, ...aliases.map((a) => `${a}.md`)]
     const seen = new Set<string>()
     const result: string[] = []
     for (const key of keys) {
       for (const bl of globalStore.knowledge.backlinkMap[key] ?? []) {
-        if (!seen.has(bl)) { seen.add(bl); result.push(bl) }
+        if (!seen.has(bl)) {
+          seen.add(bl)
+          result.push(bl)
+        }
       }
     }
     return result
@@ -2287,15 +2649,17 @@ export function RightPanel() {
   ]
 
   return (
-    <div class="w-50 h-full bg-[var(--bg-surface)] border-l border-[var(--border)] flex flex-col shrink-0">
-      <div class="flex border-b border-[var(--border)] shrink-0">
+    <div class="w-50 h-full bg-[var(--bg-surface)] border-l border-(--border)] flex flex-col shrink-0">
+      <div class="flex border-b border-(--border)] shrink-0">
         <For each={tabs}>
           {(tab) => (
             <button
               class={`flex-1 py-1.5 text-[10px] cursor-pointer transition-colors
-                ${activeTab() === tab.id
-                  ? 'text-[var(--accent)] border-b-2 border-[var(--accent)] -mb-px'
-                  : 'text-[var(--text-3)] hover:text-[var(--text-2)]'}`}
+                ${
+                  activeTab() === tab.id
+                    ? 'text-(--accent) border-b-2 border-(--accent) -mb-px'
+                    : 'text-[var(--text-3)] hover:text-[var(--text-2)]'
+                }`}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
@@ -2311,12 +2675,16 @@ export function RightPanel() {
           <For each={outLinks()}>
             {(link) => (
               <div class="py-0.5 min-w-0">
-                <div class={`flex items-center gap-1 ${link.type === 'wiki' ? 'text-[var(--link)]' : 'text-[var(--link-2)]'}`}>
-                  <span class="text-[var(--accent)] text-[10px] shrink-0">↗</span>
+                <div
+                  class={`flex items-center gap-1 ${link.type === 'wiki' ? 'text-[var(--link)]' : 'text-[var(--link-2)]'}`}
+                >
+                  <span class="text-(--accent) text-[10px] shrink-0">↗</span>
                   <span class="truncate">{link.label}</span>
                 </div>
                 <Show when={link.label !== link.target}>
-                  <div class="text-[var(--text-4)] text-[9px] truncate pl-4 mt-0.5">{link.target}</div>
+                  <div class="text-[var(--text-4)] text-[9px] truncate pl-4 mt-0.5">
+                    {link.target}
+                  </div>
                 </Show>
               </div>
             )}
@@ -2327,7 +2695,7 @@ export function RightPanel() {
           <For each={backlinks()}>
             {(link) => (
               <div class="text-[var(--link-2)] py-0.5 flex items-center gap-1">
-                <span class="text-[var(--accent)] text-[10px]">↙</span> {link}
+                <span class="text-(--accent) text-[10px]">↙</span> {link}
               </div>
             )}
           </For>
@@ -2339,12 +2707,21 @@ export function RightPanel() {
           <For each={outline()}>
             {(h) => (
               <div
-                class="py-0.5 text-[var(--text-2)] hover:text-[var(--accent)] cursor-pointer truncate transition-colors leading-snug"
-                style={{ 'padding-left': `${(h.level - 1) * 10 + 2}px`, 'font-size': h.level === 1 ? '12px' : '11px', 'font-weight': h.level === 1 ? '500' : '400' }}
+                class="py-0.5 text-[var(--text-2)] hover:text-(--accent) cursor-pointer truncate transition-colors leading-snug"
+                style={{
+                  'padding-left': `${(h.level - 1) * 10 + 2}px`,
+                  'font-size': h.level === 1 ? '12px' : '11px',
+                  'font-weight': h.level === 1 ? '500' : '400',
+                }}
                 onClick={() => jumpToHeading(h.from)}
                 title={h.text}
               >
-                <span class="text-[var(--text-4)] mr-1" style={{ 'font-size': '9px' }}>{'H' + h.level}</span>
+                <span
+                  class="text-[var(--text-4)] mr-1"
+                  style={{ 'font-size': '9px' }}
+                >
+                  {'H' + h.level}
+                </span>
                 {h.text}
               </div>
             )}
@@ -2357,7 +2734,7 @@ export function RightPanel() {
           <div class="flex flex-wrap gap-1.5 mt-1">
             <For each={tags()}>
               {(tag) => (
-                <span class="bg-[var(--accent-bg)] border border-[var(--accent-bg)] text-[var(--link-2)] text-[10px] px-2 py-0.5 rounded-full">
+                <span class="bg-(--accent-bg) border border-(--accent-bg) text-[var(--link-2)] text-[10px] px-2 py-0.5 rounded-full">
                   #{tag}
                 </span>
               )}
@@ -2385,7 +2762,7 @@ import { parseFrontmatter } from '../lib/parseFrontmatter'
 export function StatusBar() {
   const activeRuntime = createMemo(() => {
     const id = globalStore.workspace.activeLeafId
-    return id ? runtimeStore.leafInstances[id] ?? null : null
+    return id ? (runtimeStore.leafInstances[id] ?? null) : null
   })
 
   const stats = createMemo(() => {
@@ -2397,17 +2774,17 @@ export function StatusBar() {
   })
 
   return (
-    <div class="h-6 bg-[var(--bg-base)] border-t border-[var(--border)] px-3 flex items-center gap-4 text-[10px] text-[var(--text-4)] shrink-0">
+    <div class="h-6 bg-[var(--bg-base)] border-t border-(--border)] px-3 flex items-center gap-4 text-[10px] text-[var(--text-4)] shrink-0">
       <span>{stats().words} 字</span>
       <span>{stats().lines} 行</span>
       <div class="flex-1" />
       <Show when={globalStore.knowledge.isIndexing}>
         <span class="flex items-center gap-1 text-[var(--text-3)]">
-          <span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+          <span class="inline-block w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" />
           后台检测中
         </span>
       </Show>
-      <span class={activeRuntime()?.isDirty ? 'text-[var(--accent)]' : ''}>
+      <span class={activeRuntime()?.isDirty ? 'text-(--accent)' : ''}>
         {activeRuntime()?.isDirty ? '未保存' : '已保存'}
       </span>
     </div>
@@ -2418,6 +2795,7 @@ export function StatusBar() {
 - [ ] **Step 3: Update `Settings.tsx`** — replace all `uiStore`/`setUIStore` references with `globalStore` + `appActions`
 
 Open `src/components/Settings.tsx`. Make these substitutions:
+
 - `import { uiStore, setUIStore } from '../stores/uiStore'` → `import { globalStore } from '../stores/globalStore'; import { appActions } from '../actions/appActions'`
 - `uiStore.theme` → `globalStore.workspace.theme`
 - `setUIStore('theme', v)` → `appActions.setTheme(v)`
@@ -2449,6 +2827,7 @@ git commit -m "feat: update RightPanel, StatusBar, Settings to use globalStore a
 ## Task 16: Delete old files and verify
 
 **Files:**
+
 - Delete: `src/stores/fileSystemStore.ts`
 - Delete: `src/stores/knowledgeStore.ts`
 - Delete: `src/stores/uiStore.ts`
@@ -2505,6 +2884,7 @@ git commit -m "refactor: delete old stores and services, complete globalStore mi
 ## Self-Review Checklist
 
 **Spec coverage:**
+
 - ✅ `globalStore` with `fs`, `knowledge`, `workspace` namespaces — Task 1+2
 - ✅ `runtimeStore` with `rootHandle` + `leafInstances` — Task 2
 - ✅ `WorkspaceSplit` / `WorkspaceTabs` / `WorkspaceLeaf` types — Task 1
@@ -2517,6 +2897,7 @@ git commit -m "refactor: delete old stores and services, complete globalStore mi
 - ✅ Components read `globalStore`/`runtimeStore`, call actions — Tasks 10–15
 
 **Type consistency:**
+
 - `ViewComponentProps` (`{ leafId, isActive, viewState }`) defined in Task 1, used in Tasks 8, 11, 12
 - `ROOT_TABS_ID` defined in Task 2 (`globalStore.ts`), imported in Tasks 6, 13
 - `workspaceActions.clearAllLeaves()` defined in Task 6, called in Task 5 (`fsActions.openDirectory`)

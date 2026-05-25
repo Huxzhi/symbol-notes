@@ -1,8 +1,8 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { globalStore, activeLayout } from '../stores/globalStore'
-import { runtimeStore } from '../stores/runtimeStore'
 import { workspaceActions } from '../actions/workspaceActions'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
+import { activeLayout, globalStore } from '../stores/globalStore'
+import { runtimeStore } from '../stores/runtimeStore'
 
 export function StatusBar() {
   const [showSwitcher, setShowSwitcher] = createSignal(false)
@@ -29,20 +29,20 @@ export function StatusBar() {
       {/* Workspace switcher popover */}
       <Show when={showSwitcher()}>
         <div
-          class="absolute bottom-full left-0 mb-1 bg-[var(--bg-surface)] border border-[var(--border)] rounded shadow-lg z-50 min-w-[180px] py-1"
+          class="absolute bottom-full left-0 mb-1 bg-(--bg-surface) border border-(--border)] rounded shadow-lg z-50 min-w-45 py-1"
           onMouseLeave={() => setShowSwitcher(false)}
         >
           <For each={layouts()}>
             {(layout) => (
-              <div class="flex items-center gap-1 px-2 py-1 hover:bg-[var(--bg-hover)] group">
-                <span class="w-3 text-[var(--accent)] text-[10px]">
+              <div class="flex items-center gap-1 px-2 py-1 hover:bg-(--bg-hover) group">
+                <span class="w-3 text-(--accent) text-[10px]">
                   {layout.id === activeId() ? '✓' : ''}
                 </span>
                 <Show
                   when={renamingId() === layout.id}
                   fallback={
                     <span
-                      class="flex-1 text-[11px] text-[var(--text-2)] cursor-pointer"
+                      class="flex-1 text-[11px] text-(--text-2) cursor-pointer"
                       onClick={() => workspaceActions.switchLayout(layout.id)}
                     >
                       {layout.name}
@@ -50,21 +50,24 @@ export function StatusBar() {
                   }
                 >
                   <input
-                    class="flex-1 text-[11px] bg-[var(--bg-input)] text-[var(--text)] px-1 rounded outline-none"
+                    class="flex-1 text-[11px] bg-(--bg-input) text-(--text) px-1 rounded outline-none"
                     value={layout.name}
                     autofocus
-                    onBlur={e => {
-                      workspaceActions.renameLayout(layout.id, e.currentTarget.value.trim() || layout.name)
+                    onBlur={(e) => {
+                      workspaceActions.renameLayout(
+                        layout.id,
+                        e.currentTarget.value.trim() || layout.name,
+                      )
                       setRenamingId(null)
                     }}
-                    onKeyDown={e => {
+                    onKeyDown={(e) => {
                       if (e.key === 'Enter') e.currentTarget.blur()
                       if (e.key === 'Escape') setRenamingId(null)
                     }}
                   />
                 </Show>
                 <button
-                  class="text-[10px] text-[var(--text-4)] hover:text-[var(--text-2)] opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="text-[10px] text-(--text-4) hover:text-(--text-2) opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => setRenamingId(layout.id)}
                   title="重命名"
                 >
@@ -72,7 +75,7 @@ export function StatusBar() {
                 </button>
                 <Show when={layouts().length > 1}>
                   <button
-                    class="text-[10px] text-[var(--text-4)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="text-[10px] text-(--text-4) hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => workspaceActions.deleteLayout(layout.id)}
                     title="删除"
                   >
@@ -82,9 +85,9 @@ export function StatusBar() {
               </div>
             )}
           </For>
-          <div class="border-t border-[var(--border)] mt-1 pt-1">
+          <div class="border-t border-(--border)] mt-1 pt-1">
             <button
-              class="w-full text-left px-4 py-1 text-[11px] text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+              class="w-full text-left px-4 py-1 text-[11px] text-(--text-3) hover:bg-(--bg-hover) hover:text-(--text)"
               onClick={() => {
                 const n = layouts().length + 1
                 workspaceActions.createLayout(`工作区 ${n}`)
@@ -97,10 +100,10 @@ export function StatusBar() {
       </Show>
 
       {/* Status bar */}
-      <div class="h-6 bg-[var(--bg-base)] border-t border-[var(--border)] px-3 flex items-center gap-4 text-[10px] text-[var(--text-4)] shrink-0">
+      <div class="h-6 bg-(--bg-base) border-t border-(--border)] px-3 flex items-center gap-4 text-[10px] text-(--text-4) shrink-0">
         <button
-          class="hover:text-[var(--text-2)] transition-colors"
-          onClick={() => setShowSwitcher(v => !v)}
+          class="hover:text-(--text-2) transition-colors"
+          onClick={() => setShowSwitcher((v) => !v)}
           title="切换工作区"
         >
           {activeLayout().name}
@@ -109,12 +112,12 @@ export function StatusBar() {
         <span>{stats().lines} 行</span>
         <div class="flex-1" />
         <Show when={globalStore.knowledge.isIndexing}>
-          <span class="flex items-center gap-1 text-[var(--text-3)]">
-            <span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+          <span class="flex items-center gap-1 text-(--text-3)">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" />
             后台检测中
           </span>
         </Show>
-        <span class={activeRuntime()?.isDirty ? 'text-[var(--accent)]' : ''}>
+        <span class={activeRuntime()?.isDirty ? 'text-(--accent)' : ''}>
           {activeRuntime()?.isDirty ? '未保存' : '已保存'}
         </span>
       </div>

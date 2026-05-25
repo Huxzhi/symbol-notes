@@ -12,35 +12,36 @@
 
 ## File Map
 
-| Action | File | Responsibility |
-|--------|------|----------------|
-| **New** | `src/lib/viewRegistry.ts` | Register/look up view defs by type or extension |
-| **New** | `src/services/workspaceService.ts` | Single authority for tab lifecycle |
-| **New** | `src/components/ContentPane.tsx` | Render all tabs; CSS toggle active |
-| **New** | `src/components/EditorPane.tsx` | Per-tab CM6 editor + FileTitle + save |
-| **Modify** | `src/stores/uiStore.ts` | Add Tab, tabs, activeTabId; helpers activeFilePath/renameTabPath/clearTabs |
-| **Modify** | `src/services/fileSystemService.ts` | Add readFile/writeFile/loadFileContent; remove old tab API; createFile returns path |
-| **Modify** | `src/components/ImageViewer.tsx` | Props → `{ tabId; isActive }` |
-| **Modify** | `src/components/TabBar.tsx` | Use viewRegistry + workspace API |
-| **Modify** | `src/components/App.tsx` | Register views; use ContentPane |
-| **Modify** | `src/components/Sidebar.tsx` | Use workspace.openFile |
-| **Modify** | `src/components/CalendarPanel.tsx` | Use workspace.openFile |
-| **Modify** | `src/components/CalendarPage.tsx` | Use workspace.openFile; accept tabId/isActive |
-| **Modify** | `src/components/Ribbon.tsx` | Use workspace.openPage |
-| **Modify** | `src/components/RightPanel.tsx` | Use activeFilePath() helper |
-| **Modify** | `src/components/PropertiesPanel.tsx` | Read/write via editorStore.cmView |
-| **Modify** | `src/components/StatusBar.tsx` | Remove editorStore.content usage |
-| **Modify** | `src/stores/editorStore.ts` | Remove content field |
-| **Modify** | `src/stores/fileSystemStore.ts` | Remove activeFilePath, openFilePaths |
-| **Delete** | `src/components/Editor.tsx` | Absorbed into EditorPane |
-| **Delete** | `src/components/FileTitle.tsx` | Absorbed into EditorPane |
-| **Delete** | `src/lib/pageRegistry.ts` | Replaced by viewRegistry |
+| Action     | File                                 | Responsibility                                                                      |
+| ---------- | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| **New**    | `src/lib/viewRegistry.ts`            | Register/look up view defs by type or extension                                     |
+| **New**    | `src/services/workspaceService.ts`   | Single authority for tab lifecycle                                                  |
+| **New**    | `src/components/ContentPane.tsx`     | Render all tabs; CSS toggle active                                                  |
+| **New**    | `src/components/EditorPane.tsx`      | Per-tab CM6 editor + FileTitle + save                                               |
+| **Modify** | `src/stores/uiStore.ts`              | Add Tab, tabs, activeTabId; helpers activeFilePath/renameTabPath/clearTabs          |
+| **Modify** | `src/services/fileSystemService.ts`  | Add readFile/writeFile/loadFileContent; remove old tab API; createFile returns path |
+| **Modify** | `src/components/ImageViewer.tsx`     | Props → `{ tabId; isActive }`                                                       |
+| **Modify** | `src/components/TabBar.tsx`          | Use viewRegistry + workspace API                                                    |
+| **Modify** | `src/components/App.tsx`             | Register views; use ContentPane                                                     |
+| **Modify** | `src/components/Sidebar.tsx`         | Use workspace.openFile                                                              |
+| **Modify** | `src/components/CalendarPanel.tsx`   | Use workspace.openFile                                                              |
+| **Modify** | `src/components/CalendarPage.tsx`    | Use workspace.openFile; accept tabId/isActive                                       |
+| **Modify** | `src/components/Ribbon.tsx`          | Use workspace.openPage                                                              |
+| **Modify** | `src/components/RightPanel.tsx`      | Use activeFilePath() helper                                                         |
+| **Modify** | `src/components/PropertiesPanel.tsx` | Read/write via editorStore.cmView                                                   |
+| **Modify** | `src/components/StatusBar.tsx`       | Remove editorStore.content usage                                                    |
+| **Modify** | `src/stores/editorStore.ts`          | Remove content field                                                                |
+| **Modify** | `src/stores/fileSystemStore.ts`      | Remove activeFilePath, openFilePaths                                                |
+| **Delete** | `src/components/Editor.tsx`          | Absorbed into EditorPane                                                            |
+| **Delete** | `src/components/FileTitle.tsx`       | Absorbed into EditorPane                                                            |
+| **Delete** | `src/lib/pageRegistry.ts`            | Replaced by viewRegistry                                                            |
 
 ---
 
 ### Task 1: viewRegistry.ts
 
 **Files:**
+
 - Create: `src/lib/viewRegistry.ts`
 - Create: `src/lib/__tests__/viewRegistry.test.ts`
 
@@ -89,7 +90,8 @@ describe('getFileViewForExt', () => {
   })
   it('ignores page defs', () => {
     registerView({
-      kind: 'page', type: 'calendar',
+      kind: 'page',
+      type: 'calendar',
       getDisplayText: () => '日历',
       component: (() => null) as any,
     })
@@ -175,6 +177,7 @@ git commit -m "feat: add viewRegistry for workspace tab system"
 ### Task 2: uiStore.ts – Tab data model
 
 **Files:**
+
 - Modify: `src/stores/uiStore.ts`
 
 - [ ] **Step 1: Replace uiStore.ts with new data model**
@@ -188,8 +191,8 @@ export type SidebarView = 'files' | 'calendar'
 
 export interface Tab {
   id: string
-  type: string       // matches a ViewDef.type in viewRegistry
-  path?: string      // present for file tabs, absent for page tabs
+  type: string // matches a ViewDef.type in viewRegistry
+  path?: string // present for file tabs, absent for page tabs
   pinned: boolean
 }
 
@@ -198,7 +201,7 @@ interface UIState {
   showRight: boolean
   sidebarView: SidebarView
   tabs: Record<string, Tab>
-  tabOrder: string[]         // ordered list of tab IDs
+  tabOrder: string[] // ordered list of tab IDs
   activeTabId: string | null
   theme: ThemeId
   customCSS: string
@@ -273,6 +276,7 @@ git commit -m "feat(uiStore): add Tab type, tabs/activeTabId data model, workspa
 ### Task 3: fileSystemService.ts – add I/O helpers
 
 **Files:**
+
 - Modify: `src/services/fileSystemService.ts`
 
 Add three new exports (`readFile`, `writeFile`, `loadFileContent`) without removing any existing code. This task is purely additive.
@@ -310,8 +314,10 @@ export async function loadFileContent(path: string): Promise<string> {
     const { frontmatter } = parseFrontmatter(content)
     const ts = formatTimestamp(file.lastModified)
     let updated = content
-    if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
-    if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
+    if (!frontmatter.created)
+      updated = setFrontmatterField(updated, 'created', ts)
+    if (!frontmatter.updated)
+      updated = setFrontmatterField(updated, 'updated', ts)
     if (updated !== content) {
       const writable = await handle.createWritable()
       await writable.write(updated)
@@ -344,6 +350,7 @@ git commit -m "feat(fileSystemService): add readFile/writeFile/loadFileContent h
 ### Task 4: workspaceService.ts
 
 **Files:**
+
 - Create: `src/services/workspaceService.ts`
 
 - [ ] **Step 1: Create workspaceService.ts**
@@ -381,7 +388,10 @@ export function closeTab(id: string): void {
   delete newTabs[id]
   batch(() => {
     setUIStore('tabs', newTabs)
-    setUIStore('tabOrder', tabOrder.filter(t => t !== id))
+    setUIStore(
+      'tabOrder',
+      tabOrder.filter((t) => t !== id),
+    )
     if (activeTabId === id) setUIStore('activeTabId', nextId)
   })
   if (uiStore.activeTabId === null) {
@@ -498,6 +508,7 @@ git commit -m "feat: add workspaceService – single authority for tab lifecycle
 ### Task 5: EditorPane.tsx
 
 **Files:**
+
 - Create: `src/components/EditorPane.tsx`
 
 Absorbs all logic from `Editor.tsx` (CM6 init, save, reindex) and `FileTitle.tsx` (inline rename). Each tab gets its own `EditorView` instance that lives for the tab's lifetime.
@@ -758,7 +769,7 @@ export function EditorPane(props: { tabId: string; isActive: boolean }) {
             when={editing()}
             fallback={
               <h1
-                class="text-[22px] font-bold text-[var(--text)] cursor-text hover:text-[var(--accent)] transition-colors truncate leading-tight"
+                class="text-[22px] font-bold text-[var(--text)] cursor-text hover:text-(--accent) transition-colors truncate leading-tight"
                 onClick={startEdit}
                 title="点击修改文件名"
               >
@@ -767,7 +778,7 @@ export function EditorPane(props: { tabId: string; isActive: boolean }) {
             }
           >
             <input
-              class="w-full bg-transparent border-b-2 border-[var(--accent)] outline-none text-[22px] font-bold text-[var(--text)] pb-0.5 leading-tight"
+              class="w-full bg-transparent border-b-2 border-(--accent) outline-none text-[22px] font-bold text-[var(--text)] pb-0.5 leading-tight"
               value={draft()}
               onInput={e => setDraft(e.currentTarget.value)}
               onKeyDown={onTitleKeyDown}
@@ -808,6 +819,7 @@ git commit -m "feat: add EditorPane – per-tab CM6 editor with preview-replacem
 ### Task 6: ImageViewer.tsx + ContentPane.tsx
 
 **Files:**
+
 - Modify: `src/components/ImageViewer.tsx`
 - Create: `src/components/ContentPane.tsx`
 
@@ -854,7 +866,7 @@ export function ImageViewer(props: { tabId: string; isActive: boolean }) {
 
   return (
     <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]">
-      <div class="h-9 px-4 flex items-center border-b border-[var(--border)] shrink-0">
+      <div class="h-9 px-4 flex items-center border-b border-(--border)] shrink-0">
         <span class="text-[12px] text-[var(--text-2)] truncate">{fileName()}</span>
       </div>
       <div class="flex-1 flex items-center justify-center overflow-auto p-6">
@@ -936,6 +948,7 @@ git commit -m "feat: update ImageViewer props; add ContentPane for workspace ren
 ### Task 7: App.tsx + TabBar.tsx switchover
 
 **Files:**
+
 - Modify: `src/components/App.tsx`
 - Modify: `src/components/TabBar.tsx`
 
@@ -1048,7 +1061,7 @@ import { getView } from '../lib/viewRegistry'
 
 export function TabBar() {
   return (
-    <div class="h-8 bg-[var(--bg-base)] border-b border-[var(--border)] flex items-stretch shrink-0 overflow-y-hidden">
+    <div class="h-8 bg-[var(--bg-base)] border-b border-(--border)] flex items-stretch shrink-0 overflow-y-hidden">
       <div class="flex flex-1 overflow-x-auto overflow-y-hidden">
         <For each={uiStore.tabOrder}>
           {(tabId) => {
@@ -1066,11 +1079,11 @@ export function TabBar() {
 
             return (
               <div
-                class={`flex items-center gap-1.5 px-3 border-r border-[var(--border)] cursor-pointer text-[11px] shrink-0
+                class={`flex items-center gap-1.5 px-3 border-r border-(--border)] cursor-pointer text-[11px] shrink-0
                   ${
                     isActive()
-                      ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-[var(--accent)] -mb-px'
-                      : 'text-[var(--text-3)] hover:bg-[var(--bg-hover)]'
+                      ? 'bg-[var(--bg-base)] text-[var(--text)] border-b-2 border-b-(--accent) -mb-px'
+                      : 'text-[var(--text-3)] hover:bg-(--bg-hover)'
                   }`}
                 onClick={() => setActiveTab(tabId)}
                 onDblClick={() => pinTab(tabId)}
@@ -1096,7 +1109,7 @@ export function TabBar() {
         </For>
       </div>
       <button
-        class="px-2 shrink-0 text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg-hover)] flex items-center transition-colors"
+        class="px-2 shrink-0 text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-(--bg-hover) flex items-center transition-colors"
         onClick={() => setUIStore('showRight', v => !v)}
         title="切换右侧栏"
       >
@@ -1127,6 +1140,7 @@ git commit -m "feat: wire App.tsx and TabBar.tsx to workspace/viewRegistry syste
 ### Task 8: Sidebar.tsx + CalendarPanel.tsx + CalendarPage.tsx
 
 **Files:**
+
 - Modify: `src/components/Sidebar.tsx`
 - Modify: `src/components/CalendarPanel.tsx`
 - Modify: `src/components/CalendarPage.tsx`
@@ -1183,10 +1197,10 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
     <Show when={show()}>
       <div>
         <div
-          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-[var(--bg-hover)] select-none
+          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none
             ${
               isActive()
-                ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
+                ? 'bg-(--bg-hover) border-l-2 border-(--accent) text-[var(--text)]'
                 : isOther()
                   ? 'text-[var(--text-4)] border-l-2 border-transparent'
                   : 'text-[var(--text-2)] border-l-2 border-transparent'
@@ -1206,7 +1220,7 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
           <span class="text-[9px] text-[var(--text-3)]">
             {props.node.kind === 'directory' ? '▸' : fileIcon(props.node.name)}
           </span>
-          <span class={isActive() ? 'text-[var(--accent)]' : ''}>
+          <span class={isActive() ? 'text-(--accent)' : ''}>
             {displayName(props.node.name)}
           </span>
         </div>
@@ -1255,31 +1269,31 @@ export function Sidebar() {
   }
 
   return (
-    <div class="w-[190px] h-full bg-[var(--bg-surface)] border-r border-[var(--border)] flex flex-col">
-      <div class="border-b border-[var(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
+    <div class="w-[190px] h-full bg-[var(--bg-surface)] border-r border-(--border)] flex flex-col">
+      <div class="border-b border-(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
-          class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors min-w-0 group"
+          class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-(--bg-hover) transition-colors min-w-0 group"
           onClick={openDirectory}
           title={fileSystemStore.rootHandle ? '切换文件夹' : '打开文件夹'}
         >
           <FolderOpen
             size={12}
-            class="shrink-0 text-[var(--accent)] group-hover:text-[var(--accent-2)]"
+            class="shrink-0 text-(--accent) group-hover:text-[var(--accent-2)]"
           />
-          <span class="truncate text-[10px] text-[var(--accent)] font-bold tracking-widest uppercase group-hover:text-[var(--accent-2)]">
+          <span class="truncate text-[10px] text-(--accent) font-bold tracking-widest uppercase group-hover:text-[var(--accent-2)]">
             {fileSystemStore.rootHandle?.name ?? '打开文件夹'}
           </span>
         </button>
         <Show when={fileSystemStore.rootHandle}>
           <button
-            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors text-[13px]"
+            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors text-[13px]"
             title="新建文件夹"
             onClick={() => startCreate('folder')}
           >
             ⊞
           </button>
           <button
-            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors"
+            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors"
             title="新建文件"
             onClick={() => startCreate('file')}
           >
@@ -1295,7 +1309,7 @@ export function Sidebar() {
               {createMode() === 'folder' ? '▸' : '◻'}
             </span>
             <input
-              class="flex-1 bg-[var(--bg-hover)] border border-[var(--accent)] rounded px-1.5 py-0.5 text-[11px] text-[var(--text)] outline-none min-w-0"
+              class="flex-1 bg-(--bg-hover) border border-(--accent) rounded px-1.5 py-0.5 text-[11px] text-[var(--text)] outline-none min-w-0"
               placeholder={
                 createMode() === 'folder'
                   ? '文件夹 或 父/子/文件夹'
@@ -1321,10 +1335,13 @@ export function Sidebar() {
 - [ ] **Step 2: Update CalendarPanel.tsx – replace openFile import**
 
 In `src/components/CalendarPanel.tsx`, replace:
+
 ```typescript
 import { openFile } from '../services/fileSystemService'
 ```
+
 with:
+
 ```typescript
 import { openFile } from '../services/workspaceService'
 ```
@@ -1336,19 +1353,25 @@ All three `onClick={() => openFile(path)}` calls remain unchanged (same function
 In `src/components/CalendarPage.tsx`:
 
 Replace the import:
+
 ```typescript
 import { openFile } from '../services/fileSystemService'
 ```
+
 with:
+
 ```typescript
 import { openFile } from '../services/workspaceService'
 ```
 
 Change the function signature from:
+
 ```typescript
 export function CalendarPage() {
 ```
+
 to:
+
 ```typescript
 export function CalendarPage(_props: { tabId: string; isActive: boolean }) {
 ```
@@ -1373,6 +1396,7 @@ git commit -m "feat: update Sidebar/CalendarPanel/CalendarPage to use workspaceS
 ### Task 9: Ribbon.tsx
 
 **Files:**
+
 - Modify: `src/components/Ribbon.tsx`
 
 - [ ] **Step 1: Replace openPage import and activePageId reference**
@@ -1408,48 +1432,48 @@ export function Ribbon() {
     )
 
   return (
-    <div class="w-9 bg-[var(--bg-base)] border-r border-[var(--border)] flex flex-col items-center py-2 gap-1.5 shrink-0">
+    <div class="w-9 bg-[var(--bg-base)] border-r border-(--border)] flex flex-col items-center py-2 gap-1.5 shrink-0">
       <button
         onClick={() => setUIStore('showLeft', v => !v)}
-        class="p-1.5 text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] rounded cursor-pointer transition-colors"
+        class="p-1.5 text-[var(--text-3)] hover:bg-(--bg-hover) hover:text-[var(--text)] rounded cursor-pointer transition-colors"
         title="切换左侧栏"
       >
         <PanelLeft size={18} />
       </button>
 
       <button
-        class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-[var(--bg-hover)]
-          ${uiStore.sidebarView === 'files' && uiStore.showLeft ? 'text-[var(--accent)]' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
+        class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
+          ${uiStore.sidebarView === 'files' && uiStore.showLeft ? 'text-(--accent)' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
         title="文件列表"
         onClick={() => switchView('files')}
       >
         <Search size={18} />
       </button>
       <button
-        class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-[var(--bg-hover)]
-          ${uiStore.sidebarView === 'calendar' && uiStore.showLeft ? 'text-[var(--accent)]' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
+        class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
+          ${uiStore.sidebarView === 'calendar' && uiStore.showLeft ? 'text-(--accent)' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
         title="日历"
         onClick={() => switchView('calendar')}
       >
         <CalendarDays size={18} />
       </button>
       <button
-        class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-[var(--bg-hover)]
-          ${calendarPageActive() ? 'text-[var(--accent)]' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
+        class={`p-1.5 rounded cursor-pointer transition-colors hover:bg-(--bg-hover)
+          ${calendarPageActive() ? 'text-(--accent)' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}
         title="日历大图"
         onClick={() => openPage('calendar')}
       >
         <CalendarRange size={18} />
       </button>
       <button
-        class="p-1.5 text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] rounded cursor-pointer transition-colors"
+        class="p-1.5 text-[var(--text-3)] hover:bg-(--bg-hover) hover:text-[var(--text)] rounded cursor-pointer transition-colors"
         title="知识图谱"
       >
         <Network size={18} />
       </button>
       <div class="flex-1" />
       <button
-        class="p-1.5 text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] rounded cursor-pointer transition-colors"
+        class="p-1.5 text-[var(--text-3)] hover:bg-(--bg-hover) hover:text-[var(--text)] rounded cursor-pointer transition-colors"
         title="设置"
         onClick={() => setUIStore('showSettings', true)}
       >
@@ -1480,6 +1504,7 @@ git commit -m "feat: update Ribbon to use workspaceService.openPage"
 ### Task 10: RightPanel.tsx + PropertiesPanel.tsx + StatusBar.tsx
 
 **Files:**
+
 - Modify: `src/components/RightPanel.tsx`
 - Modify: `src/components/PropertiesPanel.tsx`
 - Modify: `src/components/StatusBar.tsx`
@@ -1489,11 +1514,13 @@ git commit -m "feat: update Ribbon to use workspaceService.openPage"
 In `src/components/RightPanel.tsx`, make these changes:
 
 Remove the import of `fileSystemStore`:
+
 ```typescript
 import { fileSystemStore } from '../stores/fileSystemStore'
 ```
 
 Add the import of `activeFilePath`:
+
 ```typescript
 import { activeFilePath } from '../stores/uiStore'
 ```
@@ -1501,12 +1528,14 @@ import { activeFilePath } from '../stores/uiStore'
 Replace both occurrences of `fileSystemStore.activeFilePath` with `activeFilePath()`.
 
 The two `createMemo` blocks become:
+
 ```typescript
 const currentMeta = createMemo(() => {
   const path = activeFilePath()
   return path ? (knowledgeStore.index[path] ?? null) : null
 })
 ```
+
 ```typescript
 const backlinks = createMemo(() => {
   const path = activeFilePath()
@@ -1517,6 +1546,7 @@ const backlinks = createMemo(() => {
 Also remove the `openFile` import from fileSystemService and replace the wikilink click handler in RightPanel (search for `openFile(` in RightPanel and replace with `workspace.openFile(`):
 
 Add at top of imports:
+
 ```typescript
 import { openFile } from '../services/workspaceService'
 ```
@@ -1628,17 +1658,17 @@ export function StatusBar() {
   })
 
   return (
-    <div class="h-6 bg-[var(--bg-base)] border-t border-[var(--border)] px-3 flex items-center gap-4 text-[10px] text-[var(--text-4)] shrink-0">
+    <div class="h-6 bg-[var(--bg-base)] border-t border-(--border)] px-3 flex items-center gap-4 text-[10px] text-[var(--text-4)] shrink-0">
       <span>{stats().words} 字</span>
       <span>{stats().lines} 行</span>
       <div class="flex-1" />
       <Show when={knowledgeStore.isIndexing}>
         <span class="flex items-center gap-1 text-[var(--text-3)]">
-          <span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+          <span class="inline-block w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" />
           后台检测中
         </span>
       </Show>
-      <span class={editorStore.isDirty ? 'text-[var(--accent)]' : ''}>
+      <span class={editorStore.isDirty ? 'text-(--accent)' : ''}>
         {editorStore.isDirty ? '未保存' : '已保存'}
       </span>
     </div>
@@ -1666,11 +1696,13 @@ git commit -m "feat: update RightPanel/PropertiesPanel/StatusBar to workspace AP
 ### Task 11: fileSystemService.ts – remove old tab API + update renameFile/createFile
 
 **Files:**
+
 - Modify: `src/services/fileSystemService.ts`
 
 - [ ] **Step 1: Remove tab-related imports and logic from openDirectory and restoreDirectory**
 
 In `openDirectory`, replace:
+
 ```typescript
 setFileSystemStore({
   rootHandle: handle,
@@ -1678,7 +1710,9 @@ setFileSystemStore({
   openFilePaths: [],
 })
 ```
+
 with:
+
 ```typescript
 import { clearTabs } from '../stores/uiStore'
 // (add clearTabs to the uiStore import at top of file)
@@ -1724,10 +1758,13 @@ export async function createFile(
 - [ ] **Step 3: Update renameFile to use renameTabPath + cmView for content**
 
 In `renameFile`, replace:
+
 ```typescript
 const content = editorStore.content
 ```
+
 with:
+
 ```typescript
 const content = editorStore.cmView?.state.doc.toString() ?? ''
 ```
@@ -1747,6 +1784,7 @@ Also remove the `setEditorStore({ isDirty: false })` call that followed those li
 - [ ] **Step 4: Delete the old openFile, openImageFile, closeFile, saveCurrentFile exports**
 
 Remove these four exported functions entirely from `fileSystemService.ts`:
+
 - `export async function openImageFile(path: string): Promise<void>` (lines ~201–208)
 - `export async function openFile(path: string): Promise<void>` (lines ~210–242)
 - `export async function saveCurrentFile(): Promise<void>` (lines ~244–287)
@@ -1774,6 +1812,7 @@ git commit -m "refactor(fileSystemService): remove tab API; update renameFile/cr
 ### Task 12: editorStore.ts + fileSystemStore.ts – remove deprecated fields
 
 **Files:**
+
 - Modify: `src/stores/editorStore.ts`
 - Modify: `src/stores/fileSystemStore.ts`
 
@@ -1849,6 +1888,7 @@ git commit -m "refactor: remove deprecated content/activeFilePath/openFilePaths 
 ### Task 13: Delete old files + clean up unused imports
 
 **Files:**
+
 - Delete: `src/components/Editor.tsx`
 - Delete: `src/components/FileTitle.tsx`
 - Delete: `src/lib/pageRegistry.ts`
@@ -1883,27 +1923,27 @@ git commit -m "chore: delete Editor.tsx, FileTitle.tsx, pageRegistry.ts (absorbe
 
 **Spec coverage check:**
 
-| Spec requirement | Task |
-|-----------------|------|
-| WorkspaceService as single authority | Task 4 |
-| ViewRegistry maps types to components | Task 1 |
-| Tab data model (id, type, path, pinned) | Task 2 |
-| ContentPane CSS-toggles tabs | Task 6 |
-| EditorPane: one CM6 view per tab | Task 5 |
-| Preview replacement via tab.path change + view.setState | Task 5 (createEffect on filePath()) |
-| Scroll/undo/cursor reset on replacement | Task 5 (view.setState + scrollDOM.scrollTop = 0) |
-| Save dirty content before preview replace | Task 4 (workspaceService.openFile) |
-| Sidebar calls workspace.openFile | Task 8 |
-| Double-click opens pinned tab | Task 8 (Sidebar onDblClick) |
-| Ribbon calls workspace.openPage | Task 9 |
-| fileSystemService reduced to pure I/O | Task 11 |
-| activeFilePath() derived helper | Task 2 |
-| renameTabPath() for rename | Task 2, 11 |
-| clearTabs() on openDirectory | Task 11 |
-| CalendarPanel/CalendarPage use workspace | Task 8 |
-| imageViewer accepts tabId+isActive | Task 6 |
-| RightPanel uses activeFilePath() | Task 10 |
-| Delete Editor.tsx, FileTitle.tsx, pageRegistry.ts | Task 13 |
+| Spec requirement                                        | Task                                             |
+| ------------------------------------------------------- | ------------------------------------------------ |
+| WorkspaceService as single authority                    | Task 4                                           |
+| ViewRegistry maps types to components                   | Task 1                                           |
+| Tab data model (id, type, path, pinned)                 | Task 2                                           |
+| ContentPane CSS-toggles tabs                            | Task 6                                           |
+| EditorPane: one CM6 view per tab                        | Task 5                                           |
+| Preview replacement via tab.path change + view.setState | Task 5 (createEffect on filePath())              |
+| Scroll/undo/cursor reset on replacement                 | Task 5 (view.setState + scrollDOM.scrollTop = 0) |
+| Save dirty content before preview replace               | Task 4 (workspaceService.openFile)               |
+| Sidebar calls workspace.openFile                        | Task 8                                           |
+| Double-click opens pinned tab                           | Task 8 (Sidebar onDblClick)                      |
+| Ribbon calls workspace.openPage                         | Task 9                                           |
+| fileSystemService reduced to pure I/O                   | Task 11                                          |
+| activeFilePath() derived helper                         | Task 2                                           |
+| renameTabPath() for rename                              | Task 2, 11                                       |
+| clearTabs() on openDirectory                            | Task 11                                          |
+| CalendarPanel/CalendarPage use workspace                | Task 8                                           |
+| imageViewer accepts tabId+isActive                      | Task 6                                           |
+| RightPanel uses activeFilePath()                        | Task 10                                          |
+| Delete Editor.tsx, FileTitle.tsx, pageRegistry.ts       | Task 13                                          |
 
 All spec requirements covered. No gaps found.
 

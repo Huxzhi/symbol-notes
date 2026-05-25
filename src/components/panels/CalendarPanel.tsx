@@ -130,7 +130,7 @@ export function CalendarPanel() {
           {viewYear()}年{viewMonth() + 1}月
         </span>
         <button
-          class="w-6 h-6 flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text)] hover:bg-[var(--bg-hover)] rounded text-[10px] transition-colors"
+          class="w-6 h-6 flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text)] hover:bg-(--bg-hover) rounded text-[10px] transition-colors"
           onClick={nextMonth}
         >
           ▶
@@ -141,7 +141,7 @@ export function CalendarPanel() {
         <div class="grid grid-cols-7">
           <For each={WEEKDAYS_SHORT}>
             {(d) => (
-              <div class="text-center text-[9px] text-[var(--text-4)] py-0.5 select-none">
+              <div class="text-center text-[9px] text-(--text-4) py-0.5 select-none">
                 {d}
               </div>
             )}
@@ -165,10 +165,10 @@ export function CalendarPanel() {
                   class={`h-7 flex flex-col items-center justify-center rounded text-[11px] leading-none cursor-pointer transition-colors
                     ${
                       isSelected()
-                        ? 'bg-[var(--accent)] text-white'
+                        ? 'bg-(--accent) text-white'
                         : isToday()
-                          ? 'bg-[var(--accent-bg)] text-[var(--accent)] font-semibold'
-                          : 'text-[var(--text-2)] hover:bg-[var(--bg-hover)]'
+                          ? 'bg-(--accent-bg) text-(--accent) font-semibold'
+                          : 'text-[var(--text-2)] hover:bg-(--bg-hover)'
                     }`}
                   onClick={() => setSelectedDay(isSelected() ? null : dayStr())}
                 >
@@ -181,7 +181,7 @@ export function CalendarPanel() {
                     </Show>
                     <Show when={hasCreated()}>
                       <span
-                        class={`block w-1 h-1 rounded-full ${isSelected() ? 'bg-white/80' : 'bg-[var(--accent)]'}`}
+                        class={`block w-1 h-1 rounded-full ${isSelected() ? 'bg-white/80' : 'bg-(--accent)'}`}
                       />
                     </Show>
                     <Show when={hasUpdated()}>
@@ -197,13 +197,13 @@ export function CalendarPanel() {
         </div>
       </div>
 
-      <div class="flex gap-3 px-2 py-1 mt-0.5 border-t border-[var(--border)] shrink-0">
+      <div class="flex gap-3 px-2 py-1 mt-0.5 border-t border-(--border)] shrink-0">
         <span class="flex items-center gap-1 text-[9px] text-[var(--text-4)]">
           <span class="w-1.5 h-1.5 rounded-full bg-[var(--text-2)] shrink-0" />
           日记
         </span>
         <span class="flex items-center gap-1 text-[9px] text-[var(--text-4)]">
-          <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+          <span class="w-1.5 h-1.5 rounded-full bg-(--accent) shrink-0" />
           创建
         </span>
         <span class="flex items-center gap-1 text-[9px] text-[var(--text-4)]">
@@ -214,7 +214,7 @@ export function CalendarPanel() {
 
       <Show when={selectedFiles()}>
         {(sel) => (
-          <div class="flex-1 overflow-y-auto border-t border-[var(--border)] min-h-0">
+          <div class="flex-1 overflow-y-auto border-t border-(--border)] min-h-0">
             <div class="px-2 pt-1.5 pb-0.5 text-[9px] text-[var(--text-3)] uppercase tracking-widest select-none">
               {sel().day}
             </div>
@@ -226,7 +226,7 @@ export function CalendarPanel() {
               <For each={sel().dated}>
                 {(path) => (
                   <button
-                    class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors truncate block cursor-pointer"
+                    class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-(--bg-hover) hover:text-[var(--text)] transition-colors truncate block cursor-pointer"
                     onClick={() => openFileInWorkspace(path)}
                     title={path}
                   >
@@ -236,14 +236,14 @@ export function CalendarPanel() {
               </For>
             </Show>
             <Show when={sel().created.length > 0}>
-              <div class="px-2 py-0.5 text-[9px] text-[var(--accent)] flex items-center gap-1">
-                <span class="w-1 h-1 rounded-full bg-[var(--accent)] shrink-0" />
+              <div class="px-2 py-0.5 text-[9px] text-(--accent) flex items-center gap-1">
+                <span class="w-1 h-1 rounded-full bg-(--accent) shrink-0" />
                 创建
               </div>
               <For each={sel().created}>
                 {(path) => (
                   <button
-                    class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent)] transition-colors truncate block cursor-pointer"
+                    class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-(--bg-hover) hover:text-(--accent) transition-colors truncate block cursor-pointer"
                     onClick={() => openFileInWorkspace(path)}
                     title={path}
                   >
@@ -260,7 +260,7 @@ export function CalendarPanel() {
               <For each={sel().updated}>
                 {(path) => (
                   <button
-                    class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--link-2)] transition-colors truncate block cursor-pointer"
+                    class="w-full text-left px-3 py-1 text-[10px] text-[var(--text-2)] hover:bg-(--bg-hover) hover:text-[var(--link-2)] transition-colors truncate block cursor-pointer"
                     onClick={() => openFileInWorkspace(path)}
                     title={path}
                   >
