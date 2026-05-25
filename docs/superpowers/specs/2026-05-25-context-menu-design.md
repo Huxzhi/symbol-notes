@@ -9,42 +9,61 @@ Add right-click context menus to two surfaces:
 1. **Tabs** — Close, Close Others, Close to Right
 2. **Directory entries in FilesPanel** — New File, New Folder, Delete Folder (with confirm)
 
-## Architecture: Global ContextMenu Singleton
+## Architecture: Global ContextMenu — Event Delegation + Registry
 
-### Component: `src/components/ContextMenu.tsx`
+### Event delegation
 
-A single context menu component rendered once at the app root via SolidJS `Portal` (attached to `document.body`). All consumers share one instance.
+One `contextmenu` listener on `document` (in `ContextMenu.tsx`). On right-click, it walks up the DOM from `e.target` to find the nearest element with a `data-ctx` attribute, then looks up the registered item factory for that type, builds items from `dataset`, and shows the menu.
 
-**State shape (module-level signal):**
+```
+document contextmenu → walk up to [data-ctx] → registry[type](dataset) → show menu
+```
+
+Elements declare their type and data via attributes:
+```tsx
+<div data-ctx="directory" data-path={entry.path}>
+<div data-ctx="tab" data-leaf-id={leaf.id} data-tabs-id={node.id}>
+```
+
+### Registry: `src/lib/contextMenuRegistry.ts`
 
 ```ts
 type MenuItem =
   | { label: string; action: () => void; disabled?: boolean }
   | { separator: true }
 
-type MenuState = { x: number; y: number; items: MenuItem[] } | null
+type ItemFactory = (dataset: DOMStringMap) => MenuItem[]
+
+export function registerContextMenu(type: string, factory: ItemFactory): void
+export function getMenuItems(type: string, dataset: DOMStringMap): MenuItem[]
 ```
+
+Factories are registered once at app startup (e.g., in `App.tsx` or alongside the relevant action files).
+
+### Component: `src/components/ContextMenu.tsx`
+
+Rendered once in `App.tsx` via `Portal` (attached to `document.body`). Holds a module-level signal for `{ x, y, items }`.
 
 **Public API:**
 
 ```ts
-// Called by any component to open the menu
-export function showContextMenu(e: MouseEvent, items: MenuItem[]): void
+// Internal — called by the document contextmenu handler
+function showMenuAt(x: number, y: number, items: MenuItem[]): void
 
 // Rendered once in App.tsx
 export function ContextMenu(): JSX.Element
 ```
 
 **Close behavior:**
-- Click outside: `document` `mousedown` listener (via `@solid-primitives/event-listener`)
+- Click outside: `document` `mousedown` listener
 - Press `Escape`: `document` `keydown` listener
 - Click any menu item: closes after running action
 
 **Positioning:** Menu renders at `(e.clientX, e.clientY)`. If menu would overflow viewport right/bottom edge, it flips to render left/above the cursor.
 
-**Styling:** Uses existing CSS variables — `--bg-surface`, `--border`, `--text`, `--text-2`, `--bg-hover`, `--accent`. Separator is a `1px` `--border` horizontal rule. No external style library needed.
+**Styling:** Uses existing CSS variables — `--bg-surface`, `--border`, `--text`, `--text-2`, `--bg-hover`, `--accent`. Separator is a `1px` `--border` horizontal rule.
 
-**Installation:** `@solid-primitives/event-listener` added to dependencies.
+**No extra packages needed** — event listeners added directly in `createEffect`/`onMount` with `onCleanup`.
 
 ## Tab Context Menu
 
@@ -78,15 +97,24 @@ Both actions use `setLayout` (the scoped setter) and `produce` for leafInstances
 
 **Location:** `src/components/panels/FilesPanel.tsx`
 
-Directory `div` in `FileTreeNode` gains `onContextMenu`. Menu items:
+Directory `div` in `FileTreeNode` carries `data-ctx="directory"` and `data-path`. The item factory (registered in `App.tsx`) produces:
 
 | Item | Action |
 |------|--------|
-| 新建文件 | Pre-fills inline input with `entry.path + '/'` prefix; user types the filename |
-| 新建文件夹 | Pre-fills inline input with `entry.path + '/'` prefix; user types folder name |
-| 删除文件夹 | `confirm()` dialog → `fsActions.deleteDirectory(entry.path)` |
+| 新建文件 | `setRuntimeStore('pendingCreate', { mode: 'file', prefix: path + '/' })` |
+| 新建文件夹 | `setRuntimeStore('pendingCreate', { mode: 'folder', prefix: path + '/' })` |
+| 删除文件夹 | `confirm()` dialog → `fsActions.deleteDirectory(path)` |
 
-**Inline input pre-fill:** `FilesPanel` already has `newName` signal and `createMode`. Extend `startCreate` to accept an optional `prefix` string, which is set into `newName` so the input is pre-filled with `parentPath/`.
+**`pendingCreate` in `runtimeStore`:**
+
+`RuntimeState` gains a new field:
+```ts
+pendingCreate: { mode: 'file' | 'folder'; prefix: string } | null
+```
+
+`FilesPanel` watches `runtimeStore.pendingCreate` reactively. When non-null, it shows the inline input pre-filled with `prefix` and `mode`. On confirm or cancel, it sets `pendingCreate` back to `null`.
+
+The existing local `createMode`/`newName` signals in `FilesPanel` are replaced by reading from `runtimeStore.pendingCreate`. The toolbar buttons (new file, new folder) also write to `runtimeStore.pendingCreate` (with `prefix: ''`).
 
 **New fs action:**
 
@@ -105,11 +133,14 @@ Implementation:
 
 | File | Change |
 |------|--------|
-| `src/components/ContextMenu.tsx` | New — global context menu component + `showContextMenu` |
-| `src/App.tsx` | Add `<ContextMenu />` at bottom |
-| `src/components/workspace/WorkspaceTabsView.tsx` | Add `onContextMenu` to tab divs |
+| `src/stores/types.ts` | Add `pendingCreate` field to `RuntimeState` |
+| `src/stores/runtimeStore.ts` | Initialize `pendingCreate: null` |
+| `src/lib/contextMenuRegistry.ts` | New — registry + `registerContextMenu` / `getMenuItems` |
+| `src/components/ContextMenu.tsx` | New — event delegation listener + Portal menu component |
+| `src/App.tsx` | Add `<ContextMenu />` + register all factories |
+| `src/components/workspace/WorkspaceTabsView.tsx` | Add `data-ctx="tab"` + `data-leaf-id` + `data-tabs-id` to tab divs; remove inline × close button logic (now in menu) — or keep × and add menu alongside |
 | `src/actions/workspaceActions.ts` | Add `closeOtherLeaves`, `closeRightLeaves` |
-| `src/components/panels/FilesPanel.tsx` | Add `onContextMenu` to directory entries; extend `startCreate` with prefix |
+| `src/components/panels/FilesPanel.tsx` | Add `data-ctx="directory"` + `data-path` to dir entries; replace local `createMode`/`newName` signals with `runtimeStore.pendingCreate` |
 | `src/actions/fsActions.ts` | Add `deleteDirectory` |
 
 ## Out of Scope
