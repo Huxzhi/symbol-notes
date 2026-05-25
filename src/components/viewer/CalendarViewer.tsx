@@ -7,61 +7,8 @@ import {
   toIsoDate,
   WEEKDAYS_LONG,
 } from '../../lib/calendarUtils'
-import { getFileViewForExt } from '../../lib/viewRegistry'
-import {
-  activeLayout,
-  activeRoot,
-  findLeafInTree,
-  globalStore,
-  ROOT_TABS_ID,
-} from '../../stores/globalStore'
-import type {
-  ViewComponentProps,
-  ViewState,
-  WorkspaceLeaf,
-  WorkspaceNode,
-} from '../../stores/types'
-
-function findLeafWithFile(
-  root: WorkspaceNode,
-  path: string,
-): WorkspaceLeaf | null {
-  if (root.type === 'leaf' && root.viewState.state.file === path) return root
-  if (root.type === 'tabs')
-    return root.children.find((l) => l.viewState.state.file === path) ?? null
-  if (root.type === 'split') {
-    for (const child of root.children) {
-      const found = findLeafWithFile(child, path)
-      if (found) return found
-    }
-  }
-  return null
-}
-
-function openFileInWorkspace(path: string): void {
-  const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
-  const def = getFileViewForExt(ext)
-  if (!def) return
-  const viewState: ViewState = { type: def.type, state: { file: path } }
-  const existing = findLeafWithFile(activeRoot().main, path)
-  if (existing) {
-    workspaceActions.activateLeaf(existing.id)
-    return
-  }
-  const { activeLeafId } = activeLayout()
-  const activeLeaf = activeLeafId
-    ? findLeafInTree(activeRoot().main, activeLeafId)
-    : null
-  if (
-    activeLeaf &&
-    !activeLeaf.pinned &&
-    activeLeaf.viewState.type !== 'calendar'
-  ) {
-    workspaceActions.setLeafViewState(activeLeafId!, viewState)
-    return
-  }
-  workspaceActions.createLeaf(ROOT_TABS_ID, viewState)
-}
+import { globalStore } from '../../stores/globalStore'
+import type { ViewComponentProps } from '../../stores/types'
 
 export function CalendarViewer(_props: ViewComponentProps) {
   const now = new Date()
@@ -197,7 +144,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
                     {(path) => (
                       <button
                         class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
-                        onClick={() => openFileInWorkspace(path)}
+                        onClick={() => workspaceActions.openFile(path)}
                         title={path}
                       >
                         {path.split('/').pop()?.replace(/\.md$/, '')}
@@ -208,7 +155,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
                     {(path) => (
                       <button
                         class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
-                        onClick={() => openFileInWorkspace(path)}
+                        onClick={() => workspaceActions.openFile(path)}
                         title={path}
                       >
                         {path.split('/').pop()?.replace(/\.md$/, '')}
@@ -219,7 +166,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
                     {(path) => (
                       <button
                         class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
-                        onClick={() => openFileInWorkspace(path)}
+                        onClick={() => workspaceActions.openFile(path)}
                         title={path}
                       >
                         {path.split('/').pop()?.replace(/\.md$/, '')}
