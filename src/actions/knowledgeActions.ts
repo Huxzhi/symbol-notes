@@ -1,120 +1,96 @@
+import { EditorState } from '@codemirror/state'
+import { markdown } from '@codemirror/lang-markdown'
+import { GFM } from '@lezer/markdown'
 import { produce } from 'solid-js/store'
 import { globalStore, setGlobalStore } from '../stores/globalStore'
-import { runtimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { hashContent, getCachedMeta, setCachedMeta, pruneCache } from '../services/fileCacheService'
-import {
-  extractLinks,
-  extractTags,
-  extractAliases,
-  extractBodyTags,
-  mergeTagsWithBody,
-  buildBacklinkMap,
-  buildTagMap,
-} from '../lib/knowledgeUtils'
+import { wikiLinkParser } from '../lib/wikiLinkParser'
+import { outLinksField } from '../lib/outLinksField'
+import { inlineTagsField } from '../lib/inlineTagsField'
+import { hashContent, getCachedMeta, setCachedMeta } from '../services/fileCacheService'
+import { extractTags, extractAliases, mergeTagsWithBody } from '../lib/knowledgeUtils'
 import type { FileMetadata } from '../stores/types'
 
-async function readAllFiles(
-  dirHandle: FileSystemDirectoryHandle,
-  path = '',
-): Promise<Array<{ path: string; content: string | null }>> {
-  const results: Array<{ path: string; content: string | null }> = []
-  for await (const [name, handle] of dirHandle.entries()) {
-    if (name.startsWith('.')) continue
-    const nodePath = path ? `${path}/${name}` : name
-    if (handle.kind === 'directory') {
-      const sub = await readAllFiles(handle as FileSystemDirectoryHandle, nodePath)
-      results.push(...sub)
-    } else if (name.endsWith('.md')) {
-      const file = await (handle as FileSystemFileHandle).getFile()
-      results.push({ path: nodePath, content: await file.text() })
-    } else {
-      results.push({ path: nodePath, content: null })
-    }
+// Pre-parsed CM6 fields — pass from EditorPane to skip redundant headless parse
+export interface CmParsed { outLinks: string[]; inlineTags: string[] }
+
+// ── Internal ──────────────────────────────────────────────────────────────────
+
+function parseWithCm6(content: string): CmParsed {
+  const state = EditorState.create({
+    doc: content,
+    extensions: [
+      markdown({ extensions: [GFM, wikiLinkParser] }),
+      outLinksField,
+      inlineTagsField,
+    ],
+  })
+  return {
+    outLinks: state.field(outLinksField)
+      .filter(l => l.type === 'wiki')
+      .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`),
+    inlineTags: state.field(inlineTagsField).map(m => m.tag),
   }
-  return results
 }
 
+export function applyFileMeta(newMeta: FileMetadata, prevMeta?: FileMetadata): void {
+  setGlobalStore('knowledge', 'index', newMeta.path, newMeta)
+
+  const prevLinks = new Set(prevMeta?.outLinks ?? [])
+  const nextLinks = new Set(newMeta.outLinks)
+  for (const t of prevLinks) {
+    if (!nextLinks.has(t))
+      setGlobalStore('knowledge', 'backlinkMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
+  }
+  for (const t of nextLinks) {
+    if (!prevLinks.has(t))
+      setGlobalStore('knowledge', 'backlinkMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
+  }
+
+  const prevTags = new Set(prevMeta?.tags ?? [])
+  const nextTags = new Set(newMeta.tags)
+  for (const t of prevTags) {
+    if (!nextTags.has(t))
+      setGlobalStore('knowledge', 'tagMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
+  }
+  for (const t of nextTags) {
+    if (!prevTags.has(t))
+      setGlobalStore('knowledge', 'tagMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
+  }
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
 export const knowledgeActions = {
-  async scanDirectory(): Promise<void> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return
-    const files = await readAllFiles(rootHandle)
-    const index: Record<string, FileMetadata> = {}
-    const activeHashes = new Set<string>()
-
-    await Promise.all(files.map(async ({ path, content }) => {
-      if (content === null) {
-        index[path] = { path, frontmatter: {}, outLinks: [], tags: [], aliases: [] }
-        return
-      }
-      const hash = hashContent(content)
-      activeHashes.add(hash)
-      const cached = await getCachedMeta(hash)
-      if (cached) {
-        index[path] = { path, ...cached }
-        return
-      }
-      const { frontmatter, body } = parseFrontmatter(content)
-      const parsed = {
-        frontmatter,
-        outLinks: extractLinks(body),
-        tags: mergeTagsWithBody(extractTags(frontmatter.tags), extractBodyTags(body)),
-        aliases: extractAliases(frontmatter.aliases),
-      }
-      index[path] = { path, ...parsed }
-      await setCachedMeta(hash, parsed)
-    }))
-
-    const backlinkMap = buildBacklinkMap(index)
-    const tagMap = buildTagMap(index)
-    setGlobalStore('knowledge', { index, backlinkMap, tagMap })
-    pruneCache(activeHashes).catch(() => {})
-  },
-
-  async reindexFile(path: string, content: string): Promise<void> {
+  // cmParsed: pass from EditorPane (reuses the live CM6 state).
+  // Omit when only content is available (fsActions): falls back to headless CM6.
+  async reindexFile(path: string, content: string, cmParsed?: CmParsed): Promise<void> {
     const hash = hashContent(content)
     const cached = await getCachedMeta(hash)
     let parsed: Omit<FileMetadata, 'path'>
     if (cached) {
       parsed = cached
     } else {
-      const { frontmatter, body } = parseFrontmatter(content)
+      const { frontmatter } = parseFrontmatter(content)
+      const { outLinks, inlineTags } = cmParsed ?? parseWithCm6(content)
       parsed = {
         frontmatter,
-        outLinks: extractLinks(body),
-        tags: mergeTagsWithBody(extractTags(frontmatter.tags), extractBodyTags(body)),
+        outLinks,
+        tags: mergeTagsWithBody(extractTags(frontmatter.tags), inlineTags),
         aliases: extractAliases(frontmatter.aliases),
       }
       await setCachedMeta(hash, parsed)
     }
-    knowledgeActions._applyFileMeta({ path, ...parsed }, globalStore.knowledge.index[path])
+    applyFileMeta({ path, ...parsed }, globalStore.knowledge.index[path])
   },
 
-  _applyFileMeta(newMeta: FileMetadata, prevMeta?: FileMetadata): void {
-    setGlobalStore('knowledge', 'index', newMeta.path, newMeta)
-
-    const prevLinks = new Set(prevMeta?.outLinks ?? [])
-    const nextLinks = new Set(newMeta.outLinks)
-    for (const t of prevLinks) {
-      if (!nextLinks.has(t))
-        setGlobalStore('knowledge', 'backlinkMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
-    }
-    for (const t of nextLinks) {
-      if (!prevLinks.has(t))
-        setGlobalStore('knowledge', 'backlinkMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
-    }
-
-    const prevTags = new Set(prevMeta?.tags ?? [])
-    const nextTags = new Set(newMeta.tags)
-    for (const t of prevTags) {
-      if (!nextTags.has(t))
-        setGlobalStore('knowledge', 'tagMap', t, list => list?.filter(p => p !== newMeta.path) ?? [])
-    }
-    for (const t of nextTags) {
-      if (!prevTags.has(t))
-        setGlobalStore('knowledge', 'tagMap', t, list => list ? [...list, newMeta.path] : [newMeta.path])
-    }
+  // Called by fsActions.renameFile for each file that links to the renamed path.
+  // Avoids a full CM6 re-parse: we know the only change is one outLink target.
+  remapFileLink(path: string, oldTarget: string, newTarget: string): void {
+    const meta = globalStore.knowledge.index[path]
+    if (!meta) return
+    const newOutLinks = meta.outLinks.map(l => l === oldTarget ? newTarget : l)
+    applyFileMeta({ ...meta, outLinks: newOutLinks }, meta)
   },
 
   removeFileMeta(path: string): void {

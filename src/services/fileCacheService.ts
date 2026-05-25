@@ -1,4 +1,5 @@
 import { get, set, del, keys, createStore } from 'idb-keyval'
+import { runtimeStore } from '../stores/runtimeStore'
 import type { FileMetadata } from '../stores/types'
 
 export type CachedFields = Pick<FileMetadata, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'>
@@ -45,4 +46,44 @@ export async function pruneCache(activeHashes: Set<string>): Promise<void> {
   } catch {
     // GC failure is non-fatal
   }
+}
+
+// ── File content I/O + in-memory cache ──────────────────────────────────────
+
+const contentCache = new Map<string, string>()
+
+async function resolveFileHandle(path: string, create = false): Promise<FileSystemFileHandle> {
+  const { rootHandle } = runtimeStore
+  if (!rootHandle) throw new Error('No root directory')
+  const parts = path.split('/')
+  let dir: FileSystemDirectoryHandle = rootHandle
+  for (let i = 0; i < parts.length - 1; i++) {
+    dir = await dir.getDirectoryHandle(parts[i])
+  }
+  return dir.getFileHandle(parts[parts.length - 1], create ? { create: true } : undefined)
+}
+
+export async function readFile(path: string): Promise<string> {
+  const cached = contentCache.get(path)
+  if (cached !== undefined) return cached
+  const handle = await resolveFileHandle(path)
+  const content = await (await handle.getFile()).text()
+  contentCache.set(path, content)
+  return content
+}
+
+export async function writeFile(path: string, content: string, create = false): Promise<void> {
+  const handle = await resolveFileHandle(path, create)
+  const writable = await handle.createWritable()
+  await writable.write(content)
+  await writable.close()
+  contentCache.set(path, content)
+}
+
+export function invalidateFile(path: string): void {
+  contentCache.delete(path)
+}
+
+export function clearContentCache(): void {
+  contentCache.clear()
 }

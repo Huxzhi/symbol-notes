@@ -1,3 +1,10 @@
+import { markdown } from '@codemirror/lang-markdown'
+import { syntaxHighlighting } from '@codemirror/language'
+import { languages } from '@codemirror/language-data'
+import { EditorState, Transaction } from '@codemirror/state'
+import type { ViewUpdate } from '@codemirror/view'
+import { EditorView } from '@codemirror/view'
+import { GFM } from '@lezer/markdown'
 import {
   createEffect,
   createMemo,
@@ -6,28 +13,21 @@ import {
   onMount,
   Show,
 } from 'solid-js'
-import { EditorView } from '@codemirror/view'
-import { EditorState, Transaction } from '@codemirror/state'
-import { markdown } from '@codemirror/lang-markdown'
-import { languages } from '@codemirror/language-data'
-import { syntaxHighlighting } from '@codemirror/language'
-import { GFM } from '@lezer/markdown'
-import { darkTheme, darkHighlightStyle } from '../lib/cmTheme'
-import { wikiLinkParser, wikiEmbedParser } from '../lib/wikiLinkParser'
-import { livePreviewExtension } from '../lib/livePreviewExtension'
-import { embedPreviewPlugin, embedTheme } from '../lib/embedExtension'
-import { frontmatterField } from '../lib/frontmatterField'
-import { outLinksField } from '../lib/outLinksField'
-import { inlineTagsField, inlineTagDecoField } from '../lib/inlineTagsField'
-import { headingsField } from '../lib/headingsField'
-import { setRuntimeStore } from '../stores/runtimeStore'
-import { globalStore } from '../stores/globalStore'
 import { fsActions } from '../actions/fsActions'
 import { knowledgeActions } from '../actions/knowledgeActions'
-import { startBackgroundParsing } from '../services/backgroundParser'
+import { startIndexing } from '../services/indexService'
+import { darkHighlightStyle, darkTheme } from '../lib/cmTheme'
+import { embedPreviewPlugin, embedTheme } from '../lib/embedExtension'
+import { frontmatterField } from '../lib/frontmatterField'
+import { headingsField } from '../lib/headingsField'
+import { inlineTagDecoField, inlineTagsField } from '../lib/inlineTagsField'
+import { livePreviewExtension } from '../lib/livePreviewExtension'
+import { outLinksField } from '../lib/outLinksField'
 import { formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
+import { wikiEmbedParser, wikiLinkParser } from '../lib/wikiLinkParser'
+import { globalStore } from '../stores/globalStore'
+import { setRuntimeStore } from '../stores/runtimeStore'
 import type { ViewComponentProps } from '../stores/types'
-import type { ViewUpdate } from '@codemirror/view'
 
 function buildEditorState(
   doc: string,
@@ -36,9 +36,12 @@ function buildEditorState(
 ): EditorState {
   return EditorState.create({
     doc,
-    selection: { anchor: 0 },
+    selection: { anchor: doc.length },
     extensions: [
-      markdown({ codeLanguages: languages, extensions: [GFM, wikiLinkParser, wikiEmbedParser] }),
+      markdown({
+        codeLanguages: languages,
+        extensions: [GFM, wikiLinkParser, wikiEmbedParser],
+      }),
       syntaxHighlighting(darkHighlightStyle),
       darkTheme,
       livePreviewExtension,
@@ -64,8 +67,15 @@ export function EditorPane(props: ViewComponentProps) {
   let reindexTimer: ReturnType<typeof setTimeout> | null = null
   let localDirty = false
 
-  function setLeafRuntime(patch: Partial<{ cmView: EditorView | null; isDirty: boolean; outLinks: any[]; headings: any[] }>) {
-    setRuntimeStore('leafInstances', props.leafId, prev => ({
+  function setLeafRuntime(
+    patch: Partial<{
+      cmView: EditorView | null
+      isDirty: boolean
+      outLinks: any[]
+      headings: any[]
+    }>,
+  ) {
+    setRuntimeStore('leafInstances', props.leafId, (prev) => ({
       ...(prev ?? { cmView: null, isDirty: false, outLinks: [], headings: [] }),
       ...patch,
     }))
@@ -73,7 +83,9 @@ export function EditorPane(props: ViewComponentProps) {
 
   function handleDocChange(update: ViewUpdate) {
     if (!update.docChanged) return
-    const isRemote = update.transactions.some(tr => tr.annotation(Transaction.remote))
+    const isRemote = update.transactions.some((tr) =>
+      tr.annotation(Transaction.remote),
+    )
     if (!isRemote) {
       localDirty = true
       if (props.isActive) setLeafRuntime({ isDirty: true })
@@ -82,7 +94,13 @@ export function EditorPane(props: ViewComponentProps) {
     reindexTimer = setTimeout(() => {
       reindexTimer = null
       const p = filePath()
-      if (p && view) void knowledgeActions.reindexFile(p, view.state.doc.toString())
+      if (p && view) {
+        const outLinks = view.state.field(outLinksField)
+          .filter(l => l.type === 'wiki')
+          .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`)
+        const inlineTags = view.state.field(inlineTagsField).map(m => m.tag)
+        void knowledgeActions.reindexFile(p, view.state.doc.toString(), { outLinks, inlineTags })
+      }
     }, 800)
     if (props.isActive) {
       setLeafRuntime({
@@ -108,10 +126,22 @@ export function EditorPane(props: ViewComponentProps) {
       const withUpdated = setFrontmatterField(content, 'updated', ts)
       if (withUpdated !== content) {
         let from = 0
-        while (from < content.length && from < withUpdated.length && content[from] === withUpdated[from]) from++
+        while (
+          from < content.length &&
+          from < withUpdated.length &&
+          content[from] === withUpdated[from]
+        )
+          from++
         let toOld = content.length
         let toNew = withUpdated.length
-        while (toOld > from && toNew > from && content[toOld - 1] === withUpdated[toNew - 1]) { toOld--; toNew-- }
+        while (
+          toOld > from &&
+          toNew > from &&
+          content[toOld - 1] === withUpdated[toNew - 1]
+        ) {
+          toOld--
+          toNew--
+        }
         view.dispatch({
           changes: { from, to: toOld, insert: withUpdated.slice(from, toNew) },
           annotations: Transaction.remote.of(true),
@@ -122,7 +152,11 @@ export function EditorPane(props: ViewComponentProps) {
     await fsActions.writeFile(p, content)
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
-    await knowledgeActions.reindexFile(p, content)
+    const outLinks = view.state.field(outLinksField)
+      .filter(l => l.type === 'wiki')
+      .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`)
+    const inlineTags = view.state.field(inlineTagsField).map(m => m.tag)
+    await knowledgeActions.reindexFile(p, content, { outLinks, inlineTags })
   }
 
   onMount(async () => {
@@ -141,14 +175,20 @@ export function EditorPane(props: ViewComponentProps) {
         isDirty: false,
       })
     }
-    void startBackgroundParsing(p)
+    startIndexing(p)
   })
 
   onCleanup(() => {
     if (reindexTimer !== null) clearTimeout(reindexTimer)
     view?.destroy()
     view = null
-    if (props.isActive) setLeafRuntime({ cmView: null, isDirty: false, outLinks: [], headings: [] })
+    if (props.isActive)
+      setLeafRuntime({
+        cmView: null,
+        isDirty: false,
+        outLinks: [],
+        headings: [],
+      })
   })
 
   // viewState.file changed (preview replacement): reload without unmounting
@@ -156,7 +196,11 @@ export function EditorPane(props: ViewComponentProps) {
     const p = filePath()
     if (!view || !p) return
     const newContent = await fsActions.loadFileContent(p)
-    const newState = buildEditorState(newContent, handleDocChange, handleKeyDown)
+    const newState = buildEditorState(
+      newContent,
+      handleDocChange,
+      handleKeyDown,
+    )
     view.setState(newState)
     view.scrollDOM.scrollTop = 0
     localDirty = false
@@ -167,7 +211,7 @@ export function EditorPane(props: ViewComponentProps) {
         headings: view.state.field(headingsField),
       })
     }
-    void startBackgroundParsing(p)
+    startIndexing(p)
   })
 
   // Sync runtimeStore when this pane becomes the active tab
@@ -193,8 +237,15 @@ export function EditorPane(props: ViewComponentProps) {
     return (p.split('/').pop() ?? p).replace(/\.md$/, '')
   })
 
-  const startEdit = () => { handled = false; setDraft(stem()); setEditing(true) }
-  const cancel = () => { handled = true; setEditing(false) }
+  const startEdit = () => {
+    handled = false
+    setDraft(stem())
+    setEditing(true)
+  }
+  const cancel = () => {
+    handled = true
+    setEditing(false)
+  }
   const confirmRename = async () => {
     if (handled) return
     handled = true
@@ -205,8 +256,13 @@ export function EditorPane(props: ViewComponentProps) {
     await fsActions.renameFile(p, name)
   }
   const onTitleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') { e.preventDefault(); void confirmRename() }
-    else if (e.key === 'Escape') { e.preventDefault(); cancel() }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void confirmRename()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      cancel()
+    }
   }
 
   return (
@@ -217,7 +273,7 @@ export function EditorPane(props: ViewComponentProps) {
             when={editing()}
             fallback={
               <h1
-                class="text-[22px] font-bold text-[var(--text)] cursor-text hover:text-[var(--accent)] transition-colors truncate leading-tight"
+                class="text-[22px] font-bold text-(--text) cursor-text hover:text-(--accent) transition-colors truncate leading-tight"
                 onClick={startEdit}
                 title="点击修改文件名"
               >
@@ -226,12 +282,17 @@ export function EditorPane(props: ViewComponentProps) {
             }
           >
             <input
-              class="w-full bg-transparent border-b-2 border-[var(--accent)] outline-none text-[22px] font-bold text-[var(--text)] pb-0.5 leading-tight"
+              class="w-full bg-transparent border-b-2 border-(--accent) outline-none text-[22px] font-bold text-(--text) pb-0.5 leading-tight"
               value={draft()}
-              onInput={e => setDraft(e.currentTarget.value)}
+              onInput={(e) => setDraft(e.currentTarget.value)}
               onKeyDown={onTitleKeyDown}
               onBlur={() => void confirmRename()}
-              ref={el => setTimeout(() => { el.focus(); el.select() }, 0)}
+              ref={(el) =>
+                setTimeout(() => {
+                  el.focus()
+                  el.select()
+                }, 0)
+              }
               spellcheck={false}
             />
           </Show>

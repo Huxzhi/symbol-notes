@@ -5,6 +5,13 @@ import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { knowledgeActions } from './knowledgeActions'
 import { clearEmbedUrlCache } from '../lib/embedExtension'
 import { parseFrontmatter, formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
+import {
+  readFile as fcReadFile,
+  writeFile as fcWriteFile,
+  invalidateFile,
+  clearContentCache,
+} from '../services/fileCacheService'
+import { startIndexing } from '../services/indexService'
 import type { FileNode } from '../stores/types'
 
 declare global {
@@ -37,17 +44,6 @@ async function buildTree(
     if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
     return a.name.localeCompare(b.name)
   })
-}
-
-async function getFileHandle(path: string): Promise<FileSystemFileHandle> {
-  const { rootHandle } = runtimeStore
-  if (!rootHandle) throw new Error('No root directory')
-  const parts = path.split('/')
-  let dir: FileSystemDirectoryHandle = rootHandle
-  for (let i = 0; i < parts.length - 1; i++) {
-    dir = await dir.getDirectoryHandle(parts[i])
-  }
-  return dir.getFileHandle(parts[parts.length - 1])
 }
 
 function escapeRegex(s: string): string {
@@ -83,7 +79,7 @@ async function updateBacklinks(backlinks: string[], oldPath: string, newPath: st
       const updated = replaceWikiLinks(content, oldPath, newPath)
       if (updated !== content) {
         await fsActions.writeFile(bPath, updated)
-        await knowledgeActions.reindexFile(bPath, updated)
+        knowledgeActions.remapFileLink(bPath, oldPath, newPath)
       }
     } catch { /* skip unreadable files */ }
   }
@@ -92,6 +88,7 @@ async function updateBacklinks(backlinks: string[], oldPath: string, newPath: st
 export const fsActions = {
   async openDirectory(): Promise<void> {
     clearEmbedUrlCache()
+    clearContentCache()
     const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
     await set(DB_KEY, handle)
     batch(() => {
@@ -102,7 +99,7 @@ export const fsActions = {
     const { workspaceActions } = await import('./workspaceActions')
     workspaceActions.clearAllLeaves()
     setGlobalStore('fs', 'tree', await buildTree(handle))
-    await knowledgeActions.scanDirectory()
+    startIndexing()
   },
 
   async restoreDirectory(): Promise<void> {
@@ -111,9 +108,10 @@ export const fsActions = {
     try {
       const perm = await handle.requestPermission({ mode: 'readwrite' })
       if (perm !== 'granted') return
+      clearContentCache()
       setRuntimeStore('rootHandle', handle)
       setGlobalStore('fs', 'tree', await buildTree(handle))
-      await knowledgeActions.scanDirectory()
+      startIndexing()
     } catch { /* handle invalidated */ }
   },
 
@@ -153,18 +151,16 @@ export const fsActions = {
     const finalName = newName.endsWith('.md') ? newName : `${newName}.md`
     const newPath = dir ? `${dir}/${finalName}` : finalName
 
-    const oldContent = await fsActions.readFile(oldPath)
+    const oldContent = await fcReadFile(oldPath)
+    await fcWriteFile(newPath, oldContent, true)
     let dirHandle: FileSystemDirectoryHandle = rootHandle
     if (dir) {
       for (const part of dir.split('/')) {
         dirHandle = await dirHandle.getDirectoryHandle(part)
       }
     }
-    const newHandle = await dirHandle.getFileHandle(finalName, { create: true })
-    const writable = await newHandle.createWritable()
-    await writable.write(oldContent)
-    await writable.close()
     await dirHandle.removeEntry(oldPath.split('/').pop()!)
+    invalidateFile(oldPath)
 
     const backlinks = globalStore.knowledge.backlinkMap[oldPath] ?? []
     knowledgeActions.removeFileMeta(oldPath)
@@ -183,37 +179,29 @@ export const fsActions = {
     let dir: FileSystemDirectoryHandle = rootHandle
     for (const part of parts) dir = await dir.getDirectoryHandle(part)
     await dir.removeEntry(name)
+    invalidateFile(path)
     knowledgeActions.removeFileMeta(path)
     setGlobalStore('fs', 'tree', await buildTree(rootHandle))
   },
 
   async writeFile(path: string, content: string): Promise<void> {
-    const handle = await getFileHandle(path)
-    const writable = await handle.createWritable()
-    await writable.write(content)
-    await writable.close()
+    return fcWriteFile(path, content)
   },
 
   async readFile(path: string): Promise<string> {
-    const handle = await getFileHandle(path)
-    const file = await handle.getFile()
-    return file.text()
+    return fcReadFile(path)
   },
 
   async loadFileContent(path: string): Promise<string> {
-    const handle = await getFileHandle(path)
-    const file = await handle.getFile()
-    let content = await file.text()
+    let content = await fcReadFile(path)
     if (globalStore.workspace.autoTimestamps) {
       const { frontmatter } = parseFrontmatter(content)
-      const ts = formatTimestamp(file.lastModified)
+      const ts = formatTimestamp(Date.now())
       let updated = content
       if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
       if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
       if (updated !== content) {
-        const writable = await handle.createWritable()
-        await writable.write(updated)
-        await writable.close()
+        await fcWriteFile(path, updated)
         content = updated
       }
     }
