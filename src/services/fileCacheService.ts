@@ -1,10 +1,52 @@
-import { get, set, del, keys, createStore } from 'idb-keyval'
+import { get, set, del, keys, getMany, createStore } from 'idb-keyval'
 import { runtimeStore } from '../stores/runtimeStore'
 import type { FileMetadata } from '../stores/types'
 
 export type CachedFields = Pick<FileMetadata, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'>
 
 const idbStore = createStore('symbol-notes', 'file-meta-cache')
+const fileStatStore = createStore('symbol-notes', 'file-stat-cache')
+
+export interface FileStatEntry {
+  size: number
+  mtime: number
+  hash: string
+}
+
+export async function loadAllFileStats(): Promise<Map<string, FileStatEntry>> {
+  try {
+    const allKeys = await keys<string>(fileStatStore)
+    const values = await getMany<FileStatEntry>(allKeys, fileStatStore)
+    const map = new Map<string, FileStatEntry>()
+    for (let i = 0; i < allKeys.length; i++) {
+      if (values[i] !== undefined) map.set(allKeys[i], values[i])
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
+export async function setFileStatEntry(path: string, entry: FileStatEntry): Promise<void> {
+  try {
+    await set(path, entry, fileStatStore)
+  } catch { /* non-fatal */ }
+}
+
+export async function deleteFileStatEntry(path: string): Promise<void> {
+  try {
+    await del(path, fileStatStore)
+  } catch { /* non-fatal */ }
+}
+
+export async function pruneFileStatCache(activePaths: Set<string>): Promise<void> {
+  try {
+    const allKeys = await keys<string>(fileStatStore)
+    await Promise.all(
+      allKeys.filter(k => !activePaths.has(k)).map(k => del(k, fileStatStore)),
+    )
+  } catch { /* non-fatal */ }
+}
 
 // djb2 hash — fast, sync, good enough for cache invalidation
 // Primary key for cache entries: same content always maps to same hash,
@@ -78,6 +120,7 @@ export async function writeFile(path: string, content: string, create = false): 
   await writable.write(content)
   await writable.close()
   contentCache.set(path, content)
+  deleteFileStatEntry(path).catch(() => {})
 }
 
 export function invalidateFile(path: string): void {
