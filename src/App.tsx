@@ -1,6 +1,6 @@
 import { CalendarRange } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
-import { fsActions } from './actions/fsActions'
+import { appActions } from './actions/appActions'
 import { CalendarPage } from './components/CalendarPage'
 import { EditorPane } from './components/EditorPane'
 import { ImageViewer } from './components/ImageViewer'
@@ -110,7 +110,7 @@ export default function App() {
   })
 
   onMount(async () => {
-    await fsActions.restoreDirectory()
+    await appActions.restoreVault()
   })
 
   return (
