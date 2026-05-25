@@ -14,11 +14,24 @@ import { EditorViewer } from './components/viewer/EditorViewer'
 import { ImageViewer } from './components/viewer/ImageViewer'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
+import { syncToStorage } from './lib/localStorage'
 import { registerView } from './lib/viewRegistry'
 import { activeRoot, globalStore } from './stores/globalStore'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
+
+export const IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.avif',
+])
 
 // ── View registration ─────────────────────────────────────────────────────────
 registerView({
@@ -78,18 +91,6 @@ registerView({
   component: CalendarViewer,
 })
 
-export const IMAGE_EXTS = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.svg',
-  '.ico',
-  '.bmp',
-  '.avif',
-])
-
 export default function App() {
   createEffect(() => {
     document.documentElement.setAttribute(
@@ -101,6 +102,11 @@ export default function App() {
   createEffect(() => {
     customStyleEl.textContent = globalStore.workspace.customCSS
   })
+
+  syncToStorage('sn-workspace', () => ({
+    layouts: globalStore.workspace.layouts,
+    activeLayoutId: globalStore.workspace.activeLayoutId,
+  }))
 
   onMount(async () => {
     await appActions.restoreVault()
