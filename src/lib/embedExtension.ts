@@ -10,28 +10,19 @@ import {
 import { RangeSetBuilder } from '@codemirror/state'
 import { globalStore } from '../stores/globalStore'
 import { runtimeStore } from '../stores/runtimeStore'
-import type { FileNode } from '../stores/types'
 import { IMAGE_EXTS } from './fileTypes'
 import { parseFrontmatter } from './parseFrontmatter'
 
-// ── Target resolution via file tree (available before knowledge scan) ─────────
-
-function searchTree(nodes: FileNode[], name: string): string | null {
-  for (const node of nodes) {
-    if (node.kind === 'file' && node.name === name) return node.path
-    if (node.kind === 'directory' && node.children) {
-      const found = searchTree(node.children, name)
-      if (found) return found
-    }
-  }
-  return null
-}
+// ── Target resolution via fileMap (available before knowledge scan) ───────────
 
 function resolveEmbedTarget(target: string): string | null {
   const stem = target.split('/').pop()!
   const hasExt = stem.includes('.')
   const searchName = hasExt ? stem : `${stem}.md`
-  return searchTree(globalStore.fs.tree, searchName)
+  const entry = Object.values(globalStore.fs.fileMap).find(
+    e => e.kind === 'file' && e.name === searchName,
+  )
+  return entry?.path ?? null
 }
 
 // ── Data URL cache — keyed by path, no revocation needed ─────────────────────
