@@ -15,7 +15,7 @@ import {
 } from 'solid-js'
 import { fsActions } from '../actions/fsActions'
 import { knowledgeActions } from '../actions/knowledgeActions'
-import { startIndexing } from '../services/indexService'
+import { readFile, writeFile } from '../services/fileCacheService'
 import { darkHighlightStyle, darkTheme } from '../lib/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../lib/embedExtension'
 import { frontmatterField } from '../lib/frontmatterField'
@@ -23,11 +23,27 @@ import { headingsField } from '../lib/headingsField'
 import { inlineTagDecoField, inlineTagsField } from '../lib/inlineTagsField'
 import { livePreviewExtension } from '../lib/livePreviewExtension'
 import { outLinksField } from '../lib/outLinksField'
-import { formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
+import { parseFrontmatter, formatTimestamp, setFrontmatterField } from '../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../lib/wikiLinkParser'
 import { globalStore } from '../stores/globalStore'
 import { setRuntimeStore } from '../stores/runtimeStore'
 import type { ViewComponentProps } from '../stores/types'
+
+async function loadFileContent(path: string): Promise<string> {
+  let content = await readFile(path)
+  if (globalStore.workspace.autoTimestamps) {
+    const { frontmatter } = parseFrontmatter(content)
+    const ts = formatTimestamp(Date.now())
+    let updated = content
+    if (!frontmatter.created) updated = setFrontmatterField(updated, 'created', ts)
+    if (!frontmatter.updated) updated = setFrontmatterField(updated, 'updated', ts)
+    if (updated !== content) {
+      await writeFile(path, updated)
+      content = updated
+    }
+  }
+  return content
+}
 
 function buildEditorState(
   doc: string,
@@ -149,7 +165,7 @@ export function EditorPane(props: ViewComponentProps) {
         content = withUpdated
       }
     }
-    await fsActions.writeFile(p, content)
+    await writeFile(p, content)
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
     const outLinks = view.state.field(outLinksField)
@@ -162,7 +178,7 @@ export function EditorPane(props: ViewComponentProps) {
   onMount(async () => {
     const p = filePath()
     if (!p) return
-    const doc = await fsActions.loadFileContent(p)
+    const doc = await loadFileContent(p)
     view = new EditorView({
       state: buildEditorState(doc, handleDocChange, handleKeyDown),
       parent: container,
@@ -175,7 +191,6 @@ export function EditorPane(props: ViewComponentProps) {
         isDirty: false,
       })
     }
-    startIndexing(p)
   })
 
   onCleanup(() => {
@@ -195,7 +210,7 @@ export function EditorPane(props: ViewComponentProps) {
   createEffect(async () => {
     const p = filePath()
     if (!view || !p) return
-    const newContent = await fsActions.loadFileContent(p)
+    const newContent = await loadFileContent(p)
     const newState = buildEditorState(
       newContent,
       handleDocChange,
@@ -211,7 +226,6 @@ export function EditorPane(props: ViewComponentProps) {
         headings: view.state.field(headingsField),
       })
     }
-    startIndexing(p)
   })
 
   // Sync runtimeStore when this pane becomes the active tab

@@ -1,4 +1,13 @@
 import { get, set } from 'idb-keyval'
+
+declare global {
+  interface Window {
+    showDirectoryPicker: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>
+  }
+  interface FileSystemDirectoryHandle {
+    requestPermission: (options?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>
+  }
+}
 import { setGlobalStore } from '../stores/globalStore'
 import { setRuntimeStore } from '../stores/runtimeStore'
 import { clearContentCache } from '../services/fileCacheService'
