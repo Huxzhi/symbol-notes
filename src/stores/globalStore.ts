@@ -55,7 +55,7 @@ const initialLayout: WorkspaceLayout = {
 }
 
 const [globalStore, setGlobalStore] = createStore<GlobalState>({
-  fs: { tree: [] },
+  fs: { fileMap: {} },
   knowledge: {
     index: {},
     backlinkMap: {},
