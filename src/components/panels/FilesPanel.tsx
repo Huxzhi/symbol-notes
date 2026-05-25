@@ -1,11 +1,23 @@
-import { For, Show, createSignal } from 'solid-js'
 import { FolderOpen } from 'lucide-solid'
-import { globalStore, activeFilePath, findLeafInTree, activeRoot, activeLayout, ROOT_TABS_ID } from '../stores/globalStore'
-import { runtimeStore } from '../stores/runtimeStore'
-import { fsActions } from '../actions/fsActions'
-import { workspaceActions } from '../actions/workspaceActions'
-import { getFileViewForExt } from '../lib/viewRegistry'
-import type { FileNode, ViewState, WorkspaceLeaf, WorkspaceNode } from '../stores/types'
+import { createSignal, For, Show } from 'solid-js'
+import { fsActions } from '../../actions/fsActions'
+import { workspaceActions } from '../../actions/workspaceActions'
+import { getFileViewForExt } from '../../lib/viewRegistry'
+import {
+  activeFilePath,
+  activeLayout,
+  activeRoot,
+  findLeafInTree,
+  globalStore,
+  ROOT_TABS_ID,
+} from '../../stores/globalStore'
+import { runtimeStore } from '../../stores/runtimeStore'
+import type {
+  FileNode,
+  ViewState,
+  WorkspaceLeaf,
+  WorkspaceNode,
+} from '../../stores/types'
 
 const IMAGE_EXTS = new Set([
   '.png',
@@ -39,9 +51,13 @@ function canOpen(name: string): boolean {
   return name.endsWith(MD_EXT) || IMAGE_EXTS.has(ext)
 }
 
-function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | null {
+function findLeafWithFile(
+  root: WorkspaceNode,
+  path: string,
+): WorkspaceLeaf | null {
   if (root.type === 'leaf' && root.viewState.state.file === path) return root
-  if (root.type === 'tabs') return root.children.find(l => l.viewState.state.file === path) ?? null
+  if (root.type === 'tabs')
+    return root.children.find((l) => l.viewState.state.file === path) ?? null
   if (root.type === 'split') {
     for (const child of root.children) {
       const found = findLeafWithFile(child, path)
@@ -51,18 +67,26 @@ function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | nu
   return null
 }
 
-function openFileInWorkspace(path: string, options?: { newTab?: boolean; pin?: boolean }): void {
+function openFileInWorkspace(
+  path: string,
+  options?: { newTab?: boolean; pin?: boolean },
+): void {
   const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
   const def = getFileViewForExt(ext)
   if (!def) return
   const viewState: ViewState = { type: def.type, state: { file: path } }
 
   const existing = findLeafWithFile(activeRoot().main, path)
-  if (existing) { workspaceActions.activateLeaf(existing.id); return }
+  if (existing) {
+    workspaceActions.activateLeaf(existing.id)
+    return
+  }
 
   if (!options?.newTab) {
     const { activeLeafId } = activeLayout()
-    const activeLeaf = activeLeafId ? findLeafInTree(activeRoot().main, activeLeafId) : null
+    const activeLeaf = activeLeafId
+      ? findLeafInTree(activeRoot().main, activeLeafId)
+      : null
     if (activeLeaf && !activeLeaf.pinned) {
       workspaceActions.setLeafViewState(activeLeafId!, viewState)
       return
@@ -88,13 +112,13 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
     <Show when={show()}>
       <div>
         <div
-          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-[var(--bg-hover)] select-none
+          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none
             ${
               isActive()
-                ? 'bg-[var(--bg-hover)] border-l-2 border-[var(--accent)] text-[var(--text)]'
+                ? 'bg-(--bg-hover) border-l-2 border-(--accent) text-(--text)'
                 : isOther()
-                  ? 'text-[var(--text-4)] border-l-2 border-transparent'
-                  : 'text-[var(--text-2)] border-l-2 border-transparent'
+                  ? 'text-(--text-4) border-l-2 border-transparent'
+                  : 'text-(--text-2) border-l-2 border-transparent'
             }`}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
@@ -108,10 +132,10 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
             openFileInWorkspace(props.node.path, { newTab: true, pin: true })
           }}
         >
-          <span class="text-[9px] text-[var(--text-3)]">
+          <span class="text-[9px] text-(--text-3)">
             {props.node.kind === 'directory' ? '▸' : fileIcon(props.node.name)}
           </span>
-          <span class={isActive() ? 'text-[var(--accent)]' : ''}>
+          <span class={isActive() ? 'text-(--accent)' : ''}>
             {displayName(props.node.name)}
           </span>
         </div>
@@ -132,7 +156,7 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
 
 type CreateMode = 'file' | 'folder' | null
 
-export function Sidebar() {
+export function FilesPanel() {
   const [createMode, setCreateMode] = createSignal<CreateMode>(null)
   const [newName, setNewName] = createSignal('')
 
@@ -166,30 +190,30 @@ export function Sidebar() {
 
   return (
     <div class="flex flex-col h-full">
-      <div class="border-b border-[var(--border)] shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
+      <div class="border-b border-(--border) shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
-          class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors min-w-0 group"
+          class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-(--bg-hover) transition-colors min-w-0 group"
           onClick={fsActions.openDirectory}
           title={runtimeStore.rootHandle ? '切换文件夹' : '打开文件夹'}
         >
           <FolderOpen
             size={12}
-            class="shrink-0 text-[var(--accent)] group-hover:text-[var(--accent-2)]"
+            class="shrink-0 text-(--accent) group-hover:text-(--accent-2)"
           />
-          <span class="truncate text-[10px] text-[var(--accent)] font-bold tracking-widest uppercase group-hover:text-[var(--accent-2)]">
+          <span class="truncate text-[10px] text-(--accent) font-bold tracking-widest uppercase group-hover:text-(--accent-2)">
             {runtimeStore.rootHandle?.name ?? '打开文件夹'}
           </span>
         </button>
         <Show when={runtimeStore.rootHandle}>
           <button
-            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors text-[13px]"
+            class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors text-[13px]"
             title="新建文件夹"
             onClick={() => startCreate('folder')}
           >
             ⊞
           </button>
           <button
-            class="shrink-0 text-[var(--text-3)] hover:text-[var(--accent-2)] w-5 h-5 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors"
+            class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors"
             title="新建文件"
             onClick={() => startCreate('file')}
           >
