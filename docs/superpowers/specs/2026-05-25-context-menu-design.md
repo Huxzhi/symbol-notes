@@ -5,24 +5,79 @@
 
 ## Overview
 
-Add right-click context menus to two surfaces:
-1. **Tabs** — Close, Close Others, Close to Right
-2. **Directory entries in FilesPanel** — New File, New Folder, Delete Folder (with confirm)
+Two parallel concerns addressed together:
 
-## Architecture: Global ContextMenu — Event Delegation + Registry
+1. **Right-click context menus** on tabs and file tree entries
+2. **File operation state lifted to `runtimeStore`** — create, rename, delete all go through `runtimeStore.fileOp` so `FilesPanel` becomes a pure reactive view and any caller (toolbar, context menu) uses the same API
+
+## File Operation State: `runtimeStore.fileOp`
+
+### State shape
+
+```ts
+// src/stores/types.ts
+type FileOp =
+  | { type: 'create-file' | 'create-folder'; prefix: string }
+  | { type: 'rename'; path: string }
+  | null
+
+interface RuntimeState {
+  rootHandle: FileSystemDirectoryHandle | null
+  leafInstances: Record<string, LeafRuntimeState>
+  fileOp: FileOp   // replaces nothing — this is new
+}
+```
+
+- `create-file` / `create-folder`: inline input shown in FilesPanel; `prefix` pre-fills the input (e.g. `'notes/'` for in-directory create, `''` for root)
+- `rename`: inline input shown on the target entry; `path` identifies which entry to rename
+
+### Actions: `src/actions/fileOpActions.ts` (new file)
+
+Thin wrappers around `setRuntimeStore` + `fsActions`:
+
+```ts
+export const fileOpActions = {
+  startCreate(mode: 'file' | 'folder', prefix = ''): void,
+  startRename(path: string): void,
+  cancel(): void,
+  async confirmCreate(name: string): Promise<void>,
+  async confirmRename(path: string, newName: string): Promise<void>,
+  async deleteFile(path: string): Promise<void>,       // delegates to fsActions
+  async deleteDirectory(path: string): Promise<void>,  // new in fsActions
+}
+```
+
+`confirmCreate` calls `fsActions.createFile` or `fsActions.createDirectory`, then sets `fileOp` to `null`.
+`confirmRename` calls `fsActions.renameFile`, then sets `fileOp` to `null`.
+Both `cancel()` and any successful confirm set `fileOp` to `null`.
+
+### FilesPanel changes
+
+`FilesPanel` removes its local `createMode`/`newName` signals entirely. Instead:
+
+- Reads `runtimeStore.fileOp` reactively
+- Shows inline input when `fileOp.type` is `create-*` or `rename`
+- Toolbar buttons call `fileOpActions.startCreate('file')` / `fileOpActions.startCreate('folder')`
+- Input `onKeyDown`/`onBlur` call `fileOpActions.confirmCreate` / `fileOpActions.confirmRename` / `fileOpActions.cancel`
+
+Rename input appears inline on the entry being renamed (identified by `fileOp.path`), pre-filled with the current filename (without `.md`).
+
+## Global ContextMenu — Event Delegation + Registry
 
 ### Event delegation
 
-One `contextmenu` listener on `document` (in `ContextMenu.tsx`). On right-click, it walks up the DOM from `e.target` to find the nearest element with a `data-ctx` attribute, then looks up the registered item factory for that type, builds items from `dataset`, and shows the menu.
+One `contextmenu` listener on `document` (set up inside `ContextMenu.tsx` on mount). On right-click it walks up the DOM from `e.target` to find the nearest element with `data-ctx`, looks up the registered factory, builds items from `dataset`, and shows the menu.
 
 ```
 document contextmenu → walk up to [data-ctx] → registry[type](dataset) → show menu
 ```
 
 Elements declare their type and data via attributes:
+
 ```tsx
+<div data-ctx="file"      data-path={entry.path}>
 <div data-ctx="directory" data-path={entry.path}>
-<div data-ctx="tab" data-leaf-id={leaf.id} data-tabs-id={node.id}>
+<div data-ctx="tab"       data-leaf-id={leaf.id} data-tabs-id={node.id}>
 ```
 
 ### Registry: `src/lib/contextMenuRegistry.ts`
@@ -38,113 +93,92 @@ export function registerContextMenu(type: string, factory: ItemFactory): void
 export function getMenuItems(type: string, dataset: DOMStringMap): MenuItem[]
 ```
 
-Factories are registered once at app startup (e.g., in `App.tsx` or alongside the relevant action files).
+Factories registered once at app startup in `App.tsx`.
 
 ### Component: `src/components/ContextMenu.tsx`
 
-Rendered once in `App.tsx` via `Portal` (attached to `document.body`). Holds a module-level signal for `{ x, y, items }`.
-
-**Public API:**
-
-```ts
-// Internal — called by the document contextmenu handler
-function showMenuAt(x: number, y: number, items: MenuItem[]): void
-
-// Rendered once in App.tsx
-export function ContextMenu(): JSX.Element
-```
+Rendered once in `App.tsx` via SolidJS `Portal` (attached to `document.body`). Holds a module-level signal for `{ x, y, items }`.
 
 **Close behavior:**
-- Click outside: `document` `mousedown` listener
-- Press `Escape`: `document` `keydown` listener
-- Click any menu item: closes after running action
+- Click outside (`document` `mousedown`)
+- Press `Escape` (`document` `keydown`)
+- Clicking any item (runs action then closes)
 
-**Positioning:** Menu renders at `(e.clientX, e.clientY)`. If menu would overflow viewport right/bottom edge, it flips to render left/above the cursor.
+**Positioning:** Renders at `(clientX, clientY)`. Flips left/up if menu would overflow viewport edge.
 
-**Styling:** Uses existing CSS variables — `--bg-surface`, `--border`, `--text`, `--text-2`, `--bg-hover`, `--accent`. Separator is a `1px` `--border` horizontal rule.
-
-**No extra packages needed** — event listeners added directly in `createEffect`/`onMount` with `onCleanup`.
+**Styling:** CSS variables — `--bg-surface`, `--border`, `--text`, `--text-2`, `--bg-hover`, `--accent`. Separator is a 1px `--border` `<hr>`. No new packages.
 
 ## Tab Context Menu
 
-**Location:** `src/components/workspace/WorkspaceTabsView.tsx`
-
-Each tab `div` gains `onContextMenu`. The menu is built dynamically based on tab position:
+Tab `div` in `WorkspaceTabsView` gets `data-ctx="tab"` + `data-leaf-id` + `data-tabs-id`. Factory registered in `App.tsx`:
 
 | Item | Condition | Action |
 |------|-----------|--------|
-| 关闭 | Always | `workspaceActions.closeLeaf(leaf.id)` |
-| 关闭其他 | `siblings.length > 1` | `workspaceActions.closeOtherLeaves(tabsId, leaf.id)` |
-| 关闭右侧 | Leaf is not last in tabs | `workspaceActions.closeRightLeaves(tabsId, leaf.id)` |
+| 关闭 | Always | `workspaceActions.closeLeaf(d.leafId)` |
+| 关闭其他 | `siblings.length > 1` | `workspaceActions.closeOtherLeaves(d.tabsId, d.leafId)` |
+| 关闭右侧 | Not last tab | `workspaceActions.closeRightLeaves(d.tabsId, d.leafId)` |
+
+Factory needs sibling count to conditionally disable items — it reads `activeLayout().root` to find the tabs node by `tabsId`.
 
 **New workspace actions:**
 
 ```ts
 closeOtherLeaves(tabsId: string, keepLeafId: string): void
-// Removes all leaves in the tabs group except keepLeafId.
-// Cleans up runtimeStore.leafInstances for each removed leaf.
-// Sets activeLeafId to keepLeafId.
+// Keeps only keepLeafId, removes all others. Cleans leafInstances. Sets activeLeafId = keepLeafId.
 
 closeRightLeaves(tabsId: string, leafId: string): void
-// Removes all leaves to the right of leafId in the tabs group.
-// Cleans up runtimeStore.leafInstances for each removed leaf.
-// If activeLeafId was among removed leaves, sets activeLeafId to leafId.
+// Removes all leaves after leafId in the tabs array. Cleans leafInstances.
+// If layout.activeLeafId was removed, sets activeLeafId = leafId.
 ```
 
-Both actions use `setLayout` (the scoped setter) and `produce` for leafInstances cleanup, consistent with existing `closeLeaf`.
+Both use `setLayout` + `produce(s => { delete s[id] })` for leafInstances, consistent with `closeLeaf`.
 
-## Directory Context Menu
+## File / Directory Context Menu
 
-**Location:** `src/components/panels/FilesPanel.tsx`
-
-Directory `div` in `FileTreeNode` carries `data-ctx="directory"` and `data-path`. The item factory (registered in `App.tsx`) produces:
+### File entry (`data-ctx="file"`)
 
 | Item | Action |
 |------|--------|
-| 新建文件 | `setRuntimeStore('pendingCreate', { mode: 'file', prefix: path + '/' })` |
-| 新建文件夹 | `setRuntimeStore('pendingCreate', { mode: 'folder', prefix: path + '/' })` |
-| 删除文件夹 | `confirm()` dialog → `fsActions.deleteDirectory(path)` |
+| 重命名 | `fileOpActions.startRename(path)` |
+| 删除 | `confirm()` → `fileOpActions.deleteFile(path)` |
 
-**`pendingCreate` in `runtimeStore`:**
+### Directory entry (`data-ctx="directory"`)
 
-`RuntimeState` gains a new field:
-```ts
-pendingCreate: { mode: 'file' | 'folder'; prefix: string } | null
-```
+| Item | Action |
+|------|--------|
+| 新建文件 | `fileOpActions.startCreate('file', path + '/')` |
+| 新建文件夹 | `fileOpActions.startCreate('folder', path + '/')` |
+| 重命名 | `fileOpActions.startRename(path)` |
+| — separator — | |
+| 删除文件夹 | `confirm()` → `fileOpActions.deleteDirectory(path)` |
 
-`FilesPanel` watches `runtimeStore.pendingCreate` reactively. When non-null, it shows the inline input pre-filled with `prefix` and `mode`. On confirm or cancel, it sets `pendingCreate` back to `null`.
-
-The existing local `createMode`/`newName` signals in `FilesPanel` are replaced by reading from `runtimeStore.pendingCreate`. The toolbar buttons (new file, new folder) also write to `runtimeStore.pendingCreate` (with `prefix: ''`).
-
-**New fs action:**
+### `fsActions.deleteDirectory` (new)
 
 ```ts
 async deleteDirectory(path: string): Promise<void>
 ```
 
-Implementation:
-1. Navigate to the parent directory via `rootHandle`
-2. Call `parentDir.removeEntry(dirName, { recursive: true })`
-3. Collect all `fileMap` entries where `entry.path === path || entry.path.startsWith(path + '/')`
-4. For each removed entry with `kind === 'file'`: call `invalidateFile`, `deleteFileStatEntry`, `knowledgeActions.removeFileMeta`
-5. Remove all collected entries from `fileMap` in one `produce` call
+1. Navigate to parent dir via `rootHandle`, call `removeEntry(name, { recursive: true })`
+2. Collect all `fileMap` entries where `entry.path === path || entry.path.startsWith(path + '/')`
+3. For each entry with `kind === 'file'`: `invalidateFile`, `deleteFileStatEntry`, `knowledgeActions.removeFileMeta`
+4. Remove all collected entries from `fileMap` in one `produce` call
 
 ## File Structure Changes
 
 | File | Change |
 |------|--------|
-| `src/stores/types.ts` | Add `pendingCreate` field to `RuntimeState` |
-| `src/stores/runtimeStore.ts` | Initialize `pendingCreate: null` |
-| `src/lib/contextMenuRegistry.ts` | New — registry + `registerContextMenu` / `getMenuItems` |
-| `src/components/ContextMenu.tsx` | New — event delegation listener + Portal menu component |
-| `src/App.tsx` | Add `<ContextMenu />` + register all factories |
-| `src/components/workspace/WorkspaceTabsView.tsx` | Add `data-ctx="tab"` + `data-leaf-id` + `data-tabs-id` to tab divs; remove inline × close button logic (now in menu) — or keep × and add menu alongside |
-| `src/actions/workspaceActions.ts` | Add `closeOtherLeaves`, `closeRightLeaves` |
-| `src/components/panels/FilesPanel.tsx` | Add `data-ctx="directory"` + `data-path` to dir entries; replace local `createMode`/`newName` signals with `runtimeStore.pendingCreate` |
+| `src/stores/types.ts` | Add `FileOp` type; add `fileOp: FileOp` to `RuntimeState` |
+| `src/stores/runtimeStore.ts` | Initialize `fileOp: null` |
+| `src/actions/fileOpActions.ts` | **New** — `startCreate`, `startRename`, `cancel`, `confirmCreate`, `confirmRename`, `deleteFile`, `deleteDirectory` |
 | `src/actions/fsActions.ts` | Add `deleteDirectory` |
+| `src/lib/contextMenuRegistry.ts` | **New** — registry + `registerContextMenu` / `getMenuItems` |
+| `src/components/ContextMenu.tsx` | **New** — event delegation + Portal menu |
+| `src/App.tsx` | Add `<ContextMenu />`; register all factories |
+| `src/components/workspace/WorkspaceTabsView.tsx` | Add `data-ctx="tab"` + data attrs to tab divs |
+| `src/actions/workspaceActions.ts` | Add `closeOtherLeaves`, `closeRightLeaves` |
+| `src/components/panels/FilesPanel.tsx` | Add `data-ctx` + data attrs; replace local signals with `runtimeStore.fileOp` + `fileOpActions` |
 
 ## Out of Scope
 
-- File (non-directory) right-click menu
-- Rename via context menu
+- Directory rename (File System Access API requires copy+delete; deferred)
 - Drag-and-drop reordering
