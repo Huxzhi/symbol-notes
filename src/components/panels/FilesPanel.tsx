@@ -1,5 +1,6 @@
 import { FolderOpen } from 'lucide-solid'
 import { createSignal, For, Show } from 'solid-js'
+import { appActions } from '../../actions/appActions'
 import { fsActions } from '../../actions/fsActions'
 import { workspaceActions } from '../../actions/workspaceActions'
 import { getFileViewForExt } from '../../lib/viewRegistry'
@@ -13,7 +14,7 @@ import {
 } from '../../stores/globalStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 import type {
-  FileNode,
+  FileMapEntry,
   ViewState,
   WorkspaceLeaf,
   WorkspaceNode,
@@ -99,13 +100,21 @@ function openFileInWorkspace(
   }
 }
 
-function FileTreeNode(props: { node: FileNode; depth: number }) {
-  const isActive = () => activeFilePath() === props.node.path
-  const isOther = () =>
-    props.node.kind === 'file' && isOtherFile(props.node.name)
+function childrenOf(parentPath: string | null): FileMapEntry[] {
+  return Object.values(globalStore.fs.fileMap)
+    .filter(e => e.parent === parentPath)
+    .sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+}
+
+function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
+  const isActive = () => activeFilePath() === props.entry.path
+  const isOther = () => props.entry.kind === 'file' && isOtherFile(props.entry.name)
   const show = () =>
-    props.node.kind === 'directory' ||
-    !isOtherFile(props.node.name) ||
+    props.entry.kind === 'directory' ||
+    !isOtherFile(props.entry.name) ||
     globalStore.workspace.showOtherFiles
 
   return (
@@ -122,31 +131,26 @@ function FileTreeNode(props: { node: FileNode; depth: number }) {
             }`}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
-            if (props.node.kind !== 'file') return
-            if (!canOpen(props.node.name)) return
-            openFileInWorkspace(props.node.path)
+            if (props.entry.kind !== 'file') return
+            if (!canOpen(props.entry.name)) return
+            openFileInWorkspace(props.entry.path)
           }}
           onDblClick={() => {
-            if (props.node.kind !== 'file') return
-            if (!canOpen(props.node.name)) return
-            openFileInWorkspace(props.node.path, { newTab: true, pin: true })
+            if (props.entry.kind !== 'file') return
+            if (!canOpen(props.entry.name)) return
+            openFileInWorkspace(props.entry.path, { newTab: true, pin: true })
           }}
         >
           <span class="text-[9px] text-(--text-3)">
-            {props.node.kind === 'directory' ? '▸' : fileIcon(props.node.name)}
+            {props.entry.kind === 'directory' ? '▸' : fileIcon(props.entry.name)}
           </span>
           <span class={isActive() ? 'text-(--accent)' : ''}>
-            {displayName(props.node.name)}
+            {displayName(props.entry.name)}
           </span>
         </div>
-        <Show when={props.node.kind === 'directory'}>
-          <For each={props.node.children ?? []}>
-            {(child) => (
-              <FileTreeNode
-                node={child}
-                depth={props.depth + 1}
-              />
-            )}
+        <Show when={props.entry.kind === 'directory'}>
+          <For each={childrenOf(props.entry.path)}>
+            {(child) => <FileTreeNode entry={child} depth={props.depth + 1} />}
           </For>
         </Show>
       </div>
@@ -193,7 +197,7 @@ export function FilesPanel() {
       <div class="border-b border-(--border) shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
           class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-(--bg-hover) transition-colors min-w-0 group"
-          onClick={fsActions.openDirectory}
+          onClick={() => void appActions.openVault()}
           title={runtimeStore.rootHandle ? '切换文件夹' : '打开文件夹'}
         >
           <FolderOpen
@@ -243,13 +247,8 @@ export function FilesPanel() {
             />
           </div>
         </Show>
-        <For each={globalStore.fs.tree}>
-          {(node) => (
-            <FileTreeNode
-              node={node}
-              depth={0}
-            />
-          )}
+        <For each={childrenOf(null)}>
+          {(entry) => <FileTreeNode entry={entry} depth={0} />}
         </For>
       </div>
     </div>
