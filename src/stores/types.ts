@@ -61,11 +61,13 @@ export type ThemeId = 'dark' | 'light' | 'nord'
 
 // ── File system ─────────────────────────────────────────────────────────────
 
-export interface FileNode {
+export interface FileMapEntry {
   name: string
   path: string
   kind: 'file' | 'directory'
-  children?: FileNode[]
+  parent: string | null
+  size?: number
+  mtime?: number
 }
 
 // ── Knowledge ───────────────────────────────────────────────────────────────
@@ -81,7 +83,7 @@ export interface FileMetadata {
 // ── Global store shape ──────────────────────────────────────────────────────
 
 export interface FsState {
-  tree: FileNode[]
+  fileMap: Record<string, FileMapEntry>
 }
 
 export interface KnowledgeState {
