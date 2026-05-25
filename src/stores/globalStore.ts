@@ -1,17 +1,9 @@
 import { createStore } from 'solid-js/store'
+import { loadFromStorage } from '../lib/localStorage'
 import type {
   GlobalState, ThemeId, WorkspaceNode, WorkspaceLeaf,
   WorkspaceLayout, WorkspaceRoot,
 } from './types'
-
-function saved<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw !== null ? (JSON.parse(raw) as T) : fallback
-  } catch {
-    return fallback
-  }
-}
 
 export const ROOT_TABS_ID = 'root-tabs'
 export const DEFAULT_LAYOUT_ID = 'default'
@@ -54,6 +46,16 @@ const initialLayout: WorkspaceLayout = {
   activeLeafId: null,
 }
 
+const savedWs = loadFromStorage<{ layouts: WorkspaceLayout[]; activeLayoutId: string }>(
+  'sn-workspace',
+  { layouts: [initialLayout], activeLayoutId: DEFAULT_LAYOUT_ID },
+  (v) =>
+    typeof v === 'object' &&
+    v !== null &&
+    Array.isArray((v as Record<string, unknown>).layouts) &&
+    typeof (v as Record<string, unknown>).activeLayoutId === 'string',
+)
+
 const [globalStore, setGlobalStore] = createStore<GlobalState>({
   fs: { fileMap: {} },
   knowledge: {
@@ -63,13 +65,13 @@ const [globalStore, setGlobalStore] = createStore<GlobalState>({
     isIndexing: false,
   },
   workspace: {
-    layouts: [initialLayout],
-    activeLayoutId: DEFAULT_LAYOUT_ID,
-    theme: saved<ThemeId>('sn-theme', 'dark'),
-    customCSS: saved<string>('sn-customCSS', ''),
+    layouts: savedWs.layouts,
+    activeLayoutId: savedWs.activeLayoutId,
+    theme: loadFromStorage<ThemeId>('sn-theme', 'dark'),
+    customCSS: loadFromStorage<string>('sn-customCSS', ''),
     showSettings: false,
-    autoTimestamps: saved<boolean>('sn-autoTimestamps', true),
-    showOtherFiles: saved<boolean>('sn-showOtherFiles', true),
+    autoTimestamps: loadFromStorage<boolean>('sn-autoTimestamps', true),
+    showOtherFiles: loadFromStorage<boolean>('sn-showOtherFiles', true),
   },
 })
 
