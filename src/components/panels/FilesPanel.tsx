@@ -3,22 +3,10 @@ import { createSignal, For, Show } from 'solid-js'
 import { appActions } from '../../actions/appActions'
 import { fsActions } from '../../actions/fsActions'
 import { workspaceActions } from '../../actions/workspaceActions'
-import { getFileViewForExt } from '../../lib/viewRegistry'
-import {
-  activeFilePath,
-  activeLayout,
-  activeRoot,
-  findLeafInTree,
-  globalStore,
-  ROOT_TABS_ID,
-} from '../../stores/globalStore'
+import { toggleInArray } from '../../lib/arrayUtils'
+import { activeFilePath, globalStore } from '../../stores/globalStore'
 import { runtimeStore } from '../../stores/runtimeStore'
-import type {
-  FileMapEntry,
-  ViewState,
-  WorkspaceLeaf,
-  WorkspaceNode,
-} from '../../stores/types'
+import type { FileMapEntry, ViewComponentProps } from '../../stores/types'
 
 const IMAGE_EXTS = new Set([
   '.png',
@@ -33,12 +21,6 @@ const IMAGE_EXTS = new Set([
 ])
 const MD_EXT = '.md'
 
-function fileIcon(name: string): string {
-  if (name.endsWith(MD_EXT)) return '◻'
-  const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
-  return IMAGE_EXTS.has(ext) ? '⊡' : '◫'
-}
-
 function displayName(name: string): string {
   return name.endsWith(MD_EXT) ? name.slice(0, -3) : name
 }
@@ -52,54 +34,6 @@ function canOpen(name: string): boolean {
   return name.endsWith(MD_EXT) || IMAGE_EXTS.has(ext)
 }
 
-function findLeafWithFile(
-  root: WorkspaceNode,
-  path: string,
-): WorkspaceLeaf | null {
-  if (root.type === 'leaf' && root.viewState.state.file === path) return root
-  if (root.type === 'tabs')
-    return root.children.find((l) => l.viewState.state.file === path) ?? null
-  if (root.type === 'split') {
-    for (const child of root.children) {
-      const found = findLeafWithFile(child, path)
-      if (found) return found
-    }
-  }
-  return null
-}
-
-function openFileInWorkspace(
-  path: string,
-  options?: { newTab?: boolean; pin?: boolean },
-): void {
-  const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
-  const def = getFileViewForExt(ext)
-  if (!def) return
-  const viewState: ViewState = { type: def.type, state: { file: path } }
-
-  const existing = findLeafWithFile(activeRoot().main, path)
-  if (existing) {
-    workspaceActions.activateLeaf(existing.id)
-    return
-  }
-
-  if (!options?.newTab) {
-    const { activeLeafId } = activeLayout()
-    const activeLeaf = activeLeafId
-      ? findLeafInTree(activeRoot().main, activeLeafId)
-      : null
-    if (activeLeaf && !activeLeaf.pinned) {
-      workspaceActions.setLeafViewState(activeLeafId!, viewState)
-      return
-    }
-  }
-
-  const leafId = workspaceActions.createLeaf(ROOT_TABS_ID, viewState)
-  if (options?.pin) {
-    workspaceActions.setLeafPinned(leafId, true)
-  }
-}
-
 function childrenOf(parentPath: string | null): FileMapEntry[] {
   return Object.values(globalStore.fs.fileMap)
     .filter((e) => e.parent === parentPath)
@@ -109,7 +43,12 @@ function childrenOf(parentPath: string | null): FileMapEntry[] {
     })
 }
 
-function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
+function FileTreeNode(props: {
+  entry: FileMapEntry
+  depth: number
+  collapsedFolders: string[]
+  onToggle: (path: string) => void
+}) {
   const isActive = () => activeFilePath() === props.entry.path
   const isOther = () =>
     props.entry.kind === 'file' && isOtherFile(props.entry.name)
@@ -117,6 +56,8 @@ function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
     props.entry.kind === 'directory' ||
     !isOtherFile(props.entry.name) ||
     globalStore.workspace.showOtherFiles
+  const isCollapsed = () =>
+    props.entry.kind === 'directory' && props.collapsedFolders.includes(props.entry.path)
 
   return (
     <Show when={show()}>
@@ -132,31 +73,36 @@ function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
             }`}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
-            if (props.entry.kind !== 'file') return
+            if (props.entry.kind === 'directory') {
+              props.onToggle(props.entry.path)
+              return
+            }
             if (!canOpen(props.entry.name)) return
-            openFileInWorkspace(props.entry.path)
+            workspaceActions.openFile(props.entry.path)
           }}
           onDblClick={() => {
             if (props.entry.kind !== 'file') return
             if (!canOpen(props.entry.name)) return
-            openFileInWorkspace(props.entry.path, { newTab: true, pin: true })
+            workspaceActions.openFile(props.entry.path, { newTab: true, pin: true })
           }}
         >
-          <span class="text-[9px] text-(--text-3)">
-            {props.entry.kind === 'directory'
-              ? '▸'
-              : fileIcon(props.entry.name)}
-          </span>
+          <Show when={props.entry.kind === 'directory'}>
+            <span class="text-[9px] text-(--text-3)">
+              {isCollapsed() ? '▸' : '▾'}
+            </span>
+          </Show>
           <span class={isActive() ? 'text-(--accent)' : ''}>
             {displayName(props.entry.name)}
           </span>
         </div>
-        <Show when={props.entry.kind === 'directory'}>
+        <Show when={props.entry.kind === 'directory' && !isCollapsed()}>
           <For each={childrenOf(props.entry.path)}>
             {(child) => (
               <FileTreeNode
                 entry={child}
                 depth={props.depth + 1}
+                collapsedFolders={props.collapsedFolders}
+                onToggle={props.onToggle}
               />
             )}
           </For>
@@ -168,9 +114,19 @@ function FileTreeNode(props: { entry: FileMapEntry; depth: number }) {
 
 type CreateMode = 'file' | 'folder' | null
 
-export function FilesPanel() {
+export function FilesPanel(props: ViewComponentProps) {
   const [createMode, setCreateMode] = createSignal<CreateMode>(null)
   const [newName, setNewName] = createSignal('')
+
+  const collapsedFolders = () =>
+    (props.viewState.collapsedFolders as string[] | undefined) ?? []
+
+  const handleToggle = (path: string) => {
+    workspaceActions.setLeafViewState(props.leafId, {
+      type: 'files',
+      state: { ...props.viewState, collapsedFolders: toggleInArray(collapsedFolders(), path) },
+    })
+  }
 
   const startCreate = (mode: CreateMode) => {
     setNewName('')
@@ -190,7 +146,7 @@ export function FilesPanel() {
     cancel()
     if (mode === 'file') {
       const path = await fsActions.createFile(name)
-      if (path) openFileInWorkspace(path, { newTab: true, pin: true })
+      if (path) workspaceActions.openFile(path, { newTab: true, pin: true })
     } else if (mode === 'folder') {
       await fsActions.createDirectory(name)
     }
@@ -238,7 +194,7 @@ export function FilesPanel() {
         <Show when={createMode() !== null}>
           <div class="flex items-center gap-1 px-2 py-1">
             <span class="text-[9px] text-(--text-3)">
-              {createMode() === 'folder' ? '▸' : '◻'}
+              {createMode() === 'folder' ? '▸' : ''}
             </span>
             <input
               class="flex-1 bg-(--bg-hover) border border-(--accent) rounded px-1.5 py-0.5 text-[11px] text-(--text) outline-none min-w-0"
@@ -260,6 +216,8 @@ export function FilesPanel() {
             <FileTreeNode
               entry={entry}
               depth={0}
+              collapsedFolders={collapsedFolders()}
+              onToggle={handleToggle}
             />
           )}
         </For>

@@ -25,7 +25,7 @@ export interface PanelViewDef {
   type: string
   getDisplayText(): string
   getIcon?(): JSX.Element
-  component: Component
+  component: Component<ViewComponentProps>
 }
 
 export type ViewDef = FileViewDef | PageViewDef | PanelViewDef
