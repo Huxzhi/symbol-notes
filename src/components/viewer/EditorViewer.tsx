@@ -22,6 +22,7 @@ import { headingsField } from '../../lib/headingsField'
 import { inlineTagDecoField, inlineTagsField } from '../../lib/inlineTagsField'
 import { livePreviewExtension } from '../../lib/livePreviewExtension'
 import { outLinksField } from '../../lib/outLinksField'
+import { tasksField } from '../../lib/tasksField'
 import {
   formatTimestamp,
   parseFrontmatter,
@@ -73,6 +74,7 @@ function buildEditorState(
       outLinksField,
       inlineTagsField,
       inlineTagDecoField,
+      tasksField,
       headingsField,
       EditorView.updateListener.of(onDocChange),
       EditorView.domEventHandlers({ keydown: onKeyDown }),
@@ -122,9 +124,11 @@ export function EditorViewer(props: ViewComponentProps) {
           .filter((l) => l.type === 'wiki')
           .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
         const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
+        const tasks = view.state.field(tasksField)
         void cacheActions.reindexFile(p, view.state.doc.toString(), {
           outLinks,
           inlineTags,
+          tasks,
         })
       }
     }, 800)
@@ -183,7 +187,8 @@ export function EditorViewer(props: ViewComponentProps) {
       .filter((l) => l.type === 'wiki')
       .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
     const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
-    await cacheActions.reindexFile(p, content, { outLinks, inlineTags })
+    const tasks = view.state.field(tasksField)
+    await cacheActions.reindexFile(p, content, { outLinks, inlineTags, tasks })
   }
 
   createEffect(on(

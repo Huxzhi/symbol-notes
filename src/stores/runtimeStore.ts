@@ -127,6 +127,8 @@ export const fileActions = {
     const entry: FileMeta = {
       name: finalName, path, kind: 'file', parent,
       size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      created: new Date(0).toISOString().slice(0, 10),
+      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setCacheStore('files', path, entry)
     return path
@@ -143,6 +145,8 @@ export const fileActions = {
     const entry: FileMeta = {
       name: dirName, path: name, kind: 'directory', parent,
       size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      created: new Date(0).toISOString().slice(0, 10),
+      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setCacheStore('files', name, entry)
   },
@@ -172,6 +176,8 @@ export const fileActions = {
     const entry: FileMeta = {
       name: finalName, path: newPath, kind: 'file', parent,
       size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      created: new Date(0).toISOString().slice(0, 10),
+      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setCacheStore('files', newPath, entry)
 
