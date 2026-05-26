@@ -9,8 +9,8 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  on,
   onCleanup,
-  onMount,
   Show,
 } from 'solid-js'
 import { fileActions } from '../../actions/fileActions'
@@ -30,7 +30,7 @@ import {
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/wikiLinkParser'
 import { readFile, writeFile } from '../../services/fileCacheService'
 import { globalStore } from '../../stores/globalStore'
-import { setRuntimeStore } from '../../stores/runtimeStore'
+import { runtimeStore, setRuntimeStore } from '../../stores/runtimeStore'
 import type { ViewComponentProps } from '../../stores/types'
 
 async function loadFileContent(path: string): Promise<string> {
@@ -186,23 +186,28 @@ export function EditorViewer(props: ViewComponentProps) {
     await knowledgeActions.reindexFile(p, content, { outLinks, inlineTags })
   }
 
-  onMount(async () => {
-    const p = filePath()
-    if (!p) return
-    const doc = await loadFileContent(p)
-    view = new EditorView({
-      state: buildEditorState(doc, handleDocChange, handleKeyDown),
-      parent: container,
-    })
-    if (filePath() === p && props.isActive) {
-      setLeafRuntime({
-        cmView: view,
-        outLinks: view.state.field(outLinksField),
-        headings: view.state.field(headingsField),
-        isDirty: false,
+  createEffect(on(
+    () => runtimeStore.rootHandle,
+    async (rootHandle) => {
+      if (!rootHandle || view) return
+      const p = filePath()
+      if (!p) return
+      const doc = await loadFileContent(p)
+      if (view) return
+      view = new EditorView({
+        state: buildEditorState(doc, handleDocChange, handleKeyDown),
+        parent: container,
       })
-    }
-  })
+      if (filePath() === p && props.isActive) {
+        setLeafRuntime({
+          cmView: view,
+          outLinks: view.state.field(outLinksField),
+          headings: view.state.field(headingsField),
+          isDirty: false,
+        })
+      }
+    },
+  ))
 
   onCleanup(() => {
     if (reindexTimer !== null) clearTimeout(reindexTimer)
