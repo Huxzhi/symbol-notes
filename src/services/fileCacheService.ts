@@ -2,7 +2,9 @@ import { get, set, del, keys, getMany, createStore } from 'idb-keyval'
 import { runtimeStore } from '../stores/runtimeStore'
 import type { FileMeta } from '../stores/types'
 
-export type CachedFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'>
+export type CachedFields = Pick<FileMeta,
+  'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'tasks'
+>
 
 const idbStore = createStore('symbol-notes', 'file-meta-cache')
 const fileStatStore = createStore('symbol-notes', 'file-stat-cache')

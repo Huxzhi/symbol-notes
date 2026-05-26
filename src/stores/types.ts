@@ -56,10 +56,27 @@ export interface WorkspaceLayout {
 
 export type ThemeId = 'dark' | 'light' | 'nord'
 
+// ── Task items ────────────────────────────────────────────────────────────────
+
+export interface TaskItem {
+  text: string                    // raw text after checkbox (includes [key::value])
+  cleanText: string               // text with [key::value] removed
+  checked: boolean                // status === 'x'
+  status: string                  // single char: ' ' / 'x' / '/' / '>' / '-' etc.
+  line: number                    // 0-based line number in file
+  dueDate: string | null          // [due::YYYY-MM-DD] → dated fallback
+  completedDate: string | null    // checked=true: [completion::...] → dated; checked=false: null
+  fields: Record<string, string>  // all other [key::value] inline fields
+}
+
+export interface Task extends TaskItem {
+  path: string                    // source file path, injected by indexService / buildTaskMap
+}
+
 // ── File cache ───────────────────────────────────────────────────────────────
 // Single source of truth per path. Populated in two phases:
 //   Phase 1 (FS scan): name/path/kind/parent/size/mtime/hash
-//   Phase 2 (content index): frontmatter/outLinks/tags/aliases
+//   Phase 2 (content index): frontmatter/outLinks/tags/aliases/created/updated/tasks
 
 export interface FileMeta {
   name: string
@@ -73,12 +90,17 @@ export interface FileMeta {
   outLinks: string[]
   tags: string[]
   aliases: string[]
+  created: string        // YYYY-MM-DD: frontmatter.created → mtime (never null)
+  updated: string | null // YYYY-MM-DD: frontmatter.updated → null if absent
+  dated: string          // YYYY-MM-DD: filename date → created (never null)
+  tasks: TaskItem[]      // extracted task items, no path (implicit from record key)
 }
 
 export interface CacheState {
   files: Record<string, FileMeta>
   backlinkMap: Record<string, string[]>
   tagMap: Record<string, string[]>
+  taskMap: Task[]
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
