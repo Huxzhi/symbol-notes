@@ -37,11 +37,13 @@ export function SidebarRenderer(props: { node: any; side: 'left' | 'right' }) {
 
   const handle = (
     <div
-      class="w-1 shrink-0 cursor-col-resize bg-(--border) hover:bg-(--accent) transition-colors self-stretch"
+      class="w-1 shrink-0 cursor-col-resize self-stretch flex items-stretch justify-center group"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-    />
+    >
+      <div class="w-px bg-(--border) group-hover:bg-(--accent) transition-colors" />
+    </div>
   )
 
   return (
