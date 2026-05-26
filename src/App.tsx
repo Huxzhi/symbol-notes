@@ -157,11 +157,11 @@ export default function App() {
     <div class="h-full flex flex-col bg-(--bg-base) text-(--text) overflow-hidden">
       <div class="flex flex-1 overflow-hidden">
         <Ribbon />
-        <SidebarRenderer node={activeRoot().left} />
+        <SidebarRenderer node={activeRoot().left} side="left" />
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
           <WorkspaceNodeRenderer node={activeRoot().main} />
         </div>
-        <SidebarRenderer node={activeRoot().right} />
+        <SidebarRenderer node={activeRoot().right} side="right" />
       </div>
       <StatusBar />
       <Show when={runtimeStore.showSettings}>
