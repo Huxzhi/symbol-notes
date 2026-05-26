@@ -16,7 +16,7 @@ export function CalendarPanel() {
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
   const [selectedDay, setSelectedDay] = createSignal<string | null>(todayStr)
 
-  const dayData = createMemo(() => buildDayData(globalStore.knowledge.index))
+  const dayData = createMemo(() => buildDayData(globalStore.cache.files))
   const calendarGrid = createMemo(() =>
     buildCalendarGrid(viewYear(), viewMonth()),
   )

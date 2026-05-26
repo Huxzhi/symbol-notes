@@ -1,5 +1,3 @@
-import type { FileMetadata } from '../stores/types'
-
 export function extractLinks(content: string): string[] {
   const matches = [...content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g)]
   return [...new Set(matches.map(m => {
@@ -47,14 +45,15 @@ export function mergeTagsWithBody(fmTags: string[], bodyEtags: string[]): string
   return [...set]
 }
 
+// Accept any record whose entries have outLinks / tags — compatible with FileMeta
 export function buildBacklinkMap(
-  index: Record<string, FileMetadata>,
+  files: Record<string, { outLinks: string[] }>,
 ): Record<string, string[]> {
   const map: Record<string, string[]> = {}
-  for (const path of Object.keys(index)) {
+  for (const path of Object.keys(files)) {
     if (!map[path]) map[path] = []
   }
-  for (const [path, meta] of Object.entries(index)) {
+  for (const [path, meta] of Object.entries(files)) {
     for (const link of meta.outLinks) {
       if (!map[link]) map[link] = []
       if (!map[link].includes(path)) map[link].push(path)
@@ -64,10 +63,10 @@ export function buildBacklinkMap(
 }
 
 export function buildTagMap(
-  index: Record<string, FileMetadata>,
+  files: Record<string, { tags: string[] }>,
 ): Record<string, string[]> {
   const map: Record<string, string[]> = {}
-  for (const [path, meta] of Object.entries(index)) {
+  for (const [path, meta] of Object.entries(files)) {
     for (const tag of meta.tags) {
       if (!map[tag]) map[tag] = []
       map[tag].push(path)

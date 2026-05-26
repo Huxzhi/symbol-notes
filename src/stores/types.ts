@@ -32,22 +32,19 @@ export interface WorkspaceLeaf {
 
 export type WorkspaceNode = WorkspaceSplit | WorkspaceTabs | WorkspaceLeaf
 
-// Sidebar container (not in WorkspaceNode union — carries width/collapsed)
 export interface SidebarSplit {
   id: string
   width: number
   collapsed: boolean
-  children: WorkspaceNode[]  // flat list of tabs groups (stacked vertically)
+  children: WorkspaceNode[]
 }
 
-// Root of the entire workspace tree
 export interface WorkspaceRoot {
   left: SidebarSplit
   main: WorkspaceNode
   right: SidebarSplit
 }
 
-// One switchable workspace snapshot
 export interface WorkspaceLayout {
   id: string
   name: string
@@ -59,57 +56,56 @@ export interface WorkspaceLayout {
 
 export type ThemeId = 'dark' | 'light' | 'nord'
 
-// ── File system ─────────────────────────────────────────────────────────────
+// ── File cache ───────────────────────────────────────────────────────────────
+// Single source of truth per path. Populated in two phases:
+//   Phase 1 (FS scan): name/path/kind/parent/size/mtime/hash
+//   Phase 2 (content index): frontmatter/outLinks/tags/aliases
 
-export interface FileMapEntry {
+export interface FileMeta {
   name: string
   path: string
   kind: 'file' | 'directory'
   parent: string | null
-  size?: number
-  mtime?: number
-}
-
-// ── Knowledge ───────────────────────────────────────────────────────────────
-
-export interface FileMetadata {
-  path: string
+  size: number
+  mtime: number
+  hash: string           // djb2 content hash; '' until content is indexed
   frontmatter: Record<string, unknown>
   outLinks: string[]
   tags: string[]
   aliases: string[]
 }
 
-// ── Global store shape ──────────────────────────────────────────────────────
-
-export interface FsState {
-  fileMap: Record<string, FileMapEntry>
-}
-
-export interface KnowledgeState {
-  index: Record<string, FileMetadata>
+export interface CacheState {
+  files: Record<string, FileMeta>
   backlinkMap: Record<string, string[]>
   tagMap: Record<string, string[]>
-  isIndexing: boolean
 }
 
-export interface WorkspaceState {
-  layouts: WorkspaceLayout[]
-  activeLayoutId: string
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+export interface SettingsState {
   theme: ThemeId
   customCSS: string
-  showSettings: boolean
   autoTimestamps: boolean
   showOtherFiles: boolean
 }
 
-export interface GlobalState {
-  fs: FsState
-  knowledge: KnowledgeState
-  workspace: WorkspaceState
+// ── Workspace ─────────────────────────────────────────────────────────────────
+
+export interface WorkspaceState {
+  layouts: WorkspaceLayout[]
+  activeLayoutId: string
 }
 
-// ── Runtime store shape (non-serializable) ──────────────────────────────────
+// ── Global store ──────────────────────────────────────────────────────────────
+
+export interface GlobalState {
+  cache: CacheState
+  workspace: WorkspaceState
+  settings: SettingsState
+}
+
+// ── Runtime store (non-serializable + ephemeral UI) ───────────────────────────
 
 export interface LeafRuntimeState {
   cmView: EditorView | null
@@ -127,9 +123,11 @@ export interface RuntimeState {
   rootHandle: FileSystemDirectoryHandle | null
   leafInstances: Record<string, LeafRuntimeState>
   fileOp: FileOp
+  isIndexing: boolean
+  showSettings: boolean
 }
 
-// ── View registry ───────────────────────────────────────────────────────────
+// ── View registry ─────────────────────────────────────────────────────────────
 
 export interface ViewComponentProps {
   leafId: string

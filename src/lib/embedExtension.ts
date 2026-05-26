@@ -19,7 +19,7 @@ function resolveEmbedTarget(target: string): string | null {
   const stem = target.split('/').pop()!
   const hasExt = stem.includes('.')
   const searchName = hasExt ? stem : `${stem}.md`
-  const entry = Object.values(globalStore.fs.fileMap).find(
+  const entry = Object.values(globalStore.cache.files).find(
     e => e.kind === 'file' && e.name === searchName,
   )
   return entry?.path ?? null

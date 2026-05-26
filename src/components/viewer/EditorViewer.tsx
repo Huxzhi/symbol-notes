@@ -14,7 +14,7 @@ import {
   Show,
 } from 'solid-js'
 import { fileActions } from '../../actions/fileActions'
-import { knowledgeActions } from '../../actions/knowledgeActions'
+import { cacheActions } from '../../actions/cacheActions'
 import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
 import { frontmatterField } from '../../lib/frontmatterField'
@@ -35,7 +35,7 @@ import type { ViewComponentProps } from '../../stores/types'
 
 async function loadFileContent(path: string): Promise<string> {
   let content = await readFile(path)
-  if (globalStore.workspace.autoTimestamps) {
+  if (globalStore.settings.autoTimestamps) {
     const { frontmatter } = parseFrontmatter(content)
     const ts = formatTimestamp(Date.now())
     let updated = content
@@ -122,7 +122,7 @@ export function EditorViewer(props: ViewComponentProps) {
           .filter((l) => l.type === 'wiki')
           .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
         const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
-        void knowledgeActions.reindexFile(p, view.state.doc.toString(), {
+        void cacheActions.reindexFile(p, view.state.doc.toString(), {
           outLinks,
           inlineTags,
         })
@@ -147,7 +147,7 @@ export function EditorViewer(props: ViewComponentProps) {
     const p = filePath()
     if (!view || !p) return
     let content = view.state.doc.toString()
-    if (globalStore.workspace.autoTimestamps) {
+    if (globalStore.settings.autoTimestamps) {
       const ts = formatTimestamp(Date.now())
       const withUpdated = setFrontmatterField(content, 'updated', ts)
       if (withUpdated !== content) {
@@ -183,7 +183,7 @@ export function EditorViewer(props: ViewComponentProps) {
       .filter((l) => l.type === 'wiki')
       .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
     const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
-    await knowledgeActions.reindexFile(p, content, { outLinks, inlineTags })
+    await cacheActions.reindexFile(p, content, { outLinks, inlineTags })
   }
 
   createEffect(on(

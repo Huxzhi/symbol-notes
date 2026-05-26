@@ -1,6 +1,7 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import { appActions } from '../actions/appActions'
-import { globalStore, setGlobalStore } from '../stores/globalStore'
+import { globalStore } from '../stores/globalStore'
+import { setRuntimeStore } from '../stores/runtimeStore'
 import type { ThemeId } from '../stores/types'
 
 type Section = 'appearance' | 'files' | 'shortcuts'
@@ -44,17 +45,17 @@ const SHORTCUTS = [
 export function Settings() {
   const [section, setSection] = createSignal<Section>('appearance')
   const [draftTheme, setDraftTheme] = createSignal<ThemeId>(
-    globalStore.workspace.theme,
+    globalStore.settings.theme,
   )
-  const [draftCSS, setDraftCSS] = createSignal(globalStore.workspace.customCSS)
+  const [draftCSS, setDraftCSS] = createSignal(globalStore.settings.customCSS)
   const [draftAutoTs, setDraftAutoTs] = createSignal(
-    globalStore.workspace.autoTimestamps,
+    globalStore.settings.autoTimestamps,
   )
   const [draftShowOtherFiles, setDraftShowOtherFiles] = createSignal(
-    globalStore.workspace.showOtherFiles,
+    globalStore.settings.showOtherFiles,
   )
 
-  const close = () => setGlobalStore('workspace', 'showSettings', false)
+  const close = () => setRuntimeStore('showSettings', false)
 
   const apply = () => {
     appActions.setTheme(draftTheme())

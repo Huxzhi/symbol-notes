@@ -17,12 +17,12 @@ export function LinksPanel() {
   const backlinks = createMemo(() => {
     const path = activeFilePath()
     if (!path) return []
-    const aliases = globalStore.knowledge.index[path]?.aliases ?? []
+    const aliases = globalStore.cache.files[path]?.aliases ?? []
     const keys = [path, ...aliases, ...aliases.map((a) => `${a}.md`)]
     const seen = new Set<string>()
     const result: string[] = []
     for (const key of keys) {
-      for (const bl of globalStore.knowledge.backlinkMap[key] ?? []) {
+      for (const bl of globalStore.cache.backlinkMap[key] ?? []) {
         if (!seen.has(bl)) {
           seen.add(bl)
           result.push(bl)

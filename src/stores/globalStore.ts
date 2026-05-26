@@ -1,8 +1,8 @@
 import { createStore } from 'solid-js/store'
 import { loadFromStorage } from '../lib/localStorage'
 import type {
-  GlobalState, ThemeId, WorkspaceNode, WorkspaceLeaf,
-  WorkspaceLayout, WorkspaceRoot,
+  GlobalState, SettingsState, ThemeId, WorkspaceLayout, WorkspaceLeaf,
+  WorkspaceNode, WorkspaceRoot,
 } from './types'
 
 export const ROOT_TABS_ID = 'root-tabs'
@@ -56,23 +56,24 @@ const savedWs = loadFromStorage<{ layouts: WorkspaceLayout[]; activeLayoutId: st
     typeof (v as Record<string, unknown>).activeLayoutId === 'string',
 )
 
+const savedSettings = loadFromStorage<SettingsState>('sn-settings', {
+  theme: 'dark',
+  customCSS: '',
+  autoTimestamps: true,
+  showOtherFiles: true,
+})
+
 const [globalStore, setGlobalStore] = createStore<GlobalState>({
-  fs: { fileMap: {} },
-  knowledge: {
-    index: {},
+  cache: {
+    files: {},
     backlinkMap: {},
     tagMap: {},
-    isIndexing: false,
   },
   workspace: {
     layouts: savedWs.layouts,
     activeLayoutId: savedWs.activeLayoutId,
-    theme: loadFromStorage<ThemeId>('sn-theme', 'dark'),
-    customCSS: loadFromStorage<string>('sn-customCSS', ''),
-    showSettings: false,
-    autoTimestamps: loadFromStorage<boolean>('sn-autoTimestamps', true),
-    showOtherFiles: loadFromStorage<boolean>('sn-showOtherFiles', true),
   },
+  settings: savedSettings,
 })
 
 export function activeLayout(): WorkspaceLayout {
@@ -85,15 +86,12 @@ export function activeRoot(): WorkspaceRoot {
   return activeLayout().root
 }
 
-/** Find a WorkspaceLeaf by id anywhere in a WorkspaceNode tree. */
 export function findLeafInTree(
   node: WorkspaceNode,
   leafId: string,
 ): WorkspaceLeaf | null {
   if (node.type === 'leaf') return node.id === leafId ? node : null
-  if (node.type === 'tabs') {
-    return node.children.find(l => l.id === leafId) ?? null
-  }
+  if (node.type === 'tabs') return node.children.find(l => l.id === leafId) ?? null
   for (const child of node.children) {
     const found = findLeafInTree(child, leafId)
     if (found) return found
@@ -101,7 +99,6 @@ export function findLeafInTree(
   return null
 }
 
-/** Find a WorkspaceLeaf across the entire root (left + main + right). */
 export function findLeafInRoot(
   root: WorkspaceRoot,
   leafId: string,
@@ -119,7 +116,6 @@ export function findLeafInRoot(
   return null
 }
 
-/** Derived: path of the active file leaf in main, or null. */
 export function activeFilePath(): string | null {
   const layout = activeLayout()
   if (!layout.activeLeafId) return null
@@ -128,3 +124,6 @@ export function activeFilePath(): string | null {
 }
 
 export { globalStore, setGlobalStore }
+
+// Alias for consumers that imported ThemeId from here indirectly
+export type { ThemeId }

@@ -17,7 +17,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
   const [viewYear, setViewYear] = createSignal(now.getFullYear())
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
 
-  const dayData = createMemo(() => buildDayData(globalStore.knowledge.index))
+  const dayData = createMemo(() => buildDayData(globalStore.cache.files))
   const calendarGrid = createMemo(() =>
     buildCalendarGrid(viewYear(), viewMonth()),
   )

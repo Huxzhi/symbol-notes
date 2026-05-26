@@ -1,11 +1,11 @@
 import { produce } from 'solid-js/store'
 import { globalStore, setGlobalStore } from '../stores/globalStore'
 import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
-import { knowledgeActions } from './knowledgeActions'
+import { cacheActions } from './cacheActions'
 import {
   deleteFileStatEntry, invalidateFile, readFile, writeFile,
 } from '../services/fileCacheService'
-import type { FileMapEntry } from '../stores/types'
+import type { FileMeta } from '../stores/types'
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ async function updateBacklinks(backlinks: string[], oldPath: string, newPath: st
       const updated = replaceWikiLinks(content, oldPath, newPath)
       if (updated !== content) {
         await writeFile(bPath, updated)
-        knowledgeActions.remapFileLink(bPath, oldPath, newPath)
+        cacheActions.remapFileLink(bPath, oldPath, newPath)
       }
     } catch { /* skip unreadable files */ }
   }
@@ -62,8 +62,8 @@ export const fileActions = {
     await dir.getFileHandle(finalName, { create: true })
     const path = parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
     const parent = parts.length > 0 ? parts.join('/') : null
-    const entry: FileMapEntry = { name: finalName, path, kind: 'file', parent }
-    setGlobalStore('fs', 'fileMap', path, entry)
+    const entry: FileMeta = { name: finalName, path, kind: 'file', parent, size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [] }
+    setGlobalStore('cache', 'files', path, entry)
     return path
   },
 
@@ -75,8 +75,8 @@ export const fileActions = {
     for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
     const dirName = parts[parts.length - 1]
     const parent = parts.length > 1 ? parts.slice(0, -1).join('/') : null
-    const entry: FileMapEntry = { name: dirName, path: name, kind: 'directory', parent }
-    setGlobalStore('fs', 'fileMap', name, entry)
+    const entry: FileMeta = { name: dirName, path: name, kind: 'directory', parent, size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [] }
+    setGlobalStore('cache', 'files', name, entry)
   },
 
   async renameFile(oldPath: string, newName: string): Promise<void> {
@@ -96,17 +96,17 @@ export const fileActions = {
     invalidateFile(oldPath)
     await deleteFileStatEntry(oldPath)
 
-    const backlinks = globalStore.knowledge.backlinkMap[oldPath] ?? []
-    knowledgeActions.removeFileMeta(oldPath)
-    setGlobalStore('fs', 'fileMap', produce((m: Record<string, FileMapEntry>) => { delete m[oldPath] }))
+    const backlinks = globalStore.cache.backlinkMap[oldPath] ?? []
+    cacheActions.removeCacheEntry(oldPath)
+    setGlobalStore('cache', 'files', produce((m: Record<string, FileMeta>) => { delete m[oldPath] }))
 
     const parent = dir || null
-    const entry: FileMapEntry = { name: finalName, path: newPath, kind: 'file', parent }
-    setGlobalStore('fs', 'fileMap', newPath, entry)
+    const entry: FileMeta = { name: finalName, path: newPath, kind: 'file', parent, size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [] }
+    setGlobalStore('cache', 'files', newPath, entry)
 
     const { workspaceActions } = await import('./workspaceActions')
     workspaceActions.renameLeafPath(oldPath, newPath)
-    await knowledgeActions.reindexFile(newPath, oldContent)
+    await cacheActions.reindexFile(newPath, oldContent)
     await updateBacklinks(backlinks, oldPath, newPath)
   },
 
@@ -120,8 +120,8 @@ export const fileActions = {
     await dir.removeEntry(name)
     invalidateFile(path)
     await deleteFileStatEntry(path)
-    knowledgeActions.removeFileMeta(path)
-    setGlobalStore('fs', 'fileMap', produce((m: Record<string, FileMapEntry>) => { delete m[path] }))
+    cacheActions.removeCacheEntry(path)
+    setGlobalStore('cache', 'files', produce((m: Record<string, FileMeta>) => { delete m[path] }))
   },
 
   async deleteFolder(path: string): Promise<void> {
@@ -133,20 +133,20 @@ export const fileActions = {
     for (const part of parts) parentDir = await parentDir.getDirectoryHandle(part)
     await parentDir.removeEntry(name, { recursive: true })
 
-    const toRemove = Object.values(globalStore.fs.fileMap).filter(
+    const toRemove = Object.values(globalStore.cache.files).filter(
       (e) => e.path === path || e.path.startsWith(path + '/'),
     )
     for (const entry of toRemove) {
       if (entry.kind === 'file') {
         invalidateFile(entry.path)
         await deleteFileStatEntry(entry.path)
-        knowledgeActions.removeFileMeta(entry.path)
+        cacheActions.removeCacheEntry(entry.path)
       }
     }
     setGlobalStore(
-      'fs',
-      'fileMap',
-      produce((m: Record<string, FileMapEntry>) => {
+      'cache',
+      'files',
+      produce((m: Record<string, FileMeta>) => {
         for (const entry of toRemove) delete m[entry.path]
       }),
     )

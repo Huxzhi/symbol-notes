@@ -21,6 +21,7 @@ import { syncToStorage } from './lib/localStorage'
 import { registerContextMenu } from './lib/contextMenuRegistry'
 import { registerView } from './lib/viewRegistry'
 import { activeLayout, activeRoot, globalStore } from './stores/globalStore'
+import { runtimeStore } from './stores/runtimeStore'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
@@ -142,18 +143,20 @@ export default function App() {
   createEffect(() => {
     document.documentElement.setAttribute(
       'data-theme',
-      globalStore.workspace.theme,
+      globalStore.settings.theme,
     )
   })
 
   createEffect(() => {
-    customStyleEl.textContent = globalStore.workspace.customCSS
+    customStyleEl.textContent = globalStore.settings.customCSS
   })
 
   syncToStorage('sn-workspace', () => ({
     layouts: globalStore.workspace.layouts,
     activeLayoutId: globalStore.workspace.activeLayoutId,
   }))
+
+  syncToStorage('sn-settings', () => globalStore.settings)
 
   onMount(async () => {
     await appActions.restoreVault()
@@ -170,7 +173,7 @@ export default function App() {
         <SidebarRenderer node={activeRoot().right} />
       </div>
       <StatusBar />
-      <Show when={globalStore.workspace.showSettings}>
+      <Show when={runtimeStore.showSettings}>
         <Settings />
       </Show>
       <ContextMenu />

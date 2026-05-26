@@ -4,7 +4,7 @@ import { activeFilePath, globalStore } from '../../stores/globalStore'
 export function TagsPanel() {
   const tags = createMemo(() => {
     const path = activeFilePath()
-    return path ? (globalStore.knowledge.index[path]?.tags ?? []) : []
+    return path ? (globalStore.cache.files[path]?.tags ?? []) : []
   })
 
   return (

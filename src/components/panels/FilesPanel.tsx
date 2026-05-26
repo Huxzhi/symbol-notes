@@ -6,7 +6,7 @@ import { workspaceActions } from '../../actions/workspaceActions'
 import { toggleInArray } from '../../lib/arrayUtils'
 import { activeFilePath, globalStore } from '../../stores/globalStore'
 import { runtimeStore } from '../../stores/runtimeStore'
-import type { FileMapEntry, ViewComponentProps } from '../../stores/types'
+import type { FileMeta, ViewComponentProps } from '../../stores/types'
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif'])
 const MD_EXT = '.md'
@@ -24,8 +24,8 @@ function canOpen(name: string): boolean {
   return name.endsWith(MD_EXT) || IMAGE_EXTS.has(ext)
 }
 
-function childrenOf(parentPath: string | null): FileMapEntry[] {
-  return Object.values(globalStore.fs.fileMap)
+function childrenOf(parentPath: string | null): FileMeta[] {
+  return Object.values(globalStore.cache.files)
     .filter((e) => e.parent === parentPath)
     .sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
@@ -34,7 +34,7 @@ function childrenOf(parentPath: string | null): FileMapEntry[] {
 }
 
 function FileTreeNode(props: {
-  entry: FileMapEntry
+  entry: FileMeta
   depth: number
   collapsedFolders: string[]
   onToggle: (path: string) => void
@@ -44,7 +44,7 @@ function FileTreeNode(props: {
   const show = () =>
     props.entry.kind === 'directory' ||
     !isOtherFile(props.entry.name) ||
-    globalStore.workspace.showOtherFiles
+    globalStore.settings.showOtherFiles
   const isCollapsed = () =>
     props.entry.kind === 'directory' && props.collapsedFolders.includes(props.entry.path)
   const isRenaming = () =>

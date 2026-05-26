@@ -5,6 +5,8 @@ const [runtimeStore, setRuntimeStore] = createStore<RuntimeState>({
   rootHandle: null,
   leafInstances: {},
   fileOp: null,
+  isIndexing: false,
+  showSettings: false,
 })
 
 export { runtimeStore, setRuntimeStore }

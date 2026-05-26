@@ -2,7 +2,7 @@ import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
 import { globalStore, setGlobalStore } from '../stores/globalStore'
-import { runtimeStore } from '../stores/runtimeStore'
+import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { wikiLinkParser } from '../lib/wikiLinkParser'
 import { outLinksField } from '../lib/outLinksField'
@@ -14,7 +14,7 @@ import {
 import {
   extractTags, extractAliases, mergeTagsWithBody, buildBacklinkMap, buildTagMap,
 } from '../lib/knowledgeUtils'
-import type { FileMapEntry } from '../stores/types'
+import type { FileMeta } from '../stores/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,38 +39,40 @@ function idle(): Promise<void> {
   })
 }
 
-// ── buildFileMap ──────────────────────────────────────────────────────────────
+// ── Scan ──────────────────────────────────────────────────────────────────────
 
 interface ScanResult {
-  fileMap: Record<string, FileMapEntry>
-  unchanged: Map<string, string>
-  changed: string[]
+  files: Record<string, FileMeta>
+  unchanged: Map<string, string>  // path → hash (stat matched IDB)
+  changed: string[]               // paths needing content read
   activePaths: Set<string>
 }
 
-async function buildFileMap(
+const EMPTY_CONTENT: Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'> = {
+  frontmatter: {},
+  outLinks: [],
+  tags: [],
+  aliases: [],
+}
+
+async function buildScan(
   dirHandle: FileSystemDirectoryHandle,
   idbStats: Map<string, { size: number; mtime: number; hash: string }>,
   parentPath: string | null = null,
-  result: ScanResult = {
-    fileMap: {},
-    unchanged: new Map(),
-    changed: [],
-    activePaths: new Set(),
-  },
+  result: ScanResult = { files: {}, unchanged: new Map(), changed: [], activePaths: new Set() },
 ): Promise<ScanResult> {
   for await (const [name, handle] of dirHandle.entries()) {
     if (name.startsWith('.')) continue
     const path = parentPath ? `${parentPath}/${name}` : name
 
     if (handle.kind === 'directory') {
-      result.fileMap[path] = { name, path, kind: 'directory', parent: parentPath }
-      await buildFileMap(handle as FileSystemDirectoryHandle, idbStats, path, result)
+      result.files[path] = { name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0, hash: '', ...EMPTY_CONTENT }
+      await buildScan(handle as FileSystemDirectoryHandle, idbStats, path, result)
     } else {
       const file = await (handle as FileSystemFileHandle).getFile()
       const size = file.size
       const mtime = file.lastModified
-      result.fileMap[path] = { name, path, kind: 'file', parent: parentPath, size, mtime }
+      result.files[path] = { name, path, kind: 'file', parent: parentPath, size, mtime, hash: '', ...EMPTY_CONTENT }
       result.activePaths.add(path)
 
       const cached = idbStats.get(path)
@@ -84,7 +86,7 @@ async function buildFileMap(
   return result
 }
 
-// ── Session ───────────────────────────────────────────────────────────────────
+// ── Index phases ──────────────────────────────────────────────────────────────
 
 interface Session { cancelled: boolean }
 let currentSession: Session | null = null
@@ -99,9 +101,9 @@ async function runPhase1(
     if (session.cancelled) return
     activeHashes.add(hash)
     const cached = await getCachedMeta(hash)
-    if (cached && globalStore.knowledge.index[path]) continue
+    if (cached && globalStore.cache.files[path]?.hash === hash) continue
     if (cached) {
-      setGlobalStore('knowledge', 'index', path, { path, ...cached })
+      setGlobalStore('cache', 'files', path, (f: FileMeta) => ({ ...f, hash, ...cached }))
     } else {
       changed.push(path)
     }
@@ -117,14 +119,14 @@ async function runPhase1(
       const hash = hashContent(content)
       activeHashes.add(hash)
 
-      const entry = globalStore.fs.fileMap[path]
+      const entry = globalStore.cache.files[path]
       if (entry?.size !== undefined && entry.mtime !== undefined) {
         await setFileStatEntry(path, { size: entry.size, mtime: entry.mtime, hash })
       }
 
       const cachedMeta = await getCachedMeta(hash)
       if (cachedMeta) {
-        setGlobalStore('knowledge', 'index', path, { path, ...cachedMeta })
+        setGlobalStore('cache', 'files', path, (f: FileMeta) => ({ ...f, hash, ...cachedMeta }))
         continue
       }
 
@@ -142,16 +144,17 @@ async function runPhase1(
         aliases: extractAliases(frontmatter.aliases),
       }
       await setCachedMeta(hash, parsed)
-      setGlobalStore('knowledge', 'index', path, { path, ...parsed })
+      setGlobalStore('cache', 'files', path, (f: FileMeta) => ({ ...f, hash, ...parsed }))
     } catch { /* individual file errors are non-fatal */ }
   }
 }
 
 function runPhase2(): void {
-  const backlinkMap = buildBacklinkMap(globalStore.knowledge.index)
-  const tagMap = buildTagMap(globalStore.knowledge.index)
-  setGlobalStore('knowledge', 'backlinkMap', backlinkMap)
-  setGlobalStore('knowledge', 'tagMap', tagMap)
+  const mdFiles = Object.fromEntries(
+    Object.entries(globalStore.cache.files).filter(([p]) => p.endsWith('.md')),
+  )
+  setGlobalStore('cache', 'backlinkMap', buildBacklinkMap(mdFiles))
+  setGlobalStore('cache', 'tagMap', buildTagMap(mdFiles))
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -164,13 +167,13 @@ export async function scanAndIndex(): Promise<void> {
   const { rootHandle } = runtimeStore
   if (!rootHandle) return
 
-  setGlobalStore('knowledge', 'isIndexing', true)
+  setRuntimeStore('isIndexing', true)
 
   const idbStats = await loadAllFileStats()
-  const { fileMap, unchanged, changed, activePaths } = await buildFileMap(rootHandle, idbStats)
+  const { files, unchanged, changed, activePaths } = await buildScan(rootHandle, idbStats)
 
   if (session.cancelled) return
-  setGlobalStore('fs', 'fileMap', fileMap)
+  setGlobalStore('cache', 'files', files)
 
   const mdUnchanged = new Map<string, string>()
   const mdChanged: string[] = []
@@ -191,7 +194,7 @@ export async function scanAndIndex(): Promise<void> {
   }
 
   if (currentSession === session) {
-    setGlobalStore('knowledge', 'isIndexing', false)
+    setRuntimeStore('isIndexing', false)
   }
 }
 
@@ -199,6 +202,6 @@ export async function rescanTree(): Promise<void> {
   const { rootHandle } = runtimeStore
   if (!rootHandle) return
   const idbStats = await loadAllFileStats()
-  const { fileMap } = await buildFileMap(rootHandle, idbStats)
-  setGlobalStore('fs', 'fileMap', fileMap)
+  const { files } = await buildScan(rootHandle, idbStats)
+  setGlobalStore('cache', 'files', files)
 }

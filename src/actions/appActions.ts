@@ -9,7 +9,7 @@ declare global {
   }
 }
 import { setGlobalStore } from '../stores/globalStore'
-import { setRuntimeStore } from '../stores/runtimeStore'
+import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { clearContentCache } from '../services/fileCacheService'
 import { clearEmbedUrlCache } from '../lib/embedExtension'
 import type { ThemeId } from '../stores/types'
@@ -41,26 +41,26 @@ export const appActions = {
   },
 
   setTheme(theme: ThemeId): void {
-    setGlobalStore('workspace', 'theme', theme)
-    localStorage.setItem('sn-theme', JSON.stringify(theme))
+    setGlobalStore('settings', 'theme', theme)
   },
 
   setCustomCSS(css: string): void {
-    setGlobalStore('workspace', 'customCSS', css)
-    localStorage.setItem('sn-customCSS', JSON.stringify(css))
+    setGlobalStore('settings', 'customCSS', css)
   },
 
   toggleSettings(): void {
-    setGlobalStore('workspace', 'showSettings', v => !v)
+    setRuntimeStore('showSettings', v => !v)
   },
 
   setAutoTimestamps(value: boolean): void {
-    setGlobalStore('workspace', 'autoTimestamps', value)
-    localStorage.setItem('sn-autoTimestamps', JSON.stringify(value))
+    setGlobalStore('settings', 'autoTimestamps', value)
   },
 
   setShowOtherFiles(value: boolean): void {
-    setGlobalStore('workspace', 'showOtherFiles', value)
-    localStorage.setItem('sn-showOtherFiles', JSON.stringify(value))
+    setGlobalStore('settings', 'showOtherFiles', value)
+  },
+
+  isSettingsOpen(): boolean {
+    return runtimeStore.showSettings
   },
 }
