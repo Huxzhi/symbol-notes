@@ -1,10 +1,13 @@
 import { FolderOpen } from 'lucide-solid'
 import { createSignal, For, Show } from 'solid-js'
-import { appActions } from '../../actions/appActions'
-import { fileActions } from '../../actions/fileActions'
-import { workspaceActions } from '../../actions/workspaceActions'
+
+
+import { appActions, fileActions } from '../../stores/runtimeStore'
+import { workspaceActions } from '../../stores/workspaceStore'
 import { toggleInArray } from '../../lib/arrayUtils'
-import { activeFilePath, globalStore } from '../../stores/globalStore'
+import { activeFilePath } from '../../stores/workspaceStore'
+import { cacheStore } from '../../stores/cacheStore'
+import { settingsStore } from '../../stores/settingsStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 import type { FileMeta, ViewComponentProps } from '../../stores/types'
 
@@ -25,7 +28,7 @@ function canOpen(name: string): boolean {
 }
 
 function childrenOf(parentPath: string | null): FileMeta[] {
-  return Object.values(globalStore.cache.files)
+  return Object.values(cacheStore.files)
     .filter((e) => e.parent === parentPath)
     .sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
@@ -44,7 +47,7 @@ function FileTreeNode(props: {
   const show = () =>
     props.entry.kind === 'directory' ||
     !isOtherFile(props.entry.name) ||
-    globalStore.settings.showOtherFiles
+    settingsStore.showOtherFiles
   const isCollapsed = () =>
     props.entry.kind === 'directory' && props.collapsedFolders.includes(props.entry.path)
   const isRenaming = () =>

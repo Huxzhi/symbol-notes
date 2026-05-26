@@ -1,12 +1,12 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { workspaceActions } from '../../actions/workspaceActions'
+import { workspaceActions } from '../../stores/workspaceStore'
 import {
   buildCalendarGrid,
   buildDayData,
   toIsoDate,
   WEEKDAYS_SHORT,
 } from '../../lib/calendarUtils'
-import { globalStore } from '../../stores/globalStore'
+import { cacheStore } from '../../stores/cacheStore'
 
 export function CalendarPanel() {
   const now = new Date()
@@ -16,7 +16,7 @@ export function CalendarPanel() {
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
   const [selectedDay, setSelectedDay] = createSignal<string | null>(todayStr)
 
-  const dayData = createMemo(() => buildDayData(globalStore.cache.files))
+  const dayData = createMemo(() => buildDayData(cacheStore.files))
   const calendarGrid = createMemo(() =>
     buildCalendarGrid(viewYear(), viewMonth()),
   )

@@ -1,9 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
-import {
-  activeFilePath,
-  activeLayout,
-  globalStore,
-} from '../../stores/globalStore'
+import { activeFilePath, activeLayout } from '../../stores/workspaceStore'
+import { cacheStore } from '../../stores/cacheStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 
 export function LinksPanel() {
@@ -17,12 +14,12 @@ export function LinksPanel() {
   const backlinks = createMemo(() => {
     const path = activeFilePath()
     if (!path) return []
-    const aliases = globalStore.cache.files[path]?.aliases ?? []
+    const aliases = cacheStore.files[path]?.aliases ?? []
     const keys = [path, ...aliases, ...aliases.map((a) => `${a}.md`)]
     const seen = new Set<string>()
     const result: string[] = []
     for (const key of keys) {
-      for (const bl of globalStore.cache.backlinkMap[key] ?? []) {
+      for (const bl of cacheStore.backlinkMap[key] ?? []) {
         if (!seen.has(bl)) {
           seen.add(bl)
           result.push(bl)

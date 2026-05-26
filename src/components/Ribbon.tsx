@@ -6,9 +6,9 @@ import {
   CalendarRange,
   PanelLeft,
 } from 'lucide-solid'
-import { activeRoot, activeLayout, findLeafInTree } from '../stores/globalStore'
-import { workspaceActions } from '../actions/workspaceActions'
-import { appActions } from '../actions/appActions'
+import { activeRoot, activeLayout, findLeafInTree } from '../stores/workspaceStore'
+import { workspaceActions } from '../stores/workspaceStore'
+import { appActions } from '../stores/runtimeStore'
 
 export function Ribbon() {
   const leftSidebar = () => activeRoot().left

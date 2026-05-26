@@ -1,6 +1,5 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
-import { appActions } from '../actions/appActions'
-import { globalStore } from '../stores/globalStore'
+import { settingsActions, settingsStore } from '../stores/settingsStore'
 import { setRuntimeStore } from '../stores/runtimeStore'
 import type { ThemeId } from '../stores/types'
 
@@ -45,23 +44,23 @@ const SHORTCUTS = [
 export function Settings() {
   const [section, setSection] = createSignal<Section>('appearance')
   const [draftTheme, setDraftTheme] = createSignal<ThemeId>(
-    globalStore.settings.theme,
+    settingsStore.theme,
   )
-  const [draftCSS, setDraftCSS] = createSignal(globalStore.settings.customCSS)
+  const [draftCSS, setDraftCSS] = createSignal(settingsStore.customCSS)
   const [draftAutoTs, setDraftAutoTs] = createSignal(
-    globalStore.settings.autoTimestamps,
+    settingsStore.autoTimestamps,
   )
   const [draftShowOtherFiles, setDraftShowOtherFiles] = createSignal(
-    globalStore.settings.showOtherFiles,
+    settingsStore.showOtherFiles,
   )
 
   const close = () => setRuntimeStore('showSettings', false)
 
   const apply = () => {
-    appActions.setTheme(draftTheme())
-    appActions.setCustomCSS(draftCSS())
-    appActions.setAutoTimestamps(draftAutoTs())
-    appActions.setShowOtherFiles(draftShowOtherFiles())
+    settingsActions.setTheme(draftTheme())
+    settingsActions.setCustomCSS(draftCSS())
+    settingsActions.setAutoTimestamps(draftAutoTs())
+    settingsActions.setShowOtherFiles(draftShowOtherFiles())
     close()
   }
 

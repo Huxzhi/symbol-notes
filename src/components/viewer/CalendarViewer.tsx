@@ -1,13 +1,13 @@
 import { CalendarRange } from 'lucide-solid'
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { workspaceActions } from '../../actions/workspaceActions'
+import { workspaceActions } from '../../stores/workspaceStore'
 import {
   buildCalendarGrid,
   buildDayData,
   toIsoDate,
   WEEKDAYS_LONG,
 } from '../../lib/calendarUtils'
-import { globalStore } from '../../stores/globalStore'
+import { cacheStore } from '../../stores/cacheStore'
 import type { ViewComponentProps } from '../../stores/types'
 
 export function CalendarViewer(_props: ViewComponentProps) {
@@ -17,7 +17,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
   const [viewYear, setViewYear] = createSignal(now.getFullYear())
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
 
-  const dayData = createMemo(() => buildDayData(globalStore.cache.files))
+  const dayData = createMemo(() => buildDayData(cacheStore.files))
   const calendarGrid = createMemo(() =>
     buildCalendarGrid(viewYear(), viewMonth()),
   )

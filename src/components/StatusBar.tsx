@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { workspaceActions } from '../actions/workspaceActions'
+import { workspaceActions, workspaceStore } from '../stores/workspaceStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { activeLayout, globalStore } from '../stores/globalStore'
+import { activeLayout } from '../stores/workspaceStore'
 import { runtimeStore } from '../stores/runtimeStore'
 
 export function StatusBar() {
@@ -21,8 +21,8 @@ export function StatusBar() {
     return { words, lines }
   })
 
-  const layouts = () => globalStore.workspace.layouts
-  const activeId = () => globalStore.workspace.activeLayoutId
+  const layouts = () => workspaceStore.layouts
+  const activeId = () => workspaceStore.activeLayoutId
 
   return (
     <div class="relative">

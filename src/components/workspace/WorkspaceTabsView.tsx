@@ -1,6 +1,6 @@
 import { PanelRight } from 'lucide-solid'
 import { For, createMemo } from 'solid-js'
-import { workspaceActions } from '../../actions/workspaceActions'
+import { workspaceActions } from '../../stores/workspaceStore'
 import { getView } from '../../lib/viewRegistry'
 import type { WorkspaceLeaf, WorkspaceTabs } from '../../stores/types'
 import { WorkspaceLeafView } from './WorkspaceLeafView'

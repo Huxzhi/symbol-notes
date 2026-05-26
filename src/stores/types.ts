@@ -97,14 +97,6 @@ export interface WorkspaceState {
   activeLayoutId: string
 }
 
-// ── Global store ──────────────────────────────────────────────────────────────
-
-export interface GlobalState {
-  cache: CacheState
-  workspace: WorkspaceState
-  settings: SettingsState
-}
-
 // ── Runtime store (non-serializable + ephemeral UI) ───────────────────────────
 
 export interface LeafRuntimeState {

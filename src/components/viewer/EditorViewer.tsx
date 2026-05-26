@@ -13,8 +13,8 @@ import {
   onCleanup,
   Show,
 } from 'solid-js'
-import { fileActions } from '../../actions/fileActions'
-import { cacheActions } from '../../actions/cacheActions'
+import { fileActions } from '../../stores/runtimeStore'
+import { cacheActions } from '../../stores/cacheStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
 import { frontmatterField } from '../../lib/frontmatterField'
@@ -29,13 +29,13 @@ import {
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/wikiLinkParser'
 import { readFile, writeFile } from '../../services/fileCacheService'
-import { globalStore } from '../../stores/globalStore'
+import { settingsStore } from '../../stores/settingsStore'
 import { runtimeStore, setRuntimeStore } from '../../stores/runtimeStore'
 import type { ViewComponentProps } from '../../stores/types'
 
 async function loadFileContent(path: string): Promise<string> {
   let content = await readFile(path)
-  if (globalStore.settings.autoTimestamps) {
+  if (settingsStore.autoTimestamps) {
     const { frontmatter } = parseFrontmatter(content)
     const ts = formatTimestamp(Date.now())
     let updated = content
@@ -147,7 +147,7 @@ export function EditorViewer(props: ViewComponentProps) {
     const p = filePath()
     if (!view || !p) return
     let content = view.state.doc.toString()
-    if (globalStore.settings.autoTimestamps) {
+    if (settingsStore.autoTimestamps) {
       const ts = formatTimestamp(Date.now())
       const withUpdated = setFrontmatterField(content, 'updated', ts)
       if (withUpdated !== content) {

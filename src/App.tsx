@@ -1,8 +1,7 @@
 import { CalendarRange } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
-import { appActions } from './actions/appActions'
-import { fileActions } from './actions/fileActions'
-import { workspaceActions } from './actions/workspaceActions'
+import { appActions, fileActions } from './stores/runtimeStore'
+import { workspaceActions } from './stores/workspaceStore'
 import { CalendarPanel } from './components/panels/CalendarPanel'
 import { FilesPanel } from './components/panels/FilesPanel'
 import { LinksPanel } from './components/panels/LinksPanel'
@@ -17,10 +16,11 @@ import { EditorViewer } from './components/viewer/EditorViewer'
 import { ImageViewer } from './components/viewer/ImageViewer'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
-import { syncToStorage } from './lib/localStorage'
 import { registerContextMenu } from './lib/contextMenuRegistry'
 import { registerView } from './lib/viewRegistry'
-import { activeLayout, activeRoot, globalStore } from './stores/globalStore'
+import { activeLayout, activeRoot } from './stores/workspaceStore'
+import { settingsStore } from './stores/settingsStore'
+import { initCacheStore } from './stores/cacheStore'
 import { runtimeStore } from './stores/runtimeStore'
 
 const customStyleEl = document.createElement('style')
@@ -141,24 +141,15 @@ registerContextMenu('directory', (d) => {
 
 export default function App() {
   createEffect(() => {
-    document.documentElement.setAttribute(
-      'data-theme',
-      globalStore.settings.theme,
-    )
+    document.documentElement.setAttribute('data-theme', settingsStore.theme)
   })
 
   createEffect(() => {
-    customStyleEl.textContent = globalStore.settings.customCSS
+    customStyleEl.textContent = settingsStore.customCSS
   })
 
-  syncToStorage('sn-workspace', () => ({
-    layouts: globalStore.workspace.layouts,
-    activeLayoutId: globalStore.workspace.activeLayoutId,
-  }))
-
-  syncToStorage('sn-settings', () => globalStore.settings)
-
   onMount(async () => {
+    await initCacheStore()
     await appActions.restoreVault()
   })
 

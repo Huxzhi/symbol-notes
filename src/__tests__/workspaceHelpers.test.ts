@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findLeafInTree, findLeafInRoot } from '../stores/globalStore'
+import { findLeafInTree, findLeafInRoot } from '../stores/workspaceStore'
 import type { WorkspaceRoot, WorkspaceLeaf, WorkspaceTabs, WorkspaceSplit } from '../stores/types'
 
 const makeLeaf = (id: string, type = 'markdown'): WorkspaceLeaf => ({

@@ -1,7 +1,7 @@
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { globalStore, setGlobalStore } from '../stores/globalStore'
+import { cacheStore, setCacheStore } from '../stores/cacheStore'
 import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { wikiLinkParser } from '../lib/wikiLinkParser'
@@ -101,9 +101,9 @@ async function runPhase1(
     if (session.cancelled) return
     activeHashes.add(hash)
     const cached = await getCachedMeta(hash)
-    if (cached && globalStore.cache.files[path]?.hash === hash) continue
+    if (cached && cacheStore.files[path]?.hash === hash) continue
     if (cached) {
-      setGlobalStore('cache', 'files', path, (f: FileMeta) => ({ ...f, hash, ...cached }))
+      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, ...cached }))
     } else {
       changed.push(path)
     }
@@ -119,14 +119,14 @@ async function runPhase1(
       const hash = hashContent(content)
       activeHashes.add(hash)
 
-      const entry = globalStore.cache.files[path]
+      const entry = cacheStore.files[path]
       if (entry?.size !== undefined && entry.mtime !== undefined) {
         await setFileStatEntry(path, { size: entry.size, mtime: entry.mtime, hash })
       }
 
       const cachedMeta = await getCachedMeta(hash)
       if (cachedMeta) {
-        setGlobalStore('cache', 'files', path, (f: FileMeta) => ({ ...f, hash, ...cachedMeta }))
+        setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, ...cachedMeta }))
         continue
       }
 
@@ -144,17 +144,17 @@ async function runPhase1(
         aliases: extractAliases(frontmatter.aliases),
       }
       await setCachedMeta(hash, parsed)
-      setGlobalStore('cache', 'files', path, (f: FileMeta) => ({ ...f, hash, ...parsed }))
+      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, ...parsed }))
     } catch { /* individual file errors are non-fatal */ }
   }
 }
 
 function runPhase2(): void {
   const mdFiles = Object.fromEntries(
-    Object.entries(globalStore.cache.files).filter(([p]) => p.endsWith('.md')),
+    Object.entries(cacheStore.files).filter(([p]) => p.endsWith('.md')),
   )
-  setGlobalStore('cache', 'backlinkMap', buildBacklinkMap(mdFiles))
-  setGlobalStore('cache', 'tagMap', buildTagMap(mdFiles))
+  setCacheStore('backlinkMap', buildBacklinkMap(mdFiles))
+  setCacheStore('tagMap', buildTagMap(mdFiles))
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ export async function scanAndIndex(): Promise<void> {
   const { files, unchanged, changed, activePaths } = await buildScan(rootHandle, idbStats)
 
   if (session.cancelled) return
-  setGlobalStore('cache', 'files', files)
+  setCacheStore('files', files)
 
   const mdUnchanged = new Map<string, string>()
   const mdChanged: string[] = []
@@ -203,5 +203,5 @@ export async function rescanTree(): Promise<void> {
   if (!rootHandle) return
   const idbStats = await loadAllFileStats()
   const { files } = await buildScan(rootHandle, idbStats)
-  setGlobalStore('cache', 'files', files)
+  setCacheStore('files', files)
 }

@@ -1,6 +1,6 @@
 import { EditorView } from '@codemirror/view'
 import { createMemo, For, Show } from 'solid-js'
-import { activeLayout } from '../../stores/globalStore'
+import { activeLayout } from '../../stores/workspaceStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 
 export function OutlinePanel() {

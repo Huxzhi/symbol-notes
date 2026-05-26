@@ -1,5 +1,5 @@
 import { Match, Switch } from 'solid-js'
-import { ROOT_TABS_ID } from '../../stores/globalStore'
+import { ROOT_TABS_ID } from '../../stores/workspaceStore'
 import { WorkspaceSplitView } from './WorkspaceSplitView'
 import { WorkspaceTabsView } from './WorkspaceTabsView'
 import { WorkspaceLeafView } from './WorkspaceLeafView'

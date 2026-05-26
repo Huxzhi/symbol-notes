@@ -1,10 +1,11 @@
 import { createMemo, For, Show } from 'solid-js'
-import { activeFilePath, globalStore } from '../../stores/globalStore'
+import { activeFilePath } from '../../stores/workspaceStore'
+import { cacheStore } from '../../stores/cacheStore'
 
 export function TagsPanel() {
   const tags = createMemo(() => {
     const path = activeFilePath()
-    return path ? (globalStore.cache.files[path]?.tags ?? []) : []
+    return path ? (cacheStore.files[path]?.tags ?? []) : []
   })
 
   return (
