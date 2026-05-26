@@ -118,9 +118,15 @@ export interface LeafRuntimeState {
   headings: Heading[]
 }
 
+export type FileOp =
+  | { type: 'create-file' | 'create-folder'; prefix: string }
+  | { type: 'rename'; path: string }
+  | null
+
 export interface RuntimeState {
   rootHandle: FileSystemDirectoryHandle | null
   leafInstances: Record<string, LeafRuntimeState>
+  fileOp: FileOp
 }
 
 // ── View registry ───────────────────────────────────────────────────────────
