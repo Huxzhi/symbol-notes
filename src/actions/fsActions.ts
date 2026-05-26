@@ -127,4 +127,32 @@ export const fsActions = {
     knowledgeActions.removeFileMeta(path)
     setGlobalStore('fs', 'fileMap', produce((m: Record<string, FileMapEntry>) => { delete m[path] }))
   },
+
+  async deleteDirectory(path: string): Promise<void> {
+    const { rootHandle } = runtimeStore
+    if (!rootHandle) return
+    const parts = path.split('/')
+    const name = parts.pop()!
+    let parentDir: FileSystemDirectoryHandle = rootHandle
+    for (const part of parts) parentDir = await parentDir.getDirectoryHandle(part)
+    await parentDir.removeEntry(name, { recursive: true })
+
+    const toRemove = Object.values(globalStore.fs.fileMap).filter(
+      (e) => e.path === path || e.path.startsWith(path + '/'),
+    )
+    for (const entry of toRemove) {
+      if (entry.kind === 'file') {
+        invalidateFile(entry.path)
+        await deleteFileStatEntry(entry.path)
+        knowledgeActions.removeFileMeta(entry.path)
+      }
+    }
+    setGlobalStore(
+      'fs',
+      'fileMap',
+      produce((m: Record<string, FileMapEntry>) => {
+        for (const entry of toRemove) delete m[entry.path]
+      }),
+    )
+  },
 }
