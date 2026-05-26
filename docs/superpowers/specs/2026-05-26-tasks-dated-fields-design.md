@@ -13,30 +13,37 @@ Extract task list items (`- [ ]`) from each markdown file via CM6 syntax tree an
 
 ```typescript
 // types.ts — added to FileMeta
-created: string        // YYYY-MM-DD from frontmatter.created → mtime (never null)
-updated: string | null // YYYY-MM-DD from frontmatter.updated → null if absent
-dated: string          // YYYY-MM-DD from filename → created (never null)
-tasks: Task[]          // all task items extracted from file body
+created: string          // YYYY-MM-DD from frontmatter.created → mtime (never null)
+updated: string | null   // YYYY-MM-DD from frontmatter.updated → null if absent
+dated: string            // YYYY-MM-DD from filename → created (never null)
+tasks: TaskItem[]        // all task items extracted from file body (no path)
 ```
 
-### `Task`
+### `TaskItem` and `Task`
 
 ```typescript
 // types.ts
-export interface Task {
+
+// Stored in FileMeta and IDB cache — path is implicit from the FileMeta record key
+export interface TaskItem {
   text: string                    // raw text after checkbox (includes [key::value])
   cleanText: string               // text with [key::value] removed
   checked: boolean                // status === 'x'
   status: string                  // single char: ' ' / 'x' / '/' / '>' / '-' etc.
   line: number                    // 0-based line number in file
-  dueDate: string | null          // [due::YYYY-MM-DD] → dated; always set for checked tasks
+  dueDate: string | null          // [due::YYYY-MM-DD] → dated
   completedDate: string | null    // [completion::YYYY-MM-DD] → dated; null if not checked
   fields: Record<string, string>  // all other [key::value] inline fields
-  path: string                    // source file path, re-injected on cache restore
+}
+
+// Used in CacheState.taskMap — path injected during Phase 2 aggregation
+export interface Task extends TaskItem {
+  path: string
 }
 ```
 
-`tasks: Task[]` is stored in IDB cache (keyed by content hash). `path` may be stale if a file is renamed without content change — indexService always re-injects the current `path` when restoring from cache.
+`FileMeta.tasks: TaskItem[]` — no path, cached in IDB by content hash.  
+`CacheState.taskMap: Task[]` — flat global list with path, built in Phase 2 like `backlinkMap`.
 
 ### Date field fallback chains
 
@@ -69,11 +76,11 @@ CM6 StateField using the lezer syntax tree — consistent with `outLinksField`, 
 
 | File | Change |
 |---|---|
-| `src/stores/types.ts` | Add `created`, `updated`, `dated`, `tasks` to `FileMeta`; add `Task` interface |
-| `src/lib/tasksField.ts` | **New**: CM6 `StateField<Task[]>` |
-| `src/lib/knowledgeUtils.ts` | Add `extractDateString()`, `extractDateFromName()` |
+| `src/stores/types.ts` | Add `created`, `updated`, `dated`, `tasks` to `FileMeta`; add `TaskItem`, `Task` interfaces; add `taskMap` to `CacheState` |
+| `src/lib/tasksField.ts` | **New**: CM6 `StateField<TaskItem[]>` |
+| `src/lib/knowledgeUtils.ts` | Add `extractDateString()`, `extractDateFromName()`, `buildTaskMap()` |
 | `src/services/fileCacheService.ts` | `CachedFields` adds `created`, `updated`, `tasks` |
-| `src/services/indexService.ts` | Register `tasksField` in headless state; extract and inject all new fields; compute `dated` |
+| `src/services/indexService.ts` | Register `tasksField` in headless state; extract and inject all new fields; compute `dated`; call `buildTaskMap()` in Phase 2 |
 
 ## Implementation Details
 
@@ -97,7 +104,7 @@ syntaxTree(state).iterate →
 The `StateField` follows the standard pattern:
 
 ```typescript
-export const tasksField = StateField.define<Task[]>({
+export const tasksField = StateField.define<TaskItem[]>({
   create: extractTasks,
   update(tasks, tr) {
     if (tr.docChanged) return extractTasks(tr.state)
@@ -105,8 +112,6 @@ export const tasksField = StateField.define<Task[]>({
   },
 })
 ```
-
-The StateField produces tasks with `path: ''` — indexService fills in the real path.
 
 ### `knowledgeUtils.ts` additions
 
@@ -145,9 +150,8 @@ const created = extractDateString(frontmatter.created)
 const updated = extractDateString(frontmatter.updated) ?? null
 const dated = extractDateFromName(path.split('/').at(-1) ?? '') ?? created
 
-const tasks: Task[] = state.field(tasksField).map(t => ({
+const tasks: TaskItem[] = state.field(tasksField).map(t => ({
   ...t,
-  path,
   dueDate: t.dueDate ?? dated,
   completedDate: t.checked ? (t.completedDate ?? dated) : null,
 }))
@@ -157,27 +161,67 @@ await setCachedMeta(hash, parsed)
 setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...parsed }))
 ```
 
-When restoring from cache, re-inject the current path and recompute `dated`:
+When restoring from cache, recompute `dated` (not cached):
 
 ```typescript
 if (cachedMeta) {
   const dated = extractDateFromName(filename) ?? cachedMeta.created
-  const tasks = cachedMeta.tasks.map(t => ({ ...t, path }))
-  setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cachedMeta, tasks }))
+  setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cachedMeta }))
   continue
 }
 ```
 
-`dated` is excluded from `CachedFields` — it is always recomputed from the filename and `created`.
+`dated` is excluded from `CachedFields` — always recomputed from filename and `created`.
 
 ### `CachedFields` (fileCacheService.ts)
 
-`CachedFields` is `Pick<FileMeta, ...>` extended to include the new fields. `tasks: Task[]` is cached in full — `path` is re-injected on restore, so stale path values in cache are always overwritten:
+`CachedFields` maps directly to `Pick<FileMeta, ...>`. `tasks: TaskItem[]` is cached in full — no path in cache, path is injected only in `taskMap`:
 
 ```typescript
 export type CachedFields = Pick<FileMeta,
   'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'tasks'
 >
+```
+
+### `CacheState.taskMap` and Phase 2
+
+`CacheState` gains a `taskMap: Task[]` field — a flat list of all tasks across all `.md` files with `path` injected, built in Phase 2 alongside `backlinkMap` and `tagMap`.
+
+```typescript
+// types.ts — CacheState
+export interface CacheState {
+  files: Record<string, FileMeta>
+  backlinkMap: Record<string, string[]>
+  tagMap: Record<string, string[]>
+  taskMap: Task[]                        // new
+}
+```
+
+`buildTaskMap()` in `knowledgeUtils.ts`:
+
+```typescript
+export function buildTaskMap(mdFiles: Record<string, FileMeta>): Task[] {
+  const tasks: Task[] = []
+  for (const [path, meta] of Object.entries(mdFiles)) {
+    for (const t of meta.tasks) {
+      tasks.push({ ...t, path })
+    }
+  }
+  return tasks
+}
+```
+
+`runPhase2()` in `indexService.ts` calls `buildTaskMap()`:
+
+```typescript
+function runPhase2(): void {
+  const mdFiles = Object.fromEntries(
+    Object.entries(cacheStore.files).filter(([p]) => p.endsWith('.md')),
+  )
+  setCacheStore('backlinkMap', buildBacklinkMap(mdFiles))
+  setCacheStore('tagMap', buildTagMap(mdFiles))
+  setCacheStore('taskMap', buildTaskMap(mdFiles))   // new
+}
 ```
 
 ### `EMPTY_CONTENT` update
