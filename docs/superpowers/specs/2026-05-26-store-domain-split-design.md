@@ -152,6 +152,20 @@ createRoot(() => {
 
 ---
 
+## Cross-Store Dependencies
+
+`workspaceStore` statically imports `setRuntimeStore` from `runtimeStore` (to clear `leafInstances` when closing tabs).
+
+`runtimeStore` (appActions) calls `workspaceActions.clearAllLeaves()` — this would create a circular import if done statically. The existing code already uses a **dynamic `import()`** inside `openVault` to break the cycle. This pattern is preserved in the new structure:
+
+```ts
+// runtimeStore.ts — inside appActions.openVault
+const { workspaceActions } = await import('./workspaceStore')
+workspaceActions.clearAllLeaves()
+```
+
+---
+
 ## Consumer Import Migration
 
 All ~18 files that currently import from `globalStore` or `src/actions/*` are updated:
