@@ -1,19 +1,31 @@
 import { produce } from 'solid-js/store'
+import { getFileViewForExt, getView } from '../lib/viewRegistry'
 import {
-  globalStore, setGlobalStore, ROOT_TABS_ID, activeLayout, activeRoot, findLeafInTree,
+  ROOT_TABS_ID,
+  activeLayout,
+  activeRoot,
+  findLeafInTree,
+  globalStore,
+  setGlobalStore,
 } from '../stores/globalStore'
 import { setRuntimeStore } from '../stores/runtimeStore'
-import { getView, getFileViewForExt } from '../lib/viewRegistry'
 import type {
-  WorkspaceNode, WorkspaceTabs, WorkspaceLeaf, ViewState, WorkspaceLayout,
+  ViewState,
+  WorkspaceLayout,
+  WorkspaceLeaf,
+  WorkspaceNode,
+  WorkspaceTabs,
 } from '../stores/types'
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
-function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | null {
+function findLeafWithFile(
+  root: WorkspaceNode,
+  path: string,
+): WorkspaceLeaf | null {
   if (root.type === 'leaf' && root.viewState.state.file === path) return root
   if (root.type === 'tabs')
-    return root.children.find(l => l.viewState.state.file === path) ?? null
+    return root.children.find((l) => l.viewState.state.file === path) ?? null
   if (root.type === 'split') {
     for (const child of root.children) {
       const found = findLeafWithFile(child, path)
@@ -25,13 +37,23 @@ function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | nu
 
 function layoutIdx(): number {
   return globalStore.workspace.layouts.findIndex(
-    l => l.id === globalStore.workspace.activeLayoutId,
+    (l) => l.id === globalStore.workspace.activeLayoutId,
   )
 }
 
-function findParentTabs(root: WorkspaceNode, leafId: string): WorkspaceTabs | null {
+// Scoped setters for the active layout — avoids repeating path prefixes
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const setLayout = (...args: any[]) =>
+  (setGlobalStore as any)('workspace', 'layouts', layoutIdx(), ...args)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const setRoot = (...args: any[]) => setLayout('root', ...args)
+
+function findParentTabs(
+  root: WorkspaceNode,
+  leafId: string,
+): WorkspaceTabs | null {
   if (root.type === 'tabs') {
-    if (root.children.some(l => l.id === leafId)) return root
+    if (root.children.some((l) => l.id === leafId)) return root
     return null
   }
   if (root.type === 'split') {
@@ -50,69 +72,146 @@ function mapNode(
 ): WorkspaceNode {
   if ((root as { id: string }).id === id) return updater(root)
   if (root.type === 'split') {
-    return { ...root, children: root.children.map(c => mapNode(c, id, updater)) }
+    return {
+      ...root,
+      children: root.children.map((c) => mapNode(c, id, updater)),
+    }
   }
   if (root.type === 'tabs') {
     return {
       ...root,
-      children: root.children.map(c =>
-        c.id === id ? updater(c) as WorkspaceLeaf : c,
+      children: root.children.map((c) =>
+        c.id === id ? (updater(c) as WorkspaceLeaf) : c,
       ),
     }
   }
   return root
 }
 
+function findTabsById(
+  root: WorkspaceNode,
+  tabsId: string,
+): WorkspaceTabs | null {
+  if (root.type === 'tabs' && root.id === tabsId) return root
+  if (root.type === 'split') {
+    for (const child of root.children) {
+      const found = findTabsById(child, tabsId)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 // ── Actions ──────────────────────────────────────────────────────────────────
 
 export const workspaceActions = {
-
   // ── Main area leaf operations ──────────────────────────────────────────────
 
   createLeaf(tabsId: string, viewState: ViewState): string {
-    const idx = layoutIdx()
     const leafId = crypto.randomUUID()
-    const leaf: WorkspaceLeaf = { type: 'leaf', id: leafId, viewState, pinned: false }
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-      mapNode(root, tabsId, node => {
+    const leaf: WorkspaceLeaf = {
+      type: 'leaf',
+      id: leafId,
+      viewState,
+      pinned: false,
+    }
+    setRoot('main', (root: WorkspaceNode) =>
+      mapNode(root, tabsId, (node) => {
         const tabs = node as WorkspaceTabs
-        return { ...tabs, children: [...tabs.children, leaf], activeLeafId: leafId }
+        return {
+          ...tabs,
+          children: [...tabs.children, leaf],
+          activeLeafId: leafId,
+        }
       }),
     )
-    setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', leafId)
+    setLayout('activeLeafId', leafId)
     return leafId
   },
 
   closeLeaf(leafId: string): void {
-    const idx = layoutIdx()
     const main = activeLayout().root.main
     const parentTabs = findParentTabs(main, leafId)
     if (!parentTabs) return
-    const remaining = parentTabs.children.filter(l => l.id !== leafId)
+    const remaining = parentTabs.children.filter((l) => l.id !== leafId)
     const nextActiveId =
       parentTabs.activeLeafId === leafId
         ? (remaining[remaining.length - 1]?.id ?? null)
         : parentTabs.activeLeafId
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-      mapNode(root, parentTabs.id, node => ({
+    setRoot('main', (root: WorkspaceNode) =>
+      mapNode(root, parentTabs.id, (node) => ({
         ...(node as WorkspaceTabs),
         children: remaining,
         activeLeafId: nextActiveId,
       })),
     )
     if (activeLayout().activeLeafId === leafId) {
-      setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', nextActiveId)
+      setLayout('activeLeafId', nextActiveId)
     }
-    setRuntimeStore('leafInstances', produce(s => { delete s[leafId] }))
+    setRuntimeStore(
+      'leafInstances',
+      produce((s) => {
+        delete s[leafId]
+      }),
+    )
+  },
+
+  closeOtherLeaves(tabsId: string, keepLeafId: string): void {
+    const tabs = findTabsById(activeLayout().root.main, tabsId)
+    if (!tabs) return
+    const toRemove = tabs.children.filter((l) => l.id !== keepLeafId)
+    const keep = tabs.children.find((l) => l.id === keepLeafId)
+    if (!keep) return
+    setRoot('main', (root: WorkspaceNode) =>
+      mapNode(root, tabsId, (node) => ({
+        ...(node as WorkspaceTabs),
+        children: [keep],
+        activeLeafId: keepLeafId,
+      })),
+    )
+    setLayout('activeLeafId', keepLeafId)
+    setRuntimeStore(
+      'leafInstances',
+      produce((s) => {
+        for (const l of toRemove) delete s[l.id]
+      }),
+    )
+  },
+
+  closeRightLeaves(tabsId: string, leafId: string): void {
+    const tabs = findTabsById(activeLayout().root.main, tabsId)
+    if (!tabs) return
+    const idx = tabs.children.findIndex((l) => l.id === leafId)
+    if (idx === -1) return
+    const toRemove = tabs.children.slice(idx + 1)
+    if (toRemove.length === 0) return
+    const removedIds = new Set(toRemove.map((l) => l.id))
+    const currentActiveId = activeLayout().activeLeafId ?? ''
+    const nextActiveId = removedIds.has(currentActiveId) ? leafId : currentActiveId
+    setRoot('main', (root: WorkspaceNode) =>
+      mapNode(root, tabsId, (node) => ({
+        ...(node as WorkspaceTabs),
+        children: (node as WorkspaceTabs).children.slice(0, idx + 1),
+        activeLeafId: nextActiveId,
+      })),
+    )
+    if (removedIds.has(currentActiveId)) {
+      setLayout('activeLeafId', leafId)
+    }
+    setRuntimeStore(
+      'leafInstances',
+      produce((s) => {
+        for (const l of toRemove) delete s[l.id]
+      }),
+    )
   },
 
   activateLeaf(leafId: string): void {
-    const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', leafId)
+    setLayout('activeLeafId', leafId)
     const parentTabs = findParentTabs(activeLayout().root.main, leafId)
     if (parentTabs) {
-      setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-        mapNode(root, parentTabs.id, node => ({
+      setRoot('main', (root: WorkspaceNode) =>
+        mapNode(root, parentTabs.id, (node) => ({
           ...(node as WorkspaceTabs),
           activeLeafId: leafId,
         })),
@@ -121,33 +220,35 @@ export const workspaceActions = {
   },
 
   setLeafViewState(leafId: string, viewState: ViewState): void {
-    const idx = layoutIdx()
     const root = activeLayout().root
-    const update = (n: WorkspaceNode) => ({ ...(n as WorkspaceLeaf), viewState })
-    if (findLeafInTree(root.main, leafId)) {
-      setGlobalStore('workspace', 'layouts', idx, 'root', 'main', r => mapNode(r, leafId, update))
-      return
-    }
-    for (const side of ['left', 'right'] as const) {
-      const children = root[side].children
-      if (children.some(n => findLeafInTree(n, leafId))) {
-        setGlobalStore('workspace', 'layouts', idx, 'root', side, 'children',
-          children.map(n => mapNode(n, leafId, update)),
-        )
+    const update = (n: WorkspaceNode) => ({
+      ...(n as WorkspaceLeaf),
+      viewState,
+    })
+    type Area = [
+      nodes: WorkspaceNode[],
+      save: (updated: WorkspaceNode[]) => void,
+    ]
+    const areas: Area[] = [
+      [[root.main], ([n]) => setRoot('main', n)],
+      [root.left.children, (cs) => setRoot('left', 'children', cs)],
+      [root.right.children, (cs) => setRoot('right', 'children', cs)],
+    ]
+    for (const [nodes, save] of areas) {
+      if (nodes.some((n) => findLeafInTree(n, leafId))) {
+        save(nodes.map((n) => mapNode(n, leafId, update)))
         return
       }
     }
   },
 
   setLeafPinned(leafId: string, pinned: boolean): void {
-    const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
-      mapNode(root, leafId, node => ({ ...(node as WorkspaceLeaf), pinned })),
+    setRoot('main', (root: WorkspaceNode) =>
+      mapNode(root, leafId, (node) => ({ ...(node as WorkspaceLeaf), pinned })),
     )
   },
 
   splitLeaf(leafId: string, direction: 'horizontal' | 'vertical'): string {
-    const idx = layoutIdx()
     const newTabsId = crypto.randomUUID()
     const newLeafId = crypto.randomUUID()
     const parentTabs = findParentTabs(activeLayout().root.main, leafId)
@@ -157,7 +258,14 @@ export const workspaceActions = {
       type: 'tabs',
       id: newTabsId,
       activeLeafId: newLeafId,
-      children: [{ type: 'leaf', id: newLeafId, viewState: { type: '', state: {} }, pinned: false }],
+      children: [
+        {
+          type: 'leaf',
+          id: newLeafId,
+          viewState: { type: '', state: {} },
+          pinned: false,
+        },
+      ],
     }
     const splitNode: WorkspaceNode = {
       type: 'split',
@@ -165,10 +273,10 @@ export const workspaceActions = {
       direction,
       children: [parentTabs, newTabs],
     }
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root =>
+    setRoot('main', (root: WorkspaceNode) =>
       mapNode(root, parentTabs.id, () => splitNode),
     )
-    setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', newLeafId)
+    setLayout('activeLeafId', newLeafId)
     return newLeafId
   },
 
@@ -177,15 +285,22 @@ export const workspaceActions = {
     if (!def || def.kind !== 'page') return
     const main = activeLayout().root.main
     if (main.type === 'tabs') {
-      const existing = main.children.find(l => l.viewState.type === type)
-      if (existing) { workspaceActions.activateLeaf(existing.id); return }
+      const existing = main.children.find((l) => l.viewState.type === type)
+      if (existing) {
+        workspaceActions.activateLeaf(existing.id)
+        return
+      }
     }
     workspaceActions.createLeaf(ROOT_TABS_ID, { type, state: {} })
   },
 
   openFile(
     path: string,
-    options?: { area?: 'left' | 'main' | 'right'; newTab?: boolean; pin?: boolean },
+    options?: {
+      area?: 'left' | 'main' | 'right'
+      newTab?: boolean
+      pin?: boolean
+    },
   ): void {
     const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
     const def = getFileViewForExt(ext)
@@ -202,8 +317,14 @@ export const workspaceActions = {
       if (!options?.newTab) {
         const layout = activeLayout()
         const activeLeafId = layout.activeLeafId
-        const activeLeaf = activeLeafId ? findLeafInTree(activeRoot().main, activeLeafId) : null
-        if (activeLeaf && !activeLeaf.pinned && activeLeaf.viewState.type !== 'calendar') {
+        const activeLeaf = activeLeafId
+          ? findLeafInTree(activeRoot().main, activeLeafId)
+          : null
+        if (
+          activeLeaf &&
+          !activeLeaf.pinned &&
+          activeLeaf.viewState.type !== 'calendar'
+        ) {
           workspaceActions.setLeafViewState(activeLeafId!, viewState)
           return
         }
@@ -214,50 +335,68 @@ export const workspaceActions = {
     }
 
     // Sidebar: left or right
-    const idx = layoutIdx()
     const sideChildren = activeRoot()[area].children
-    const firstTabs = sideChildren.find(n => n.type === 'tabs') as WorkspaceTabs | undefined
+    const firstTabs = sideChildren.find((n) => n.type === 'tabs') as
+      | WorkspaceTabs
+      | undefined
     if (!firstTabs) return
-    const existing = firstTabs.children.find(l => l.viewState.state.file === path)
+    const existing = firstTabs.children.find(
+      (l) => l.viewState.state.file === path,
+    )
     if (existing && !options?.newTab) {
       workspaceActions.activateSidebarLeaf(area, existing.id)
       return
     }
     const leafId = crypto.randomUUID()
-    const leaf: WorkspaceLeaf = { type: 'leaf', id: leafId, viewState, pinned: options?.pin ?? false }
-    setGlobalStore('workspace', 'layouts', idx, 'root', area, 'children',
-      sideChildren.map(node =>
+    const leaf: WorkspaceLeaf = {
+      type: 'leaf',
+      id: leafId,
+      viewState,
+      pinned: options?.pin ?? false,
+    }
+    setRoot(
+      area,
+      'children',
+      sideChildren.map((node) =>
         node === firstTabs
-          ? { ...(node as WorkspaceTabs), children: [...(node as WorkspaceTabs).children, leaf], activeLeafId: leafId }
+          ? {
+              ...(node as WorkspaceTabs),
+              children: [...(node as WorkspaceTabs).children, leaf],
+              activeLeafId: leafId,
+            }
           : node,
       ),
     )
   },
 
   clearAllLeaves(): void {
-    const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', {
+    setRoot('main', {
       type: 'tabs',
       id: ROOT_TABS_ID,
       activeLeafId: null,
       children: [],
     })
-    setGlobalStore('workspace', 'layouts', idx, 'activeLeafId', null)
+    setLayout('activeLeafId', null)
     setRuntimeStore('leafInstances', {})
   },
 
   renameLeafPath(oldPath: string, newPath: string): void {
-    const idx = layoutIdx()
     const ext = newPath.slice(newPath.lastIndexOf('.')).toLowerCase()
     const def = getFileViewForExt(ext)
     const newType = def?.type ?? 'markdown'
-    setGlobalStore('workspace', 'layouts', idx, 'root', 'main', root => {
+    setRoot('main', (root: WorkspaceNode) => {
       function walk(node: WorkspaceNode): WorkspaceNode {
         if (node.type === 'leaf' && node.viewState.state.file === oldPath) {
-          return { ...node, viewState: { type: newType, state: { file: newPath } } }
+          return {
+            ...node,
+            viewState: { type: newType, state: { file: newPath } },
+          }
         }
         if (node.type === 'tabs') {
-          return { ...node, children: node.children.map(walk) as WorkspaceLeaf[] }
+          return {
+            ...node,
+            children: node.children.map(walk) as WorkspaceLeaf[],
+          }
         }
         if (node.type === 'split') {
           return { ...node, children: node.children.map(walk) }
@@ -271,23 +410,19 @@ export const workspaceActions = {
   // ── Sidebar operations ─────────────────────────────────────────────────────
 
   toggleSidebar(side: 'left' | 'right'): void {
-    const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'root', side, 'collapsed', (v: boolean) => !v)
+    setRoot(side, 'collapsed', (v: boolean) => !v)
   },
 
-  resizeSidebar(side: 'left' | 'right', width: number): void {
-    const idx = layoutIdx()
-    setGlobalStore('workspace', 'layouts', idx, 'root', side, 'width', width)
-  },
-
-  // Activate a panel leaf within a sidebar tabs group (known side)
   activateSidebarLeaf(side: 'left' | 'right', leafId: string): void {
-    const idx = layoutIdx()
     const children = activeLayout().root[side].children
-    setGlobalStore(
-      'workspace', 'layouts', idx, 'root', side, 'children',
-      children.map(node => {
-        if (node.type === 'tabs' && node.children.some(l => l.id === leafId)) {
+    setRoot(
+      side,
+      'children',
+      children.map((node) => {
+        if (
+          node.type === 'tabs' &&
+          node.children.some((l) => l.id === leafId)
+        ) {
           return { ...node, activeLeafId: leafId }
         }
         return node
@@ -295,20 +430,23 @@ export const workspaceActions = {
     )
   },
 
-  // Activate a panel leaf by id — searches left then right sidebar
   activateSidebarLeafById(leafId: string): void {
-    const idx = layoutIdx()
     const root = activeLayout().root
     for (const side of ['left', 'right'] as const) {
       const children = root[side].children
       const hasLeaf = children.some(
-        node => node.type === 'tabs' && node.children.some(l => l.id === leafId),
+        (node) =>
+          node.type === 'tabs' && node.children.some((l) => l.id === leafId),
       )
       if (hasLeaf) {
-        setGlobalStore(
-          'workspace', 'layouts', idx, 'root', side, 'children',
-          children.map(node => {
-            if (node.type === 'tabs' && node.children.some(l => l.id === leafId)) {
+        setRoot(
+          side,
+          'children',
+          children.map((node) => {
+            if (
+              node.type === 'tabs' &&
+              node.children.some((l) => l.id === leafId)
+            ) {
               return { ...node, activeLeafId: leafId }
             }
             return node
@@ -319,21 +457,30 @@ export const workspaceActions = {
     }
   },
 
-  // Split a sidebar tabs group — inserts a new empty tabs group below (vertical stack)
   splitSidebarLeaf(side: 'left' | 'right', leafId: string): string {
-    const idx = layoutIdx()
     const newLeafId = crypto.randomUUID()
     const newTabs: WorkspaceTabs = {
       type: 'tabs',
       id: crypto.randomUUID(),
       activeLeafId: newLeafId,
-      children: [{ type: 'leaf', id: newLeafId, viewState: { type: '', state: {} }, pinned: false }],
+      children: [
+        {
+          type: 'leaf',
+          id: newLeafId,
+          viewState: { type: '', state: {} },
+          pinned: false,
+        },
+      ],
     }
     const children = activeLayout().root[side].children
-    setGlobalStore(
-      'workspace', 'layouts', idx, 'root', side, 'children',
-      children.flatMap(node => {
-        if (node.type === 'tabs' && node.children.some(l => l.id === leafId)) {
+    setRoot(
+      side,
+      'children',
+      children.flatMap((node) => {
+        if (
+          node.type === 'tabs' &&
+          node.children.some((l) => l.id === leafId)
+        ) {
           return [node, newTabs]
         }
         return [node]
@@ -354,18 +501,26 @@ export const workspaceActions = {
         left: {
           ...current.root.left,
           id: crypto.randomUUID(),
-          children: current.root.left.children.map(n => ({ ...n })),
+          children: current.root.left.children.map((n) => ({ ...n })),
         },
-        main: { type: 'tabs', id: ROOT_TABS_ID, activeLeafId: null, children: [] },
+        main: {
+          type: 'tabs',
+          id: ROOT_TABS_ID,
+          activeLeafId: null,
+          children: [],
+        },
         right: {
           ...current.root.right,
           id: crypto.randomUUID(),
-          children: current.root.right.children.map(n => ({ ...n })),
+          children: current.root.right.children.map((n) => ({ ...n })),
         },
       },
       activeLeafId: null,
     }
-    setGlobalStore('workspace', 'layouts', (ls: WorkspaceLayout[]) => [...ls, newLayout])
+    setGlobalStore('workspace', 'layouts', (ls: WorkspaceLayout[]) => [
+      ...ls,
+      newLayout,
+    ])
     setGlobalStore('workspace', 'activeLayoutId', newId)
     return newId
   },
@@ -375,14 +530,14 @@ export const workspaceActions = {
   },
 
   renameLayout(id: string, name: string): void {
-    const idx = globalStore.workspace.layouts.findIndex(l => l.id === id)
+    const idx = globalStore.workspace.layouts.findIndex((l) => l.id === id)
     if (idx === -1) return
     setGlobalStore('workspace', 'layouts', idx, 'name', name)
   },
 
   deleteLayout(id: string): void {
     if (globalStore.workspace.layouts.length <= 1) return
-    const remaining = globalStore.workspace.layouts.filter(l => l.id !== id)
+    const remaining = globalStore.workspace.layouts.filter((l) => l.id !== id)
     const newActiveId =
       globalStore.workspace.activeLayoutId === id
         ? remaining[0].id
