@@ -19,28 +19,24 @@ dated: string          // YYYY-MM-DD from filename → created (never null)
 tasks: Task[]          // all task items extracted from file body
 ```
 
-### `Task` and `TaskEntry`
+### `Task`
 
 ```typescript
-// tasksField.ts — StateField output and IDB cache shape
-export interface TaskEntry {
+// types.ts
+export interface Task {
   text: string                    // raw text after checkbox (includes [key::value])
   cleanText: string               // text with [key::value] removed
   checked: boolean                // status === 'x'
   status: string                  // single char: ' ' / 'x' / '/' / '>' / '-' etc.
   line: number                    // 0-based line number in file
-  dueDate: string | null          // [due::YYYY-MM-DD] → dated (if checked or always)
-  completedDate: string | null    // checked=true: [completion::YYYY-MM-DD] → dated; checked=false: null
+  dueDate: string | null          // [due::YYYY-MM-DD] → dated; always set for checked tasks
+  completedDate: string | null    // [completion::YYYY-MM-DD] → dated; null if not checked
   fields: Record<string, string>  // all other [key::value] inline fields
-}
-
-// types.ts — FileMeta uses Task (TaskEntry + path injected by indexService)
-export interface Task extends TaskEntry {
-  path: string
+  path: string                    // source file path, re-injected on cache restore
 }
 ```
 
-`path` is not stored in IDB cache — it is injected by `indexService` when building the `FileMeta` entry, since the cache is content-hash keyed and path-agnostic.
+`tasks: Task[]` is stored in IDB cache (keyed by content hash). `path` may be stale if a file is renamed without content change — indexService always re-injects the current `path` when restoring from cache.
 
 ### Date field fallback chains
 
@@ -73,8 +69,8 @@ CM6 StateField using the lezer syntax tree — consistent with `outLinksField`, 
 
 | File | Change |
 |---|---|
-| `src/stores/types.ts` | Add `created`, `updated`, `dated`, `tasks` to `FileMeta`; add `Task`, `TaskEntry` interfaces |
-| `src/lib/tasksField.ts` | **New**: CM6 `StateField<TaskEntry[]>` |
+| `src/stores/types.ts` | Add `created`, `updated`, `dated`, `tasks` to `FileMeta`; add `Task` interface |
+| `src/lib/tasksField.ts` | **New**: CM6 `StateField<Task[]>` |
 | `src/lib/knowledgeUtils.ts` | Add `extractDateString()`, `extractDateFromName()` |
 | `src/services/fileCacheService.ts` | `CachedFields` adds `created`, `updated`, `tasks` |
 | `src/services/indexService.ts` | Register `tasksField` in headless state; extract and inject all new fields; compute `dated` |
@@ -101,7 +97,7 @@ syntaxTree(state).iterate →
 The `StateField` follows the standard pattern:
 
 ```typescript
-export const tasksField = StateField.define<TaskEntry[]>({
+export const tasksField = StateField.define<Task[]>({
   create: extractTasks,
   update(tasks, tr) {
     if (tr.docChanged) return extractTasks(tr.state)
@@ -109,6 +105,8 @@ export const tasksField = StateField.define<TaskEntry[]>({
   },
 })
 ```
+
+The StateField produces tasks with `path: ''` — indexService fills in the real path.
 
 ### `knowledgeUtils.ts` additions
 
@@ -147,8 +145,7 @@ const created = extractDateString(frontmatter.created)
 const updated = extractDateString(frontmatter.updated) ?? null
 const dated = extractDateFromName(path.split('/').at(-1) ?? '') ?? created
 
-const rawTasks = state.field(tasksField)
-const tasks: Task[] = rawTasks.map(t => ({
+const tasks: Task[] = state.field(tasksField).map(t => ({
   ...t,
   path,
   dueDate: t.dueDate ?? dated,
@@ -156,31 +153,36 @@ const tasks: Task[] = rawTasks.map(t => ({
 }))
 
 const parsed = { frontmatter, outLinks, tags, aliases, created, updated, tasks }
-await setCachedMeta(hash, { frontmatter, outLinks, tags, aliases, created, updated, tasks: rawTasks })
+await setCachedMeta(hash, parsed)
 setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...parsed }))
 ```
 
-Note: `dated` and `path` are excluded from `CachedFields` — `dated` is computed from name + `created`, and `path` is injected at runtime. When restoring from IDB cache, `dated` and `path`-injected tasks are recomputed.
+When restoring from cache, re-inject the current path and recompute `dated`:
+
+```typescript
+if (cachedMeta) {
+  const dated = extractDateFromName(filename) ?? cachedMeta.created
+  const tasks = cachedMeta.tasks.map(t => ({ ...t, path }))
+  setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cachedMeta, tasks }))
+  continue
+}
+```
+
+`dated` is excluded from `CachedFields` — it is always recomputed from the filename and `created`.
 
 ### `CachedFields` (fileCacheService.ts)
 
-`FileMeta.tasks` is `Task[]` (includes `path`), but the cached shape stores `TaskEntry[]` (no `path`, since the cache is content-hash keyed). `CachedFields` is therefore defined as an explicit interface rather than `Pick<FileMeta, ...>`:
+`CachedFields` is `Pick<FileMeta, ...>` extended to include the new fields. `tasks: Task[]` is cached in full — `path` is re-injected on restore, so stale path values in cache are always overwritten:
 
 ```typescript
-export interface CachedFields {
-  frontmatter: Record<string, unknown>
-  outLinks: string[]
-  tags: string[]
-  aliases: string[]
-  created: string
-  updated: string | null
-  tasks: TaskEntry[]
-}
+export type CachedFields = Pick<FileMeta,
+  'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'tasks'
+>
 ```
 
 ### `EMPTY_CONTENT` update
 
-`created` and `dated` are computed from `mtime` (known at scan time) and set directly on each file entry — they are not part of `EMPTY_CONTENT`. `EMPTY_CONTENT` gains only `updated` and `tasks`:
+`created` and `dated` are computed from `mtime` at scan time and set directly on each file entry — not via `EMPTY_CONTENT`. `EMPTY_CONTENT` gains `updated` and `tasks`:
 
 ```typescript
 const EMPTY_CONTENT = {
