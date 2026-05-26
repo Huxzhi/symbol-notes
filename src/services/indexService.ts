@@ -13,8 +13,10 @@ import {
 } from './fileCacheService'
 import {
   extractTags, extractAliases, mergeTagsWithBody, buildBacklinkMap, buildTagMap,
+  extractDateString, extractDateFromName, buildTaskMap,
 } from '../lib/knowledgeUtils'
-import type { FileMeta } from '../stores/types'
+import { tasksField } from '../lib/tasksField'
+import type { FileMeta, TaskItem } from '../stores/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,6 +27,7 @@ function createHeadlessState(content: string): EditorState {
       markdown({ extensions: [GFM, wikiLinkParser] }),
       outLinksField,
       inlineTagsField,
+      tasksField,
     ],
   })
 }
@@ -48,11 +51,13 @@ interface ScanResult {
   activePaths: Set<string>
 }
 
-const EMPTY_CONTENT: Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases'> = {
+const EMPTY_CONTENT: Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'updated' | 'tasks'> = {
   frontmatter: {},
   outLinks: [],
   tags: [],
   aliases: [],
+  updated: null,
+  tasks: [],
 }
 
 async function buildScan(
@@ -66,13 +71,25 @@ async function buildScan(
     const path = parentPath ? `${parentPath}/${name}` : name
 
     if (handle.kind === 'directory') {
-      result.files[path] = { name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0, hash: '', ...EMPTY_CONTENT }
+      const dirMtime = new Date(0).toISOString().slice(0, 10)
+      result.files[path] = {
+        name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0, hash: '',
+        ...EMPTY_CONTENT,
+        created: dirMtime,
+        dated: extractDateFromName(name) ?? dirMtime,
+      }
       await buildScan(handle as FileSystemDirectoryHandle, idbStats, path, result)
     } else {
       const file = await (handle as FileSystemFileHandle).getFile()
       const size = file.size
       const mtime = file.lastModified
-      result.files[path] = { name, path, kind: 'file', parent: parentPath, size, mtime, hash: '', ...EMPTY_CONTENT }
+      const mtimeStr = new Date(mtime).toISOString().slice(0, 10)
+      result.files[path] = {
+        name, path, kind: 'file', parent: parentPath, size, mtime, hash: '',
+        ...EMPTY_CONTENT,
+        created: mtimeStr,
+        dated: extractDateFromName(name) ?? mtimeStr,
+      }
       result.activePaths.add(path)
 
       const cached = idbStats.get(path)
@@ -103,7 +120,9 @@ async function runPhase1(
     const cached = await getCachedMeta(hash)
     if (cached && cacheStore.files[path]?.hash === hash) continue
     if (cached) {
-      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, ...cached }))
+      const fname = path.split('/').at(-1) ?? ''
+      const dated = extractDateFromName(fname) ?? cached.created
+      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cached }))
     } else {
       changed.push(path)
     }
@@ -126,7 +145,9 @@ async function runPhase1(
 
       const cachedMeta = await getCachedMeta(hash)
       if (cachedMeta) {
-        setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, ...cachedMeta }))
+        const fname = path.split('/').at(-1) ?? ''
+        const dated = extractDateFromName(fname) ?? cachedMeta.created
+        setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cachedMeta }))
         continue
       }
 
@@ -137,14 +158,29 @@ async function runPhase1(
         .filter(l => l.type === 'wiki')
         .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`)
 
+      const created = extractDateString(frontmatter.created)
+                   ?? new Date(entry.mtime).toISOString().slice(0, 10)
+      const updated = extractDateString(frontmatter.updated) ?? null
+      const filename = path.split('/').at(-1) ?? ''
+      const dated = extractDateFromName(filename) ?? created
+
+      const tasks: TaskItem[] = state.field(tasksField).map(t => ({
+        ...t,
+        dueDate: t.dueDate ?? dated,
+        completedDate: t.checked ? (t.completedDate ?? dated) : null,
+      }))
+
       const parsed = {
         frontmatter,
         outLinks,
         tags: mergeTagsWithBody(extractTags(frontmatter.tags), inlineTags),
         aliases: extractAliases(frontmatter.aliases),
+        created,
+        updated,
+        tasks,
       }
       await setCachedMeta(hash, parsed)
-      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, ...parsed }))
+      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...parsed }))
     } catch { /* individual file errors are non-fatal */ }
   }
 }
@@ -155,6 +191,7 @@ function runPhase2(): void {
   )
   setCacheStore('backlinkMap', buildBacklinkMap(mdFiles))
   setCacheStore('tagMap', buildTagMap(mdFiles))
+  setCacheStore('taskMap', buildTaskMap(mdFiles))
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
