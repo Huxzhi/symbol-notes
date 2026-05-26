@@ -1,3 +1,5 @@
+import type { Task } from '../stores/types'
+
 export const WEEKDAYS_SHORT = ['一', '二', '三', '四', '五', '六', '日']
 export const WEEKDAYS_LONG  = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
@@ -26,6 +28,15 @@ function stemDate(path: string): string | null {
   m = RE_DATE_COMPACT.exec(stem)
   if (m) return `${m[1]}-${m[2]}-${m[3]}`
   return null
+}
+
+export function buildTaskDayData(tasks: Task[]): Record<string, Task[]> {
+  const map: Record<string, Task[]> = {}
+  for (const task of tasks) {
+    if (!task.dueDate) continue
+    ;(map[task.dueDate] ??= []).push(task)
+  }
+  return map
 }
 
 export function buildDayData(index: Record<string, { frontmatter: Record<string, unknown> }>) {

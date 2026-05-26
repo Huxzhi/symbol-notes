@@ -4,6 +4,7 @@ import { workspaceActions } from '../../stores/workspaceStore'
 import {
   buildCalendarGrid,
   buildDayData,
+  buildTaskDayData,
   toIsoDate,
   WEEKDAYS_LONG,
 } from '../../lib/calendarUtils'
@@ -18,6 +19,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
 
   const dayData = createMemo(() => buildDayData(cacheStore.files))
+  const taskDayData = createMemo(() => buildTaskDayData(cacheStore.taskMap))
   const calendarGrid = createMemo(() =>
     buildCalendarGrid(viewYear(), viewMonth()),
   )
@@ -81,6 +83,14 @@ export function CalendarViewer(_props: ViewComponentProps) {
             <span class="w-2 h-2 rounded-sm bg-[var(--link-2)]" />
             修改
           </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-sm bg-[var(--tag)]" style="opacity:0.25" />
+            待办
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-sm bg-[var(--text-4)]" />
+            已完成
+          </span>
         </div>
       </div>
 
@@ -122,6 +132,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
             const dated = () => dayData().dated[dayStr()] ?? []
             const created = () => dayData().created[dayStr()] ?? []
             const updated = () => dayData().updated[dayStr()] ?? []
+            const tasks = () => taskDayData()[dayStr()] ?? []
 
             return (
               <div
@@ -173,11 +184,27 @@ export function CalendarViewer(_props: ViewComponentProps) {
                       </button>
                     )}
                   </For>
+                  <For each={tasks()}>
+                    {(task) => (
+                      <button
+                        class={`text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors flex items-center gap-1 min-w-0
+                          ${task.checked
+                            ? 'bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)]'
+                            : 'bg-[var(--tag)] bg-opacity-15 text-[var(--tag)] hover:bg-opacity-30'}`}
+                        onClick={() => workspaceActions.openFile(task.path)}
+                        title={`${task.path}\n${task.cleanText}`}
+                      >
+                        <span class="shrink-0">{task.checked ? '☑' : '☐'}</span>
+                        <span class={`truncate ${task.checked ? 'line-through' : ''}`}>{task.cleanText}</span>
+                      </button>
+                    )}
+                  </For>
                   <Show
                     when={
                       dated().length === 0 &&
                       created().length === 0 &&
-                      updated().length === 0
+                      updated().length === 0 &&
+                      tasks().length === 0
                     }
                   >
                     <div class="flex-1" />
