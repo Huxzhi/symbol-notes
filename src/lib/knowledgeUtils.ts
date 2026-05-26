@@ -62,6 +62,30 @@ export function buildBacklinkMap(
   return map
 }
 
+import type { TaskItem, Task } from '../stores/types'
+
+export function extractDateString(val: unknown): string | null {
+  if (typeof val !== 'string') return null
+  return /^\d{4}-\d{2}-\d{2}/.test(val) ? val.slice(0, 10) : null
+}
+
+export function extractDateFromName(name: string): string | null {
+  const m = name.match(/(\d{4}-\d{2}-\d{2})/)
+  return m ? m[1] : null
+}
+
+export function buildTaskMap(
+  files: Record<string, { tasks: TaskItem[] }>,
+): Task[] {
+  const result: Task[] = []
+  for (const [path, meta] of Object.entries(files)) {
+    for (const t of meta.tasks) {
+      result.push({ ...t, path })
+    }
+  }
+  return result
+}
+
 export function buildTagMap(
   files: Record<string, { tags: string[] }>,
 ): Record<string, string[]> {
