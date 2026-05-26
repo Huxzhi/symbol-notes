@@ -1,7 +1,7 @@
 import { FolderOpen } from 'lucide-solid'
 import { createSignal, For, Show } from 'solid-js'
 import { appActions } from '../../actions/appActions'
-import { fileOpActions } from '../../actions/fileOpActions'
+import { fileActions } from '../../actions/fileActions'
 import { workspaceActions } from '../../actions/workspaceActions'
 import { toggleInArray } from '../../lib/arrayUtils'
 import { activeFilePath, globalStore } from '../../stores/globalStore'
@@ -55,13 +55,13 @@ function FileTreeNode(props: {
 
   const confirmRename = async () => {
     const val = renameValue().trim()
-    if (!val) { fileOpActions.cancel(); return }
-    await fileOpActions.confirmRename(props.entry.path, val)
+    if (!val) { fileActions.cancelOp(); return }
+    await fileActions.commitRename(props.entry.path, val)
   }
 
   const onRenameKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') void confirmRename()
-    else if (e.key === 'Escape') fileOpActions.cancel()
+    else if (e.key === 'Escape') fileActions.cancelOp()
   }
 
   return (
@@ -147,13 +147,13 @@ export function FilesPanel(props: ViewComponentProps) {
 
   const confirmCreate = async () => {
     const val = createValue().trim()
-    if (!val) { fileOpActions.cancel(); return }
-    await fileOpActions.confirmCreate(val)
+    if (!val) { fileActions.cancelOp(); return }
+    await fileActions.commitCreate(val)
   }
 
   const onCreateKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') void confirmCreate()
-    else if (e.key === 'Escape') fileOpActions.cancel()
+    else if (e.key === 'Escape') fileActions.cancelOp()
   }
 
   return (
@@ -173,12 +173,12 @@ export function FilesPanel(props: ViewComponentProps) {
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors text-[13px]"
             title="新建文件夹"
-            onClick={() => { setCreateValue(''); fileOpActions.startCreate('folder') }}
+            onClick={() => { setCreateValue(''); fileActions.beginCreate('folder') }}
           >⊞</button>
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors"
             title="新建文件"
-            onClick={() => { setCreateValue(''); fileOpActions.startCreate('file') }}
+            onClick={() => { setCreateValue(''); fileActions.beginCreate('file') }}
           >+</button>
         </Show>
       </div>

@@ -1,8 +1,7 @@
 import { CalendarRange } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
 import { appActions } from './actions/appActions'
-import { fileOpActions } from './actions/fileOpActions'
-import { fsActions } from './actions/fsActions'
+import { fileActions } from './actions/fileActions'
 import { workspaceActions } from './actions/workspaceActions'
 import { CalendarPanel } from './components/panels/CalendarPanel'
 import { FilesPanel } from './components/panels/FilesPanel'
@@ -123,19 +122,19 @@ registerContextMenu('tab', (d) => {
 registerContextMenu('file', (d) => {
   const path = d.path!
   return [
-    { label: '重命名', action: () => fileOpActions.startRename(path) },
+    { label: '重命名', action: () => fileActions.beginRename(path) },
     { separator: true as const },
-    { label: '删除', action: () => { if (confirm(`删除 ${path.split('/').pop()}？`)) void fsActions.deleteFile(path) } },
+    { label: '删除', action: () => { if (confirm(`删除 ${path.split('/').pop()}？`)) void fileActions.deleteFile(path) } },
   ]
 })
 
 registerContextMenu('directory', (d) => {
   const path = d.path!
   return [
-    { label: '新建文件', action: () => fileOpActions.startCreate('file', path + '/') },
-    { label: '新建文件夹', action: () => fileOpActions.startCreate('folder', path + '/') },
+    { label: '新建文件', action: () => fileActions.beginCreate('file', path + '/') },
+    { label: '新建文件夹', action: () => fileActions.beginCreate('folder', path + '/') },
     { separator: true as const },
-    { label: '删除文件夹', action: () => { if (confirm(`删除文件夹 ${path.split('/').pop()}？`)) void fsActions.deleteDirectory(path) } },
+    { label: '删除文件夹', action: () => { if (confirm(`删除文件夹 ${path.split('/').pop()}？`)) void fileActions.deleteFolder(path) } },
   ]
 })
 

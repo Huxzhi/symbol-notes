@@ -1,11 +1,13 @@
 import { produce } from 'solid-js/store'
 import { globalStore, setGlobalStore } from '../stores/globalStore'
-import { runtimeStore } from '../stores/runtimeStore'
+import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { knowledgeActions } from './knowledgeActions'
 import {
-  readFile, writeFile, invalidateFile, deleteFileStatEntry,
+  deleteFileStatEntry, invalidateFile, readFile, writeFile,
 } from '../services/fileCacheService'
 import type { FileMapEntry } from '../stores/types'
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -46,7 +48,9 @@ async function updateBacklinks(backlinks: string[], oldPath: string, newPath: st
   }
 }
 
-export const fsActions = {
+// ── File system operations ────────────────────────────────────────────────────
+
+export const fileActions = {
   async createFile(name: string): Promise<string | null> {
     const { rootHandle } = runtimeStore
     if (!rootHandle) return null
@@ -54,9 +58,7 @@ export const fsActions = {
     const fileName = parts.pop()!
     const finalName = fileName.endsWith('.md') ? fileName : `${fileName}.md`
     let dir = rootHandle
-    for (const part of parts) {
-      dir = await dir.getDirectoryHandle(part, { create: true })
-    }
+    for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
     await dir.getFileHandle(finalName, { create: true })
     const path = parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
     const parent = parts.length > 0 ? parts.join('/') : null
@@ -65,14 +67,12 @@ export const fsActions = {
     return path
   },
 
-  async createDirectory(name: string): Promise<void> {
+  async createFolder(name: string): Promise<void> {
     const { rootHandle } = runtimeStore
     if (!rootHandle) return
     const parts = name.split('/')
     let dir = rootHandle
-    for (const part of parts) {
-      dir = await dir.getDirectoryHandle(part, { create: true })
-    }
+    for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
     const dirName = parts[parts.length - 1]
     const parent = parts.length > 1 ? parts.slice(0, -1).join('/') : null
     const entry: FileMapEntry = { name: dirName, path: name, kind: 'directory', parent }
@@ -82,9 +82,7 @@ export const fsActions = {
   async renameFile(oldPath: string, newName: string): Promise<void> {
     const { rootHandle } = runtimeStore
     if (!rootHandle) return
-    const dir = oldPath.includes('/')
-      ? oldPath.slice(0, oldPath.lastIndexOf('/'))
-      : ''
+    const dir = oldPath.includes('/') ? oldPath.slice(0, oldPath.lastIndexOf('/')) : ''
     const finalName = newName.endsWith('.md') ? newName : `${newName}.md`
     const newPath = dir ? `${dir}/${finalName}` : finalName
 
@@ -92,9 +90,7 @@ export const fsActions = {
     await writeFile(newPath, oldContent, true)
     let dirHandle: FileSystemDirectoryHandle = rootHandle
     if (dir) {
-      for (const part of dir.split('/')) {
-        dirHandle = await dirHandle.getDirectoryHandle(part)
-      }
+      for (const part of dir.split('/')) dirHandle = await dirHandle.getDirectoryHandle(part)
     }
     await dirHandle.removeEntry(oldPath.split('/').pop()!)
     invalidateFile(oldPath)
@@ -128,7 +124,7 @@ export const fsActions = {
     setGlobalStore('fs', 'fileMap', produce((m: Record<string, FileMapEntry>) => { delete m[path] }))
   },
 
-  async deleteDirectory(path: string): Promise<void> {
+  async deleteFolder(path: string): Promise<void> {
     const { rootHandle } = runtimeStore
     if (!rootHandle) return
     const parts = path.split('/')
@@ -154,5 +150,39 @@ export const fsActions = {
         for (const entry of toRemove) delete m[entry.path]
       }),
     )
+  },
+
+  // ── UI operation flow ───────────────────────────────────────────────────────
+
+  beginCreate(mode: 'file' | 'folder', prefix = ''): void {
+    setRuntimeStore('fileOp', { type: mode === 'file' ? 'create-file' : 'create-folder', prefix })
+  },
+
+  beginRename(path: string): void {
+    setRuntimeStore('fileOp', { type: 'rename', path })
+  },
+
+  cancelOp(): void {
+    setRuntimeStore('fileOp', null)
+  },
+
+  async commitCreate(name: string): Promise<void> {
+    const op = runtimeStore.fileOp
+    if (!op || (op.type !== 'create-file' && op.type !== 'create-folder')) return
+    setRuntimeStore('fileOp', null)
+    if (op.type === 'create-file') {
+      const path = await fileActions.createFile(name)
+      if (path) {
+        const { workspaceActions } = await import('./workspaceActions')
+        workspaceActions.openFile(path, { newTab: true, pin: true })
+      }
+    } else {
+      await fileActions.createFolder(name)
+    }
+  },
+
+  async commitRename(path: string, newName: string): Promise<void> {
+    setRuntimeStore('fileOp', null)
+    await fileActions.renameFile(path, newName)
   },
 }

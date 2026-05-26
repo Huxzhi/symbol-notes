@@ -13,7 +13,7 @@ import {
   onMount,
   Show,
 } from 'solid-js'
-import { fsActions } from '../../actions/fsActions'
+import { fileActions } from '../../actions/fileActions'
 import { knowledgeActions } from '../../actions/knowledgeActions'
 import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
@@ -278,7 +278,7 @@ export function EditorViewer(props: ViewComponentProps) {
     const name = draft().trim()
     const p = filePath()
     if (!name || name === stem() || !p) return
-    await fsActions.renameFile(p, name)
+    await fileActions.renameFile(p, name)
   }
   const onTitleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
