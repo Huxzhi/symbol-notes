@@ -1,6 +1,9 @@
 import { CalendarRange } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
 import { appActions } from './actions/appActions'
+import { fileOpActions } from './actions/fileOpActions'
+import { fsActions } from './actions/fsActions'
+import { workspaceActions } from './actions/workspaceActions'
 import { CalendarPanel } from './components/panels/CalendarPanel'
 import { FilesPanel } from './components/panels/FilesPanel'
 import { LinksPanel } from './components/panels/LinksPanel'
@@ -9,14 +12,16 @@ import { TagsPanel } from './components/panels/TagsPanel'
 import { Ribbon } from './components/Ribbon'
 import { Settings } from './components/Settings'
 import { StatusBar } from './components/StatusBar'
+import { ContextMenu } from './components/ContextMenu'
 import { CalendarViewer } from './components/viewer/CalendarViewer'
 import { EditorViewer } from './components/viewer/EditorViewer'
 import { ImageViewer } from './components/viewer/ImageViewer'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
 import { syncToStorage } from './lib/localStorage'
+import { registerContextMenu } from './lib/contextMenuRegistry'
 import { registerView } from './lib/viewRegistry'
-import { activeRoot, globalStore } from './stores/globalStore'
+import { activeLayout, activeRoot, globalStore } from './stores/globalStore'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
@@ -91,6 +96,49 @@ registerView({
   component: CalendarViewer,
 })
 
+// ── Context menu factories ────────────────────────────────────────────────────
+
+registerContextMenu('tab', (d) => {
+  const leafId = d.leafId!
+  const tabsId = d.tabsId!
+  const root = activeLayout().root
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function findTabs(node: any): any {
+    if (node.type === 'tabs' && node.id === tabsId) return node
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (node.type === 'split') for (const c of node.children) { const f = findTabs(c); if (f) return f }
+    return null
+  }
+  const tabs = findTabs(root.main)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const siblings: any[] = tabs?.children ?? []
+  const idx = siblings.findIndex((l) => l.id === leafId)
+  return [
+    { label: '关闭', action: () => workspaceActions.closeLeaf(leafId) },
+    { label: '关闭其他', action: () => workspaceActions.closeOtherLeaves(tabsId, leafId), disabled: siblings.length <= 1 },
+    { label: '关闭右侧', action: () => workspaceActions.closeRightLeaves(tabsId, leafId), disabled: idx >= siblings.length - 1 },
+  ]
+})
+
+registerContextMenu('file', (d) => {
+  const path = d.path!
+  return [
+    { label: '重命名', action: () => fileOpActions.startRename(path) },
+    { separator: true as const },
+    { label: '删除', action: () => { if (confirm(`删除 ${path.split('/').pop()}？`)) void fsActions.deleteFile(path) } },
+  ]
+})
+
+registerContextMenu('directory', (d) => {
+  const path = d.path!
+  return [
+    { label: '新建文件', action: () => fileOpActions.startCreate('file', path + '/') },
+    { label: '新建文件夹', action: () => fileOpActions.startCreate('folder', path + '/') },
+    { separator: true as const },
+    { label: '删除文件夹', action: () => { if (confirm(`删除文件夹 ${path.split('/').pop()}？`)) void fsActions.deleteDirectory(path) } },
+  ]
+})
+
 export default function App() {
   createEffect(() => {
     document.documentElement.setAttribute(
@@ -126,6 +174,7 @@ export default function App() {
       <Show when={globalStore.workspace.showSettings}>
         <Settings />
       </Show>
+      <ContextMenu />
     </div>
   )
 }
