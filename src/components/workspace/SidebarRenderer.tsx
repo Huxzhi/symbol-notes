@@ -42,7 +42,7 @@ export function SidebarRenderer(props: { node: any; side: 'left' | 'right' }) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div class="w-px bg-(--border) group-hover:bg-(--accent) transition-colors" />
+      <div class="w-0.5 bg-(--border) group-hover:bg-(--accent) transition-colors" />
     </div>
   )
 
