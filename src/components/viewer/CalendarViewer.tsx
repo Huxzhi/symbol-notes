@@ -187,15 +187,15 @@ export function CalendarViewer(_props: ViewComponentProps) {
                   <For each={tasks()}>
                     {(task) => (
                       <button
-                        class={`text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors flex items-center gap-1 min-w-0
+                        class={`text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate
                           ${task.checked
-                            ? 'bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)]'
-                            : 'bg-[var(--tag)] bg-opacity-15 text-[var(--tag)] hover:bg-opacity-30'}`}
+                            ? 'bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through'
+                            : 'bg-[var(--tag)] text-[var(--tag)] hover:opacity-80'}`}
+                        style={task.checked ? {} : { 'background-color': 'color-mix(in srgb, var(--tag) 18%, transparent)' }}
                         onClick={() => workspaceActions.openFile(task.path)}
                         title={`${task.path}\n${task.cleanText}`}
                       >
-                        <span class="shrink-0">{task.checked ? '☑' : '☐'}</span>
-                        <span class={`truncate ${task.checked ? 'line-through' : ''}`}>{task.cleanText}</span>
+                        {task.checked ? '☑ ' : '☐ '}{task.cleanText}
                       </button>
                     )}
                   </For>
