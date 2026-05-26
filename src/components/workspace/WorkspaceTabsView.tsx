@@ -34,6 +34,9 @@ export function WorkspaceTabsView(props: {
               const isPanelLeaf = () => def()?.kind === 'panel'
               return (
                 <div
+                  data-ctx={!isPanelLeaf() ? 'tab' : undefined}
+                  data-leaf-id={!isPanelLeaf() ? leaf.id : undefined}
+                  data-tabs-id={!isPanelLeaf() ? props.node.id : undefined}
                   class={`flex items-center gap-1.5 px-3 border-r border-(--border)] cursor-pointer text-[11px] shrink-0
                     ${
                       isActive()
