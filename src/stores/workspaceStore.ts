@@ -400,6 +400,10 @@ export const workspaceActions = {
     setRoot(side, 'collapsed', (v: boolean) => !v)
   },
 
+  setSidebarWidth(side: 'left' | 'right', width: number): void {
+    setRoot(side, 'width', width)
+  },
+
   activateSidebarLeaf(side: 'left' | 'right', leafId: string): void {
     const children = activeLayout().root[side].children
     setRoot(side, 'children',
