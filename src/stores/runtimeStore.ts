@@ -296,6 +296,87 @@ export const fileActions = {
     await cacheActions.reindexFile(newPath, oldContent)
     await updateBacklinks(backlinks, srcPath, newPath)
   },
+
+  async moveFolder(srcPath: string, destDirPath: string | null): Promise<void> {
+    const { rootHandle } = runtimeStore
+    if (!rootHandle) return
+    const folderName = srcPath.split('/').pop()!
+    const newFolderPath = destDirPath ? `${destDirPath}/${folderName}` : folderName
+    if (newFolderPath === srcPath) return
+    if (newFolderPath.startsWith(srcPath + '/')) return
+
+    const descendants = Object.values(cacheStore.files).filter(
+      e => e.path === srcPath || e.path.startsWith(srcPath + '/'),
+    )
+    const fileEntries = descendants.filter(e => e.kind === 'file')
+    const dirEntries = descendants.filter(e => e.kind === 'directory')
+
+    // Create new directory structure (sorted by depth so parents come first)
+    const allNewDirs = [newFolderPath, ...dirEntries.map(
+      e => newFolderPath + e.path.slice(srcPath.length),
+    )].sort((a, b) => a.split('/').length - b.split('/').length)
+
+    for (const dirPath of allNewDirs) {
+      const parts = dirPath.split('/')
+      let dir: FileSystemDirectoryHandle = rootHandle
+      for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
+    }
+
+    // Copy each file to the new location
+    const fileContents = new Map<string, string>()
+    for (const entry of fileEntries) {
+      const content = await readFile(entry.path)
+      fileContents.set(entry.path, content)
+      const newFilePath = newFolderPath + entry.path.slice(srcPath.length)
+      await writeFile(newFilePath, content, true)
+    }
+
+    // Delete old folder in one shot
+    const oldParts = srcPath.split('/')
+    const oldFolderName = oldParts.pop()!
+    let oldParentDir: FileSystemDirectoryHandle = rootHandle
+    for (const part of oldParts) oldParentDir = await oldParentDir.getDirectoryHandle(part)
+    await oldParentDir.removeEntry(oldFolderName, { recursive: true })
+
+    // Invalidate old file caches
+    for (const entry of fileEntries) {
+      invalidateFile(entry.path)
+      await deleteFileStatEntry(entry.path)
+    }
+
+    // Update cacheStore: remove old entries, insert new ones
+    setCacheStore('files', produce((m: Record<string, FileMeta>) => {
+      for (const entry of descendants) delete m[entry.path]
+    }))
+    for (const entry of descendants) {
+      const newEntryPath = newFolderPath + entry.path.slice(srcPath.length)
+      const newParent = newEntryPath.includes('/')
+        ? newEntryPath.slice(0, newEntryPath.lastIndexOf('/'))
+        : null
+      setCacheStore('files', newEntryPath, { ...entry, path: newEntryPath, parent: newParent, hash: '' })
+    }
+
+    // Reindex files and update workspace tabs + backlinks
+    const { workspaceActions } = await import('./workspaceStore')
+    for (const entry of fileEntries) {
+      const newFilePath = newFolderPath + entry.path.slice(srcPath.length)
+      const content = fileContents.get(entry.path) ?? ''
+      workspaceActions.renameLeafPath(entry.path, newFilePath)
+      await cacheActions.reindexFile(newFilePath, content)
+      const backlinks = cacheStore.backlinkMap[entry.path] ?? []
+      await updateBacklinks(backlinks, entry.path, newFilePath)
+    }
+  },
+
+  async moveEntry(srcPath: string, destDirPath: string | null): Promise<void> {
+    const entry = cacheStore.files[srcPath]
+    if (!entry) return
+    if (entry.kind === 'directory') {
+      await fileActions.moveFolder(srcPath, destDirPath)
+    } else {
+      await fileActions.moveFile(srcPath, destDirPath)
+    }
+  },
 }
 
 export { runtimeStore, setRuntimeStore }
