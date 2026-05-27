@@ -92,7 +92,7 @@ function applyContent(path: string, hash: string, content: ContentFields): void 
 
   setCacheStore('taskMap', (list: Task[]) => [
     ...list.filter(t => t.path !== path),
-    ...content.tasks.map(t => ({ ...t, path })),
+    ...(content.tasks ?? []).map(t => ({ ...t, path })),
   ])
 }
 

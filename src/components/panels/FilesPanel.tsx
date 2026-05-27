@@ -182,7 +182,7 @@ export function FilesPanel(props: ViewComponentProps) {
     setDragSrc(entry.path)
     e.dataTransfer!.setData('application/x-symbol-notes-file', entry.path)
     e.dataTransfer!.setData('text/plain', computeWikiLink(entry.name, entry.kind))
-    e.dataTransfer!.effectAllowed = 'move'
+    e.dataTransfer!.effectAllowed = 'copyMove'
   }
 
   const handleDragEnd = () => {
