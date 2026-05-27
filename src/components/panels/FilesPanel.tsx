@@ -1,7 +1,6 @@
 import { FolderOpen } from 'lucide-solid'
 import { createSignal, For, Show } from 'solid-js'
 
-
 import { appActions, fileActions } from '../../stores/runtimeStore'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { toggleInArray } from '../../lib/arrayUtils'
@@ -9,6 +8,7 @@ import { activeFilePath } from '../../stores/workspaceStore'
 import { cacheStore } from '../../stores/cacheStore'
 import { settingsStore } from '../../stores/settingsStore'
 import { runtimeStore } from '../../stores/runtimeStore'
+import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
 import type { FileMeta, ViewComponentProps } from '../../stores/types'
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif'])
@@ -41,6 +41,13 @@ function FileTreeNode(props: {
   depth: number
   collapsedFolders: string[]
   onToggle: (path: string) => void
+  dragSrc: () => string | null
+  dragOver: () => string | null
+  onDragStart: (e: DragEvent, entry: FileMeta) => void
+  onDragEnd: () => void
+  onDirDragOver: (e: DragEvent, path: string) => void
+  onDirDragLeave: (e: DragEvent, path: string) => void
+  onDirDrop: (e: DragEvent, destDirPath: string) => void
 }) {
   const isActive = () => activeFilePath() === props.entry.path
   const isOther = () => props.entry.kind === 'file' && isOtherFile(props.entry.name)
@@ -67,19 +74,26 @@ function FileTreeNode(props: {
     else if (e.key === 'Escape') fileActions.cancelOp()
   }
 
+  const isDragTarget = () =>
+    props.entry.kind === 'directory' && props.dragOver() === props.entry.path
+
   return (
     <Show when={show()}>
       <div>
         <div
           data-ctx={props.entry.kind === 'directory' ? 'directory' : 'file'}
           data-path={props.entry.path}
+          draggable={true}
           class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none
             ${isActive()
               ? 'bg-(--bg-hover) border-l-2 border-(--accent) text-(--text)'
               : isOther()
                 ? 'text-(--text-4) border-l-2 border-transparent'
                 : 'text-(--text-2) border-l-2 border-transparent'
-            }`}
+            }
+            ${props.dragSrc() === props.entry.path ? 'opacity-50' : ''}
+            ${isDragTarget() ? '!bg-(--bg-hover) !border-l-2 !border-(--accent-2)' : ''}
+          `}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
             if (isRenaming()) return
@@ -93,6 +107,17 @@ function FileTreeNode(props: {
             if (!canOpen(props.entry.name)) return
             workspaceActions.openFile(props.entry.path, { newTab: true, pin: true })
           }}
+          onDragStart={(e) => props.onDragStart(e, props.entry)}
+          onDragEnd={props.onDragEnd}
+          onDragOver={props.entry.kind === 'directory'
+            ? (e) => props.onDirDragOver(e, props.entry.path)
+            : undefined}
+          onDragLeave={props.entry.kind === 'directory'
+            ? (e) => props.onDirDragLeave(e, props.entry.path)
+            : undefined}
+          onDrop={props.entry.kind === 'directory'
+            ? (e) => props.onDirDrop(e, props.entry.path)
+            : undefined}
         >
           <Show when={props.entry.kind === 'directory'}>
             <span class="text-[9px] text-(--text-3)">{isCollapsed() ? '▸' : '▾'}</span>
@@ -123,6 +148,13 @@ function FileTreeNode(props: {
                 depth={props.depth + 1}
                 collapsedFolders={props.collapsedFolders}
                 onToggle={props.onToggle}
+                dragSrc={props.dragSrc}
+                dragOver={props.dragOver}
+                onDragStart={props.onDragStart}
+                onDragEnd={props.onDragEnd}
+                onDirDragOver={props.onDirDragOver}
+                onDirDragLeave={props.onDirDragLeave}
+                onDirDrop={props.onDirDrop}
               />
             )}
           </For>
@@ -141,6 +173,75 @@ export function FilesPanel(props: ViewComponentProps) {
       type: 'files',
       state: { ...props.viewState, collapsedFolders: toggleInArray(collapsedFolders(), path) },
     })
+  }
+
+  const [dragSrc, setDragSrc] = createSignal<string | null>(null)
+  const [dragOver, setDragOver] = createSignal<string | null>(null)
+
+  const handleDragStart = (e: DragEvent, entry: FileMeta) => {
+    setDragSrc(entry.path)
+    e.dataTransfer!.setData('application/x-symbol-notes-file', entry.path)
+    e.dataTransfer!.setData('text/plain', computeWikiLink(entry.name, entry.kind))
+    e.dataTransfer!.effectAllowed = 'move'
+  }
+
+  const handleDragEnd = () => {
+    setDragSrc(null)
+    setDragOver(null)
+  }
+
+  const handleDirDragOver = (e: DragEvent, path: string) => {
+    const src = dragSrc()
+    if (!src) return
+    const srcEntry = cacheStore.files[src]
+    if (!isValidMoveDrop(src, path, srcEntry?.parent ?? null)) return
+    e.preventDefault()
+    e.dataTransfer!.dropEffect = 'move'
+    setDragOver(path)
+  }
+
+  const handleDirDragLeave = (e: DragEvent, path: string) => {
+    const rel = e.relatedTarget as Node | null
+    if (rel && (e.currentTarget as Element).contains(rel)) return
+    if (dragOver() === path) setDragOver(null)
+  }
+
+  const handleDirDrop = (e: DragEvent, destDirPath: string) => {
+    e.preventDefault()
+    const src = dragSrc()
+    setDragSrc(null)
+    setDragOver(null)
+    if (!src) return
+    const srcEntry = cacheStore.files[src]
+    if (!isValidMoveDrop(src, destDirPath, srcEntry?.parent ?? null)) return
+    void fileActions.moveEntry(src, destDirPath)
+  }
+
+  const handleRootDragOver = (e: DragEvent) => {
+    const src = dragSrc()
+    if (!src) return
+    const srcEntry = cacheStore.files[src]
+    if (!isValidMoveDrop(src, null, srcEntry?.parent ?? null)) return
+    e.preventDefault()
+    e.dataTransfer!.dropEffect = 'move'
+    setDragOver('__root__')
+  }
+
+  const handleRootDragLeave = (e: DragEvent) => {
+    const rel = e.relatedTarget as Node | null
+    if (rel && (e.currentTarget as Element).contains(rel)) return
+    if (dragOver() === '__root__') setDragOver(null)
+  }
+
+  const handleRootDrop = (e: DragEvent) => {
+    e.preventDefault()
+    const src = dragSrc()
+    setDragSrc(null)
+    setDragOver(null)
+    if (!src) return
+    const srcEntry = cacheStore.files[src]
+    if (!isValidMoveDrop(src, null, srcEntry?.parent ?? null)) return
+    void fileActions.moveEntry(src, null)
   }
 
   const fileOp = () => runtimeStore.fileOp
@@ -186,7 +287,12 @@ export function FilesPanel(props: ViewComponentProps) {
         </Show>
       </div>
 
-      <div class="overflow-y-auto flex-1 py-1">
+      <div
+        class={`overflow-y-auto flex-1 py-1 ${dragOver() === '__root__' ? 'outline outline-1 outline-(--accent-2) outline-offset-[-2px]' : ''}`}
+        onDragOver={handleRootDragOver}
+        onDragLeave={handleRootDragLeave}
+        onDrop={handleRootDrop}
+      >
         <Show when={isCreating()}>
           <div class="flex items-center gap-1 px-2 py-1">
             <span class="text-[9px] text-(--text-3)">
@@ -214,6 +320,13 @@ export function FilesPanel(props: ViewComponentProps) {
               depth={0}
               collapsedFolders={collapsedFolders()}
               onToggle={handleToggle}
+              dragSrc={dragSrc}
+              dragOver={dragOver}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDirDragOver={handleDirDragOver}
+              onDirDragLeave={handleDirDragLeave}
+              onDirDrop={handleDirDrop}
             />
           )}
         </For>
