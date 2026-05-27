@@ -259,6 +259,43 @@ export const fileActions = {
     setRuntimeStore('fileOp', null)
     await fileActions.renameFile(path, newName)
   },
+
+  async moveFile(srcPath: string, destDirPath: string | null): Promise<void> {
+    const { rootHandle } = runtimeStore
+    if (!rootHandle) return
+    const name = srcPath.split('/').pop()!
+    const newPath = destDirPath ? `${destDirPath}/${name}` : name
+    if (newPath === srcPath) return
+
+    const oldContent = await readFile(srcPath)
+    await writeFile(newPath, oldContent, true)
+
+    const oldParts = srcPath.split('/')
+    const oldFileName = oldParts.pop()!
+    let oldDir: FileSystemDirectoryHandle = rootHandle
+    for (const part of oldParts) oldDir = await oldDir.getDirectoryHandle(part)
+    await oldDir.removeEntry(oldFileName)
+
+    invalidateFile(srcPath)
+    await deleteFileStatEntry(srcPath)
+
+    const backlinks = cacheStore.backlinkMap[srcPath] ?? []
+    cacheActions.removeCacheEntry(srcPath)
+    setCacheStore('files', produce((m: Record<string, FileMeta>) => { delete m[srcPath] }))
+
+    const entry: FileMeta = {
+      name, path: newPath, kind: 'file', parent: destDirPath ?? null,
+      size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      created: new Date(0).toISOString().slice(0, 10),
+      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
+    }
+    setCacheStore('files', newPath, entry)
+
+    const { workspaceActions } = await import('./workspaceStore')
+    workspaceActions.renameLeafPath(srcPath, newPath)
+    await cacheActions.reindexFile(newPath, oldContent)
+    await updateBacklinks(backlinks, srcPath, newPath)
+  },
 }
 
 export { runtimeStore, setRuntimeStore }
