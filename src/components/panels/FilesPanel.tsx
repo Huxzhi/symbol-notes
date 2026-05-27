@@ -1,5 +1,5 @@
 import { FolderOpen } from 'lucide-solid'
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, For, onCleanup, Show } from 'solid-js'
 
 import { appActions, fileActions } from '../../stores/runtimeStore'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -177,12 +177,33 @@ export function FilesPanel(props: ViewComponentProps) {
 
   const [dragSrc, setDragSrc] = createSignal<string | null>(null)
   const [dragOver, setDragOver] = createSignal<string | null>(null)
+  const [moveMsg, setMoveMsg] = createSignal<string | null>(null)
+  let moveMsgTimer: ReturnType<typeof setTimeout> | null = null
+  onCleanup(() => { if (moveMsgTimer) clearTimeout(moveMsgTimer) })
+
+  const showMoveMsg = (msg: string) => {
+    if (moveMsgTimer) clearTimeout(moveMsgTimer)
+    setMoveMsg(msg)
+    moveMsgTimer = setTimeout(() => setMoveMsg(null), 2500)
+  }
 
   const handleDragStart = (e: DragEvent, entry: FileMeta) => {
     setDragSrc(entry.path)
     e.dataTransfer!.setData('application/x-symbol-notes-file', entry.path)
     e.dataTransfer!.setData('text/plain', computeWikiLink(entry.name, entry.kind))
     e.dataTransfer!.effectAllowed = 'copyMove'
+
+    const ghost = document.createElement('div')
+    ghost.textContent = displayName(entry.name)
+    Object.assign(ghost.style, {
+      position: 'fixed', top: '-100px', left: '-100px',
+      padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+      background: 'var(--bg-hover)', color: 'var(--text)',
+      border: '1px solid var(--accent)', whiteSpace: 'nowrap', pointerEvents: 'none',
+    })
+    document.body.appendChild(ghost)
+    e.dataTransfer!.setDragImage(ghost, ghost.offsetWidth / 2, 12)
+    setTimeout(() => ghost.remove(), 0)
   }
 
   const handleDragEnd = () => {
@@ -206,7 +227,7 @@ export function FilesPanel(props: ViewComponentProps) {
     if (dragOver() === path) setDragOver(null)
   }
 
-  const handleDirDrop = (e: DragEvent, destDirPath: string) => {
+  const handleDirDrop = async (e: DragEvent, destDirPath: string) => {
     e.preventDefault()
     const src = dragSrc()
     setDragSrc(null)
@@ -214,7 +235,14 @@ export function FilesPanel(props: ViewComponentProps) {
     if (!src) return
     const srcEntry = cacheStore.files[src]
     if (!isValidMoveDrop(src, destDirPath, srcEntry?.parent ?? null)) return
-    void fileActions.moveEntry(src, destDirPath)
+    const srcName = displayName(srcEntry?.name ?? src.split('/').pop()!)
+    const destName = destDirPath.split('/').pop() ?? destDirPath
+    try {
+      await fileActions.moveEntry(src, destDirPath)
+      showMoveMsg(`已移动 ${srcName} → ${destName}`)
+    } catch {
+      showMoveMsg(`移动失败`)
+    }
   }
 
   const handleRootDragOver = (e: DragEvent) => {
@@ -233,7 +261,7 @@ export function FilesPanel(props: ViewComponentProps) {
     if (dragOver() === '__root__') setDragOver(null)
   }
 
-  const handleRootDrop = (e: DragEvent) => {
+  const handleRootDrop = async (e: DragEvent) => {
     e.preventDefault()
     const src = dragSrc()
     setDragSrc(null)
@@ -241,7 +269,13 @@ export function FilesPanel(props: ViewComponentProps) {
     if (!src) return
     const srcEntry = cacheStore.files[src]
     if (!isValidMoveDrop(src, null, srcEntry?.parent ?? null)) return
-    void fileActions.moveEntry(src, null)
+    const srcName = displayName(srcEntry?.name ?? src.split('/').pop()!)
+    try {
+      await fileActions.moveEntry(src, null)
+      showMoveMsg(`已移动 ${srcName} → 根目录`)
+    } catch {
+      showMoveMsg(`移动失败`)
+    }
   }
 
   const fileOp = () => runtimeStore.fileOp
@@ -261,7 +295,7 @@ export function FilesPanel(props: ViewComponentProps) {
   }
 
   return (
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col h-full relative">
       <div class="border-b border-(--border) shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
           class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-(--bg-hover) transition-colors min-w-0 group"
@@ -331,6 +365,11 @@ export function FilesPanel(props: ViewComponentProps) {
           )}
         </For>
       </div>
+      <Show when={moveMsg()}>
+        <div class="absolute bottom-0 left-0 right-0 px-2.5 py-1 text-[10px] text-(--text-2) bg-(--bg) border-t border-(--border) truncate pointer-events-none">
+          {moveMsg()}
+        </div>
+      </Show>
     </div>
   )
 }
