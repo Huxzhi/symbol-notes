@@ -79,7 +79,7 @@ function FileTreeNode(props: {
 
   return (
     <Show when={show()}>
-      <div>
+      <div class={isDragTarget() ? 'outline outline-1 outline-(--accent-2) outline-offset-[-1px] bg-(--bg-hover)' : ''}>
         <div
           data-ctx={props.entry.kind === 'directory' ? 'directory' : 'file'}
           data-path={props.entry.path}
@@ -92,7 +92,7 @@ function FileTreeNode(props: {
                 : 'text-(--text-2) border-l-2 border-transparent'
             }
             ${props.dragSrc() === props.entry.path ? 'opacity-50' : ''}
-            ${isDragTarget() ? '!bg-(--bg-hover) !border-l-2 !border-(--accent-2)' : ''}
+            ${isDragTarget() ? '!border-(--accent-2)' : ''}
           `}
           style={{ 'padding-left': `${6 + props.depth * 14}px` }}
           onClick={() => {
