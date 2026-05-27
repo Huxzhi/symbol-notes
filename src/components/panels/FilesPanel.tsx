@@ -79,7 +79,18 @@ function FileTreeNode(props: {
 
   return (
     <Show when={show()}>
-      <div class={isDragTarget() ? 'outline outline-1 outline-(--accent-2) outline-offset-[-1px] bg-(--bg-hover)' : ''}>
+      <div
+        class={isDragTarget() ? 'outline outline-1 outline-(--accent-2) outline-offset-[-1px] bg-(--bg-hover)' : ''}
+        onDragOver={props.entry.kind === 'directory'
+          ? (e) => props.onDirDragOver(e, props.entry.path)
+          : undefined}
+        onDragLeave={props.entry.kind === 'directory'
+          ? (e) => props.onDirDragLeave(e, props.entry.path)
+          : undefined}
+        onDrop={props.entry.kind === 'directory'
+          ? (e) => props.onDirDrop(e, props.entry.path)
+          : undefined}
+      >
         <div
           data-ctx={props.entry.kind === 'directory' ? 'directory' : 'file'}
           data-path={props.entry.path}
@@ -109,15 +120,6 @@ function FileTreeNode(props: {
           }}
           onDragStart={(e) => props.onDragStart(e, props.entry)}
           onDragEnd={props.onDragEnd}
-          onDragOver={props.entry.kind === 'directory'
-            ? (e) => props.onDirDragOver(e, props.entry.path)
-            : undefined}
-          onDragLeave={props.entry.kind === 'directory'
-            ? (e) => props.onDirDragLeave(e, props.entry.path)
-            : undefined}
-          onDrop={props.entry.kind === 'directory'
-            ? (e) => props.onDirDrop(e, props.entry.path)
-            : undefined}
         >
           <Show when={props.entry.kind === 'directory'}>
             <span class="text-[9px] text-(--text-3)">{isCollapsed() ? '▸' : '▾'}</span>
@@ -212,6 +214,7 @@ export function FilesPanel(props: ViewComponentProps) {
   }
 
   const handleDirDragOver = (e: DragEvent, path: string) => {
+    e.stopPropagation()
     const src = dragSrc()
     if (!src) return
     const srcEntry = cacheStore.files[src]
@@ -229,6 +232,7 @@ export function FilesPanel(props: ViewComponentProps) {
 
   const handleDirDrop = async (e: DragEvent, destDirPath: string) => {
     e.preventDefault()
+    e.stopPropagation()
     const src = dragSrc()
     setDragSrc(null)
     setDragOver(null)
