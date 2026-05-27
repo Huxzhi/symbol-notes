@@ -1,6 +1,4 @@
-import { CalendarRange } from 'lucide-solid'
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { workspaceActions } from '../../stores/workspaceStore'
 import {
   buildCalendarGrid,
   buildDayData,
@@ -10,6 +8,7 @@ import {
 } from '../../lib/calendarUtils'
 import { cacheStore } from '../../stores/cacheStore'
 import type { ViewComponentProps } from '../../stores/types'
+import { workspaceActions } from '../../stores/workspaceStore'
 
 export function CalendarViewer(_props: ViewComponentProps) {
   const now = new Date()
@@ -84,7 +83,10 @@ export function CalendarViewer(_props: ViewComponentProps) {
             修改
           </span>
           <span class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-sm bg-[var(--tag)]" style="opacity:0.25" />
+            <span
+              class="w-2 h-2 rounded-sm bg-[var(--tag)]"
+              style="opacity:0.25"
+            />
             待办
           </span>
           <span class="flex items-center gap-1.5">
@@ -188,14 +190,24 @@ export function CalendarViewer(_props: ViewComponentProps) {
                     {(task) => (
                       <button
                         class={`text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate
-                          ${task.checked
-                            ? 'bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through'
-                            : 'bg-[var(--tag)] text-[var(--tag)] hover:opacity-80'}`}
-                        style={task.checked ? {} : { 'background-color': 'color-mix(in srgb, var(--tag) 18%, transparent)' }}
+                          ${
+                            task.checked
+                              ? 'bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through'
+                              : 'bg-[var(--tag)] text-[var(--tag)] hover:opacity-80'
+                          }`}
+                        style={
+                          task.checked
+                            ? {}
+                            : {
+                                'background-color':
+                                  'color-mix(in srgb, var(--tag) 18%, transparent)',
+                              }
+                        }
                         onClick={() => workspaceActions.openFile(task.path)}
-                        title={`${task.path}\n${task.cleanText}`}
+                        title={`${task.path}`}
                       >
-                        {task.checked ? '☑ ' : '☐ '}{task.cleanText}
+                        {task.checked ? '☑ ' : '☐ '}
+                        {task.cleanText}
                       </button>
                     )}
                   </For>
