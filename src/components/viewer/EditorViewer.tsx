@@ -14,7 +14,8 @@ import {
   Show,
 } from 'solid-js'
 import { fileActions } from '../../stores/runtimeStore'
-import { cacheActions } from '../../stores/cacheStore'
+import { cacheActions, cacheStore, setCacheStore } from '../../stores/cacheStore'
+import { showModal, closeModal } from '../../stores/modalStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
 import { frontmatterField } from '../../lib/frontmatterField'
@@ -29,7 +30,7 @@ import {
   setFrontmatterField,
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/wikiLinkParser'
-import { readFile, writeFile } from '../../services/fileCacheService'
+import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileCacheService'
 import { settingsStore } from '../../stores/settingsStore'
 import { runtimeStore, setRuntimeStore } from '../../stores/runtimeStore'
 import type { ViewComponentProps } from '../../stores/types'
@@ -150,6 +151,29 @@ export function EditorViewer(props: ViewComponentProps) {
   async function saveFile(): Promise<void> {
     const p = filePath()
     if (!view || !p) return
+
+    const knownMtime = cacheStore.files[p]?.mtime
+    if (knownMtime) {
+      const currentMtime = await getFileMtime(p)
+      if (currentMtime > knownMtime) {
+        const filename = p.split('/').pop() ?? p
+        showModal({
+          title: '文件已被外部修改',
+          message: `"${filename}" 在磁盘上已被其他程序修改，如何处理？`,
+          buttons: [
+            { label: '覆盖保存', variant: 'danger',  onClick: () => { closeModal(); void doSave(p) } },
+            { label: '重新加载', variant: 'primary', onClick: () => { closeModal(); void doReload(p) } },
+            { label: '取消',     variant: 'ghost',   onClick: closeModal },
+          ],
+        })
+        return
+      }
+    }
+    await doSave(p)
+  }
+
+  async function doSave(p: string): Promise<void> {
+    if (!view) return
     let content = view.state.doc.toString()
     if (settingsStore.autoTimestamps) {
       const ts = formatTimestamp(Date.now())
@@ -180,6 +204,8 @@ export function EditorViewer(props: ViewComponentProps) {
       }
     }
     await writeFile(p, content)
+    const newMtime = await getFileMtime(p)
+    setCacheStore('files', p, 'mtime', newMtime)
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
     const outLinks = view.state
@@ -189,6 +215,23 @@ export function EditorViewer(props: ViewComponentProps) {
     const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
     const tasks = view.state.field(tasksField)
     await cacheActions.reindexFile(p, content, { outLinks, inlineTags, tasks })
+  }
+
+  async function doReload(p: string): Promise<void> {
+    if (!view) return
+    invalidateFile(p)
+    const newContent = await loadFileContent(p)
+    const newState = buildEditorState(newContent, handleDocChange, handleKeyDown)
+    view.setState(newState)
+    view.scrollDOM.scrollTop = 0
+    localDirty = false
+    if (props.isActive) {
+      setLeafRuntime({
+        isDirty: false,
+        outLinks: view.state.field(outLinksField),
+        headings: view.state.field(headingsField),
+      })
+    }
   }
 
   createEffect(on(
