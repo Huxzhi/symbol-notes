@@ -125,6 +125,11 @@ export async function writeFile(path: string, content: string, create = false): 
   deleteFileStatEntry(path).catch(() => {})
 }
 
+export async function getFileMtime(path: string): Promise<number> {
+  const handle = await resolveFileHandle(path)
+  return (await handle.getFile()).lastModified
+}
+
 export function invalidateFile(path: string): void {
   contentCache.delete(path)
 }
