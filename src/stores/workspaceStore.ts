@@ -54,13 +54,18 @@ const initialLayout: WorkspaceLayout = {
   activeLeafId: null,
 }
 
-const savedWs = loadFromStorage<{ layouts: WorkspaceLayout[]; activeLayoutId: string }>(
+const defaultWorkspace: WorkspaceState = {
+  layouts: { [DEFAULT_LAYOUT_ID]: initialLayout },
+  activeLayoutId: DEFAULT_LAYOUT_ID,
+}
+
+const savedWs = loadFromStorage<WorkspaceState>(
   'sn-workspace',
-  { layouts: [initialLayout], activeLayoutId: DEFAULT_LAYOUT_ID },
+  defaultWorkspace,
   (v) =>
-    typeof v === 'object' &&
-    v !== null &&
-    Array.isArray((v as Record<string, unknown>).layouts) &&
+    typeof v === 'object' && v !== null &&
+    typeof (v as Record<string, unknown>).layouts === 'object' &&
+    !Array.isArray((v as Record<string, unknown>).layouts) &&
     typeof (v as Record<string, unknown>).activeLayoutId === 'string',
 )
 
@@ -81,7 +86,11 @@ createRoot(() => {
 // ── Selectors ────────────────────────────────────────────────────────────────
 
 export function activeLayout(): WorkspaceLayout {
-  return workspaceStore.layouts.find(l => l.id === workspaceStore.activeLayoutId)!
+  return workspaceStore.layouts[workspaceStore.activeLayoutId]
+}
+
+export function layoutList(): WorkspaceLayout[] {
+  return Object.values(workspaceStore.layouts)
 }
 
 export function activeRoot(): WorkspaceRoot {
@@ -133,12 +142,8 @@ function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | nu
   return null
 }
 
-function layoutIdx(): number {
-  return workspaceStore.layouts.findIndex(l => l.id === workspaceStore.activeLayoutId)
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const setLayout = (...args: any[]) => (setWorkspaceStore as any)('layouts', layoutIdx(), ...args)
+const setLayout = (...args: any[]) => (setWorkspaceStore as any)('layouts', workspaceStore.activeLayoutId, ...args)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const setRoot = (...args: any[]) => setLayout('root', ...args)
 
@@ -467,7 +472,7 @@ export const workspaceActions = {
       },
       activeLeafId: null,
     }
-    setWorkspaceStore('layouts', (ls: WorkspaceLayout[]) => [...ls, newLayout])
+    setWorkspaceStore('layouts', newId, newLayout)
     setWorkspaceStore('activeLayoutId', newId)
     return newId
   },
@@ -477,18 +482,17 @@ export const workspaceActions = {
   },
 
   renameLayout(id: string, name: string): void {
-    const idx = workspaceStore.layouts.findIndex(l => l.id === id)
-    if (idx === -1) return
-    setWorkspaceStore('layouts', idx, 'name', name)
+    if (!workspaceStore.layouts[id]) return
+    setWorkspaceStore('layouts', id, 'name', name)
   },
 
   deleteLayout(id: string): void {
-    if (workspaceStore.layouts.length <= 1) return
-    const remaining = workspaceStore.layouts.filter(l => l.id !== id)
+    const ids = Object.keys(workspaceStore.layouts)
+    if (ids.length <= 1) return
     const newActiveId = workspaceStore.activeLayoutId === id
-      ? remaining[0].id
+      ? ids.find(lid => lid !== id)!
       : workspaceStore.activeLayoutId
-    setWorkspaceStore('layouts', remaining)
+    setWorkspaceStore('layouts', produce((ls) => { delete ls[id] }))
     setWorkspaceStore('activeLayoutId', newActiveId)
   },
 }

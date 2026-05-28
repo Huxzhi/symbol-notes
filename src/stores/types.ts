@@ -115,9 +115,10 @@ export interface SettingsState {
 // ── Workspace ─────────────────────────────────────────────────────────────────
 
 export interface WorkspaceState {
-  layouts: WorkspaceLayout[]
+  layouts: Record<string, WorkspaceLayout>
   activeLayoutId: string
 }
+
 
 // ── Runtime store (non-serializable + ephemeral UI) ───────────────────────────
 
