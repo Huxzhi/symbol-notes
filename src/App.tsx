@@ -1,103 +1,75 @@
-import { CalendarRange } from 'lucide-solid'
+import { FolderOpen, Network, Settings as SettingsIcon } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
 import { appActions, fileActions } from './stores/runtimeStore'
-import { workspaceActions } from './stores/workspaceStore'
-import { CalendarPanel } from './components/panels/CalendarPanel'
+import { workspaceActions, activeLayout, activeRoot, activeSidebarType } from './stores/workspaceStore'
+import { registerRibbonItem } from './lib/ribbonRegistry'
+import { registerView } from './lib/viewRegistry'
+import { registerPlugin, startPlugins } from './lib/pluginRegistry'
 import { FilesPanel } from './components/panels/FilesPanel'
 import { LinksPanel } from './components/panels/LinksPanel'
 import { OutlinePanel } from './components/panels/OutlinePanel'
 import { TagsPanel } from './components/panels/TagsPanel'
+import { SearchPanel } from './components/panels/SearchPanel'
 import { Ribbon } from './components/Ribbon'
 import { Settings } from './components/Settings'
 import { StatusBar } from './components/StatusBar'
 import { ContextMenu } from './components/ContextMenu'
-import { CalendarViewer } from './components/viewer/CalendarViewer'
+import { ToastContainer } from './components/ToastContainer'
+import { ConfirmModal } from './components/ConfirmModal'
 import { EditorViewer } from './components/viewer/EditorViewer'
 import { ImageViewer } from './components/viewer/ImageViewer'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
 import { registerContextMenu } from './lib/contextMenuRegistry'
-import { registerView } from './lib/viewRegistry'
-import { activeLayout, activeRoot } from './stores/workspaceStore'
 import { settingsStore } from './stores/settingsStore'
 import { initCacheStore } from './stores/cacheStore'
 import { runtimeStore } from './stores/runtimeStore'
+import { CalendarPlugin } from './plugins/calendar'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
 
 export const IMAGE_EXTS = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.svg',
-  '.ico',
-  '.bmp',
-  '.avif',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp', '.avif',
 ])
 
-// ── View registration ─────────────────────────────────────────────────────────
-registerView({
-  kind: 'panel',
-  position: 'left',
-  type: 'files',
-  getDisplayText: () => '文件',
-  component: FilesPanel,
+// ── Core ribbon items (always present) ───────────────────────────────────────
+registerRibbonItem({
+  id: 'files',
+  title: '文件列表',
+  getIcon: () => <FolderOpen size={18} />,
+  onClick: () => workspaceActions.switchSidebarPanel('left', 'files'),
+  isActive: () => activeSidebarType('left') === 'files',
 })
-registerView({
-  kind: 'panel',
-  position: 'left',
-  type: 'calendar-panel',
-  getDisplayText: () => '日历',
-  component: CalendarPanel,
+registerRibbonItem({
+  id: 'graph',
+  title: '知识图谱',
+  getIcon: () => <Network size={18} />,
+  onClick: () => {},
 })
-registerView({
-  kind: 'panel',
-  position: 'right',
-  type: 'links',
-  getDisplayText: () => '链接',
-  component: LinksPanel,
+registerRibbonItem({
+  id: 'settings',
+  title: '设置',
+  getIcon: () => <SettingsIcon size={18} />,
+  onClick: () => appActions.toggleSettings(),
+  position: 'bottom',
 })
-registerView({
-  kind: 'panel',
-  position: 'right',
-  type: 'outline',
-  getDisplayText: () => '大纲',
-  component: OutlinePanel,
-})
-registerView({
-  kind: 'panel',
-  position: 'right',
-  type: 'tags',
-  getDisplayText: () => '标签',
-  component: TagsPanel,
-})
-registerView({
-  kind: 'file',
-  type: 'markdown',
-  getDisplayText: (p) => p.split('/').pop()!,
-  canAcceptFile: (ext) => ext === '.md',
-  component: EditorViewer,
-})
-registerView({
-  kind: 'file',
-  type: 'image',
-  getDisplayText: (p) => p.split('/').pop()!,
-  canAcceptFile: (ext) => IMAGE_EXTS.has(ext),
-  component: ImageViewer,
-})
-registerView({
-  kind: 'page',
-  type: 'calendar',
-  getDisplayText: () => '日历',
-  getIcon: () => <CalendarRange size={11} />,
-  component: CalendarViewer,
-})
+
+// ── Core view registrations ───────────────────────────────────────────────────
+registerView({ kind: 'panel', position: 'left',  type: 'files',   getDisplayText: () => '文件',  component: FilesPanel })
+registerView({ kind: 'panel', position: 'right', type: 'links',   getDisplayText: () => '链接',  component: LinksPanel })
+registerView({ kind: 'panel', position: 'right', type: 'outline', getDisplayText: () => '大纲',  component: OutlinePanel })
+registerView({ kind: 'panel', position: 'right', type: 'tags',    getDisplayText: () => '标签',  component: TagsPanel })
+registerView({ kind: 'panel', position: 'right', type: 'search',  getDisplayText: () => '搜索',  component: SearchPanel })
+registerView({ kind: 'file',  type: 'markdown', getDisplayText: (p) => p.split('/').pop()!, canAcceptFile: (ext) => ext === '.md',          component: EditorViewer })
+registerView({ kind: 'file',  type: 'image',    getDisplayText: (p) => p.split('/').pop()!, canAcceptFile: (ext) => IMAGE_EXTS.has(ext),    component: ImageViewer })
+
+// ── Plugin registration ───────────────────────────────────────────────────────
+registerPlugin(CalendarPlugin)
+
+startPlugins()
 
 // ── Context menu factories ────────────────────────────────────────────────────
-
 registerContextMenu('tab', (d) => {
   const leafId = d.leafId!
   const tabsId = d.tabsId!
@@ -168,6 +140,8 @@ export default function App() {
         <Settings />
       </Show>
       <ContextMenu />
+      <ToastContainer />
+      <ConfirmModal />
     </div>
   )
 }
