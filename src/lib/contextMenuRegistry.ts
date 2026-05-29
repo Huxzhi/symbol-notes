@@ -10,6 +10,10 @@ export function registerContextMenu(type: string, factory: ItemFactory): void {
   registry.set(type, factory)
 }
 
+export function unregisterContextMenu(type: string): void {
+  registry.delete(type)
+}
+
 export function getMenuItems(type: string, dataset: DOMStringMap): MenuItem[] {
   return registry.get(type)?.(dataset) ?? []
 }
