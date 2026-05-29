@@ -21,6 +21,7 @@ import { TagsPlugin } from './plugins/tags'
 import { SearchPlugin } from './plugins/search'
 import { AppPlugin } from './plugins/app'
 import { CalendarPlugin } from './plugins/calendar'
+import { DailyNotePlugin } from './plugins/daily-note'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
@@ -33,6 +34,7 @@ registerPlugin(TagsPlugin)
 registerPlugin(SearchPlugin)
 registerPlugin(AppPlugin)
 registerPlugin(CalendarPlugin)
+registerPlugin(DailyNotePlugin)
 startPlugins()
 
 export default function App() {
