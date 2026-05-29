@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { cacheStore } from '../../stores/cacheStore'
 import { workspaceActions } from '../../stores/workspaceStore'
+import { definePlugin } from '../../lib/pluginRegistry'
 
 interface TagNode {
   segment: string
@@ -92,7 +93,7 @@ function TagTreeNode(props: {
   )
 }
 
-export function TagsPanel() {
+function TagsPanel() {
   const [collapsed, setCollapsed] = createSignal(new Set<string>())
   const roots = createMemo(() => buildTagTree(cacheStore.tagMap))
 
@@ -129,3 +130,18 @@ export function TagsPanel() {
     </div>
   )
 }
+
+export const TagsPlugin = definePlugin({
+  id: 'tags',
+  name: '标签',
+  core: true,
+  setup(ctx) {
+    ctx.view({
+      kind: 'panel',
+      position: 'right',
+      type: 'tags',
+      getDisplayText: () => '标签',
+      component: TagsPanel,
+    })
+  },
+})

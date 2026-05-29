@@ -1,6 +1,7 @@
 import { createMemo, For, Show } from 'solid-js'
 import { cacheStore } from '../../stores/cacheStore'
 import { workspaceActions } from '../../stores/workspaceStore'
+import { definePlugin } from '../../lib/pluginRegistry'
 import type { ViewComponentProps } from '../../stores/types'
 
 function displayName(path: string): string {
@@ -8,7 +9,7 @@ function displayName(path: string): string {
   return name.endsWith('.md') ? name.slice(0, -3) : name
 }
 
-export function SearchPanel(props: ViewComponentProps) {
+function SearchPanel(props: ViewComponentProps) {
   const tag = () => props.viewState.tag as string | undefined
 
   const results = createMemo(() => {
@@ -54,3 +55,18 @@ export function SearchPanel(props: ViewComponentProps) {
     </div>
   )
 }
+
+export const SearchPlugin = definePlugin({
+  id: 'search',
+  name: '搜索',
+  core: true,
+  setup(ctx) {
+    ctx.view({
+      kind: 'panel',
+      position: 'right',
+      type: 'search',
+      getDisplayText: () => '搜索',
+      component: SearchPanel,
+    })
+  },
+})

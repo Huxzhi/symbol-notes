@@ -2,8 +2,9 @@ import { EditorView } from '@codemirror/view'
 import { createMemo, For, Show } from 'solid-js'
 import { activeLayout } from '../../stores/workspaceStore'
 import { runtimeStore } from '../../stores/runtimeStore'
+import { definePlugin } from '../../lib/pluginRegistry'
 
-export function OutlinePanel() {
+function OutlinePanel() {
   const activeLeafRuntime = () => {
     const { activeLeafId } = activeLayout()
     return activeLeafId ? runtimeStore.leafInstances[activeLeafId] : null
@@ -51,3 +52,18 @@ export function OutlinePanel() {
     </div>
   )
 }
+
+export const OutlinePlugin = definePlugin({
+  id: 'outline',
+  name: '大纲',
+  core: true,
+  setup(ctx) {
+    ctx.view({
+      kind: 'panel',
+      position: 'right',
+      type: 'outline',
+      getDisplayText: () => '大纲',
+      component: OutlinePanel,
+    })
+  },
+})

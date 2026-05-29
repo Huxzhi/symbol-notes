@@ -2,8 +2,9 @@ import { createMemo, For, Show } from 'solid-js'
 import { activeFilePath, activeLayout } from '../../stores/workspaceStore'
 import { cacheStore } from '../../stores/cacheStore'
 import { runtimeStore } from '../../stores/runtimeStore'
+import { definePlugin } from '../../lib/pluginRegistry'
 
-export function LinksPanel() {
+function LinksPanel() {
   const activeLeafRuntime = () => {
     const { activeLeafId } = activeLayout()
     return activeLeafId ? runtimeStore.leafInstances[activeLeafId] : null
@@ -67,3 +68,18 @@ export function LinksPanel() {
     </div>
   )
 }
+
+export const LinksPlugin = definePlugin({
+  id: 'links',
+  name: '链接',
+  core: true,
+  setup(ctx) {
+    ctx.view({
+      kind: 'panel',
+      position: 'right',
+      type: 'links',
+      getDisplayText: () => '链接',
+      component: LinksPanel,
+    })
+  },
+})
