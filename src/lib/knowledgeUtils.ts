@@ -70,8 +70,11 @@ export function extractDateString(val: unknown): string | null {
 }
 
 export function extractDateFromName(name: string): string | null {
-  const m = name.match(/(\d{4}-\d{2}-\d{2})/)
-  return m ? m[1] : null
+  const hyphen = name.match(/(\d{4}-\d{2}-\d{2})/)
+  if (hyphen) return hyphen[1]
+  const compact = name.match(/(?<!\d)(\d{4})(\d{2})(\d{2})(?!\d)/)
+  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
+  return null
 }
 
 export function buildTaskMap(
