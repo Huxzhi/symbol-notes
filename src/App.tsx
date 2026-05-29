@@ -5,7 +5,7 @@ import { workspaceActions, activeLayout, activeRoot, activeSidebarType } from '.
 import { registerRibbonItem } from './lib/ribbonRegistry'
 import { registerView } from './lib/viewRegistry'
 import { registerPlugin, startPlugins } from './lib/pluginRegistry'
-import { FilesPanel } from './components/panels/FilesPanel'
+import { FilesPanel } from './plugins/files/FilesPanel'
 import { LinksPanel } from './components/panels/LinksPanel'
 import { OutlinePanel } from './components/panels/OutlinePanel'
 import { TagsPanel } from './components/panels/TagsPanel'
