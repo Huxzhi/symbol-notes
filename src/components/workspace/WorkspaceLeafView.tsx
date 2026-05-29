@@ -1,7 +1,7 @@
 import { Dynamic } from 'solid-js/web'
 import { ErrorBoundary, onMount, onCleanup } from 'solid-js'
-import { getView } from '../../lib/viewRegistry'
-import type { PanelViewDef } from '../../lib/viewRegistry'
+import { getView } from '../../lib/pluginRegistry'
+import type { PanelViewDef } from '../../lib/pluginRegistry'
 import type { WorkspaceLeaf } from '../../stores/types'
 
 export function WorkspaceLeafView(props: { leaf: WorkspaceLeaf; isActive: boolean }) {

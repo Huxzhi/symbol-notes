@@ -4,7 +4,7 @@ import { fileActions } from '../../stores/runtimeStore'
 import { cacheStore } from '../../stores/cacheStore'
 import { showModal, closeModal } from '../../stores/modalStore'
 import { todayPath } from './formatDate'
-import type { SettingsTabProps } from '../../lib/settingsTabRegistry'
+import type { SettingsTabProps } from '../../lib/pluginRegistry'
 
 const DEFAULTS = { folder: 'journal', dateFormat: 'YYYY-MM-DD', autoCreate: false }
 

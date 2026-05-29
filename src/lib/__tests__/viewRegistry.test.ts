@@ -3,10 +3,10 @@ import {
   registerView,
   getView,
   getFileViewForExt,
-  _clearRegistryForTest,
-} from '../viewRegistry'
+  _clearViewRegistryForTest,
+} from '../pluginRegistry'
 
-beforeEach(() => _clearRegistryForTest())
+beforeEach(() => _clearViewRegistryForTest())
 
 const makeFileDef = (type: string, ext: string) => ({
   kind: 'file' as const,

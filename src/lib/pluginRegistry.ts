@@ -1,17 +1,160 @@
 import { createRoot, createEffect, createSignal, onCleanup } from 'solid-js'
 import { createStore } from 'solid-js/store'
-import { registerView, unregisterView } from './viewRegistry'
-import { registerRibbonItem, unregisterRibbonItem } from './ribbonRegistry'
-import { registerContextMenu, unregisterContextMenu } from './contextMenuRegistry'
-import { registerSettingsTab, unregisterSettingsTab, type SettingsTabInput } from './settingsTabRegistry'
+import type { Component, JSX } from 'solid-js'
 import { settingsStore } from '../stores/settingsStore'
 import { workspaceActions, getLeafsByType, activeLayout, activeFilePath, activeSidebarType } from '../stores/workspaceStore'
 import { loadFromStorage, saveToStorage } from './localStorage'
-import type { ViewDef } from './viewRegistry'
-import type { RibbonItemDef } from './ribbonRegistry'
-import type { MenuItem } from './contextMenuRegistry'
+import type { ViewComponentProps } from '../stores/types'
+
+// ── View Registry ─────────────────────────────────────────────────────────────
+
+export interface FileViewDef {
+  kind: 'file'
+  type: string
+  getDisplayText(path: string): string
+  getIcon?(): JSX.Element
+  canAcceptFile(ext: string): boolean
+  component: Component<ViewComponentProps>
+}
+
+export interface PageViewDef {
+  kind: 'page'
+  type: string
+  getDisplayText(): string
+  getIcon?(): JSX.Element
+  component: Component<ViewComponentProps>
+}
+
+export interface PanelViewDef {
+  kind: 'panel'
+  position: 'left' | 'right'
+  type: string
+  getDisplayText(): string
+  getIcon?(): JSX.Element
+  component: Component<ViewComponentProps>
+  onLeafOpen?(leafId: string): void
+  onLeafClose?(leafId: string): void
+}
+
+export type ViewDef = FileViewDef | PageViewDef | PanelViewDef
+
+const [_viewRegistry, setViewRegistry] = createSignal(new Map<string, ViewDef>())
+
+export function registerView(def: ViewDef): void {
+  setViewRegistry(m => new Map(m).set(def.type, def))
+}
+
+export function unregisterView(type: string): void {
+  setViewRegistry(m => { const n = new Map(m); n.delete(type); return n })
+}
+
+export function getView(type: string): ViewDef | undefined {
+  return _viewRegistry().get(type)
+}
+
+export function getFileViewForExt(ext: string): FileViewDef | undefined {
+  for (const def of _viewRegistry().values()) {
+    if (def.kind === 'file' && def.canAcceptFile(ext)) return def as FileViewDef
+  }
+  return undefined
+}
+
+export function getLeftPanelViews(): PanelViewDef[] {
+  return [..._viewRegistry().values()].filter((d): d is PanelViewDef => d.kind === 'panel' && d.position === 'left')
+}
+
+export function getRightPanelViews(): PanelViewDef[] {
+  return [..._viewRegistry().values()].filter((d): d is PanelViewDef => d.kind === 'panel' && d.position === 'right')
+}
+
+export function _clearViewRegistryForTest(): void {
+  setViewRegistry(new Map())
+}
+
+// ── Ribbon Registry ───────────────────────────────────────────────────────────
+
+export interface RibbonItemDef {
+  id: string
+  title: string
+  getIcon(): JSX.Element
+  onClick(): void
+  isActive?(): boolean
+  position?: 'bottom'
+}
+
+const [_ribbonItems, setRibbonItems] = createSignal<RibbonItemDef[]>([])
+
+export function registerRibbonItem(def: RibbonItemDef): void {
+  setRibbonItems(prev => [...prev, def])
+}
+
+export function unregisterRibbonItem(id: string): void {
+  setRibbonItems(prev => prev.filter(d => d.id !== id))
+}
+
+export function getRibbonItems(position: 'top' | 'bottom' = 'top'): RibbonItemDef[] {
+  return _ribbonItems().filter(d => (d.position ?? 'top') === position)
+}
+
+// ── Settings Tab Registry ─────────────────────────────────────────────────────
+
+export interface SettingsTabProps {
+  getConfig<T extends Record<string, unknown>>(defaults: T): T
+  setConfig(patch: Record<string, unknown>): void
+}
+
+export interface SettingsTabInput {
+  name: string
+  component: Component<SettingsTabProps>
+}
+
+export interface SettingsTabDef extends SettingsTabInput {
+  pluginId: string
+  getConfig<T extends Record<string, unknown>>(defaults: T): T
+  setConfig(patch: Record<string, unknown>): void
+}
+
+const [_settingsTabs, setSettingsTabs] = createSignal<SettingsTabDef[]>([])
+
+export function registerSettingsTab(def: SettingsTabDef): void {
+  setSettingsTabs(prev => [...prev, def])
+}
+
+export function unregisterSettingsTab(pluginId: string): void {
+  setSettingsTabs(prev => prev.filter(t => t.pluginId !== pluginId))
+}
+
+export function getSettingsTabs(): SettingsTabDef[] {
+  return _settingsTabs()
+}
+
+// ── Context Menu Registry ─────────────────────────────────────────────────────
+
+export type MenuItem =
+  | { label: string; action: () => void; disabled?: boolean }
+  | { separator: true }
 
 type ContextMenuFactory = (dataset: DOMStringMap) => MenuItem[]
+
+const _contextMenuRegistry = new Map<string, ContextMenuFactory>()
+
+export function registerContextMenu(type: string, factory: ContextMenuFactory): void {
+  _contextMenuRegistry.set(type, factory)
+}
+
+export function unregisterContextMenu(type: string): void {
+  _contextMenuRegistry.delete(type)
+}
+
+export function getMenuItems(type: string, dataset: DOMStringMap): MenuItem[] {
+  return _contextMenuRegistry.get(type)?.(dataset) ?? []
+}
+
+export function _resetContextMenuForTest(): void {
+  _contextMenuRegistry.clear()
+}
+
+// ── Plugin Lifecycle ──────────────────────────────────────────────────────────
 
 export interface PluginContext {
   view(def: ViewDef): void

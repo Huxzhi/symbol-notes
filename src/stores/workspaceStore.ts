@@ -1,7 +1,7 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { loadFromStorage, saveToStorage } from '../lib/localStorage'
-import { getFileViewForExt, getView } from '../lib/viewRegistry'
+import { getFileViewForExt, getView } from '../lib/pluginRegistry'
 import { setRuntimeStore } from './runtimeStore'
 import type {
   ViewState,

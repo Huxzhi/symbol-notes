@@ -1,7 +1,7 @@
 import { For, Show, onMount, onCleanup } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Portal } from 'solid-js/web'
-import { getMenuItems, type MenuItem } from '../lib/contextMenuRegistry'
+import { getMenuItems, type MenuItem } from '../lib/pluginRegistry'
 
 type MenuState = { x: number; y: number; items: MenuItem[] } | null
 

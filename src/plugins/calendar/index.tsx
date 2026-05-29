@@ -2,7 +2,7 @@ import { CalendarDays, CalendarRange } from 'lucide-solid'
 import { definePlugin } from '../../lib/pluginRegistry'
 import { CalendarPanel } from './CalendarPanel'
 import { CalendarViewer } from './CalendarViewer'
-import type { SettingsTabProps } from '../../lib/settingsTabRegistry'
+import type { SettingsTabProps } from '../../lib/pluginRegistry'
 
 function CalendarSettings(props: SettingsTabProps) {
   const config = () => props.getConfig({

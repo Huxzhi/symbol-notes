@@ -3,10 +3,10 @@ import {
   registerContextMenu,
   getMenuItems,
   unregisterContextMenu,
-  _resetForTest,
-} from '../contextMenuRegistry'
+  _resetContextMenuForTest,
+} from '../pluginRegistry'
 
-beforeEach(() => _resetForTest())
+beforeEach(() => _resetContextMenuForTest())
 
 describe('registerContextMenu', () => {
   it('returns items from registered factory', () => {

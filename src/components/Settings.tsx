@@ -3,7 +3,7 @@ import { Dynamic } from 'solid-js/web'
 import { settingsActions, settingsStore } from '../stores/settingsStore'
 import { setRuntimeStore } from '../stores/runtimeStore'
 import { getRegisteredPlugins } from '../lib/pluginRegistry'
-import { getSettingsTabs } from '../lib/settingsTabRegistry'
+import { getSettingsTabs } from '../lib/pluginRegistry'
 import type { ThemeId } from '../stores/types'
 
 const BUILTIN_SECTIONS = [
