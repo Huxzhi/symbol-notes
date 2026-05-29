@@ -89,6 +89,30 @@ export function activeLayout(): WorkspaceLayout {
   return workspaceStore.layouts[workspaceStore.activeLayoutId]
 }
 
+export function getLeafsByType(type: string): string[] {
+  const results: string[] = []
+  function walk(node: WorkspaceNode) {
+    if (node.type === 'leaf' && node.viewState.type === type) results.push(node.id)
+    else if (node.type === 'tabs') node.children.forEach(walk)
+    else if (node.type === 'split') node.children.forEach(walk)
+  }
+  walk(activeRoot().main)
+  return results
+}
+
+export function activeSidebarType(side: 'left' | 'right'): string | null {
+  const sidebar = activeRoot()[side]
+  if (sidebar.collapsed) return null
+  for (const node of sidebar.children) {
+    if (node.type === 'tabs' && (node as WorkspaceTabs).activeLeafId) {
+      const tabs = node as WorkspaceTabs
+      const leaf = tabs.children.find(l => l.id === tabs.activeLeafId)
+      if (leaf) return leaf.viewState.type
+    }
+  }
+  return null
+}
+
 export function layoutList(): WorkspaceLayout[] {
   return Object.values(workspaceStore.layouts)
 }
@@ -415,6 +439,46 @@ export const workspaceActions = {
       children.map(node =>
         node.type === 'tabs' && node.children.some(l => l.id === leafId)
           ? { ...node, activeLeafId: leafId }
+          : node,
+      ),
+    )
+  },
+
+  switchSidebarPanel(side: 'left' | 'right', type: string): void {
+    const sidebar = activeRoot()[side]
+    const isOpen = !sidebar.collapsed
+    const currentType = activeSidebarType(side)
+    if (currentType === type && isOpen) {
+      workspaceActions.toggleSidebar(side)
+      return
+    }
+    for (const node of sidebar.children) {
+      if (node.type === 'tabs') {
+        const tabs = node as WorkspaceTabs
+        const leaf = tabs.children.find(l => l.viewState.type === type)
+        if (leaf) { workspaceActions.activateSidebarLeaf(side, leaf.id); break }
+      }
+    }
+    if (!isOpen) workspaceActions.toggleSidebar(side)
+  },
+
+  openSidebarPanel(area: 'left' | 'right', type: string, state: Record<string, unknown> = {}): void {
+    const viewState: ViewState = { type, state }
+    const sideChildren = activeRoot()[area].children
+    const firstTabs = sideChildren.find(n => n.type === 'tabs') as WorkspaceTabs | undefined
+    if (!firstTabs) return
+    const existing = firstTabs.children.find(l => l.viewState.type === type)
+    if (existing) {
+      workspaceActions.setLeafViewState(existing.id, viewState)
+      workspaceActions.activateSidebarLeaf(area, existing.id)
+      return
+    }
+    const leafId = crypto.randomUUID()
+    const leaf: WorkspaceLeaf = { type: 'leaf', id: leafId, viewState, pinned: false }
+    setRoot(area, 'children',
+      sideChildren.map(node =>
+        node.type === 'tabs' && node.id === firstTabs.id
+          ? { ...(node as WorkspaceTabs), children: [...firstTabs.children, leaf], activeLeafId: leafId }
           : node,
       ),
     )

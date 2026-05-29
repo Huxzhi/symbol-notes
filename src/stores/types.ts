@@ -110,6 +110,7 @@ export interface SettingsState {
   customCSS: string
   autoTimestamps: boolean
   showOtherFiles: boolean
+  pluginStates: Record<string, boolean>
 }
 
 // ── Workspace ─────────────────────────────────────────────────────────────────

@@ -130,3 +130,8 @@ html, body, #root {
   transition: background .15s, color .15s;
 }
 .interactive:hover { background: var(--bg-hover); color: var(--text); }
+
+@keyframes toast-in {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
