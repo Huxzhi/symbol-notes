@@ -1,4 +1,4 @@
-import { Network, Settings as SettingsIcon } from 'lucide-solid'
+import { Settings as SettingsIcon } from 'lucide-solid'
 import { definePlugin } from '../../lib/pluginRegistry'
 import { appActions } from '../../stores/runtimeStore'
 
@@ -7,13 +7,6 @@ export const AppPlugin = definePlugin({
   name: '应用',
   core: true,
   setup(ctx) {
-    ctx.ribbon({
-      id: 'graph',
-      title: '知识图谱',
-      getIcon: () => <Network size={18} />,
-      onClick: () => {},
-    })
-
     ctx.ribbon({
       id: 'settings',
       title: '设置',
