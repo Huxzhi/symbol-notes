@@ -3,26 +3,20 @@ import { createSignal, For, Show } from 'solid-js'
 
 import { appActions, fileActions } from '../../stores/runtimeStore'
 import { workspaceActions } from '../../stores/workspaceStore'
-import { toggleInArray } from '../../lib/arrayUtils'
-import { activeFilePath } from '../../stores/workspaceStore'
-import { cacheStore } from '../../stores/cacheStore'
-import { settingsStore } from '../../stores/settingsStore'
-import { runtimeStore } from '../../stores/runtimeStore'
-import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
-import { showError, showToast } from '../../stores/toastStore'
-import type { FileMeta, ViewComponentProps } from '../../stores/types'
 
-const IMAGE_EXTS = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.svg',
-  '.ico',
-  '.bmp',
-  '.avif',
-])
+import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
+import { cacheStore } from '../../stores/cacheStore'
+import { runtimeStore } from '../../stores/runtimeStore'
+import { settingsStore } from '../../stores/settingsStore'
+import { showError, showToast } from '../../stores/toastStore'
+import { getFileViewForExt } from '../../lib/pluginRegistry'
+import type { FileMeta, ViewComponentProps } from '../../stores/types'
+import { activeFilePath } from '../../stores/workspaceStore'
+
+export function toggleInArray(arr: string[], val: string): string[] {
+  return arr.includes(val) ? arr.filter((p) => p !== val) : [...arr, val]
+}
+
 const MD_EXT = '.md'
 
 function displayName(name: string): string {
@@ -35,7 +29,7 @@ function isOtherFile(name: string): boolean {
 
 function canOpen(name: string): boolean {
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
-  return name.endsWith(MD_EXT) || IMAGE_EXTS.has(ext)
+  return getFileViewForExt(ext) !== undefined
 }
 
 function childrenOf(parentPath: string | null): FileMeta[] {
