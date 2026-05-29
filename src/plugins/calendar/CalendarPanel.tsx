@@ -1,12 +1,12 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
+import { cacheStore } from '../../stores/cacheStore'
 import { workspaceActions } from '../../stores/workspaceStore'
 import {
   buildCalendarGrid,
   buildDayData,
   toIsoDate,
   WEEKDAYS_SHORT,
-} from '../../lib/calendarUtils'
-import { cacheStore } from '../../stores/cacheStore'
+} from './calendarUtils'
 
 export function CalendarPanel() {
   const now = new Date()

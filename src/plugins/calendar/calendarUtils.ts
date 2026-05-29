@@ -1,15 +1,26 @@
-import type { Task } from '../stores/types'
+import type { Task } from '../../stores/types'
 
 export const WEEKDAYS_SHORT = ['一', '二', '三', '四', '五', '六', '日']
-export const WEEKDAYS_LONG  = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+export const WEEKDAYS_LONG = [
+  '周一',
+  '周二',
+  '周三',
+  '周四',
+  '周五',
+  '周六',
+  '周日',
+]
 
 export function toIsoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
-export function buildCalendarGrid(year: number, month: number): (number | null)[] {
-  const firstDow = new Date(year, month, 1).getDay()   // 0=Sun
-  const startOffset = (firstDow + 6) % 7               // Mon=0 … Sun=6
+export function buildCalendarGrid(
+  year: number,
+  month: number,
+): (number | null)[] {
+  const firstDow = new Date(year, month, 1).getDay() // 0=Sun
+  const startOffset = (firstDow + 6) % 7 // Mon=0 … Sun=6
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const cells: (number | null)[] = []
   for (let i = 0; i < startOffset; i++) cells.push(null)
@@ -19,7 +30,7 @@ export function buildCalendarGrid(year: number, month: number): (number | null)[
 }
 
 const RE_DATE_COMPACT = /^(\d{4})(\d{2})(\d{2})/
-const RE_DATE_DASHED  = /^(\d{4})-(\d{2})-(\d{2})/
+const RE_DATE_DASHED = /^(\d{4})-(\d{2})-(\d{2})/
 
 function stemDate(path: string): string | null {
   const stem = path.split('/').pop()!.replace(/\.md$/, '')
@@ -39,16 +50,22 @@ export function buildTaskDayData(tasks: Task[]): Record<string, Task[]> {
   return map
 }
 
-export function buildDayData(index: Record<string, { frontmatter: Record<string, unknown> }>) {
+export function buildDayData(
+  index: Record<string, { frontmatter: Record<string, unknown> }>,
+) {
   const created: Record<string, string[]> = {}
   const updated: Record<string, string[]> = {}
-  const dated:   Record<string, string[]> = {}
+  const dated: Record<string, string[]> = {}
   for (const [path, meta] of Object.entries(index)) {
     const fm = meta.frontmatter
-    const c = typeof fm.created === 'string' && fm.created.length >= 10
-      ? fm.created.slice(0, 10) : null
-    const u = typeof fm.updated === 'string' && fm.updated.length >= 10
-      ? fm.updated.slice(0, 10) : null
+    const c =
+      typeof fm.created === 'string' && fm.created.length >= 10
+        ? fm.created.slice(0, 10)
+        : null
+    const u =
+      typeof fm.updated === 'string' && fm.updated.length >= 10
+        ? fm.updated.slice(0, 10)
+        : null
     if (c) (created[c] ??= []).push(path)
     if (u && u !== c) (updated[u] ??= []).push(path)
     const d = stemDate(path)

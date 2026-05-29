@@ -1,4 +1,5 @@
 import { syntaxTree } from '@codemirror/language'
+import { RangeSetBuilder } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -7,12 +8,22 @@ import {
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
-import { RangeSetBuilder } from '@codemirror/state'
 import { cacheStore } from '../stores/cacheStore'
 import { runtimeStore } from '../stores/runtimeStore'
-import { IMAGE_EXTS } from './fileTypes'
+
 import { parseFrontmatter } from './parseFrontmatter'
 
+export const IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.ico',
+  '.bmp',
+  '.avif',
+])
 // ── Target resolution via fileMap (available before knowledge scan) ───────────
 
 function resolveEmbedTarget(target: string): string | null {
@@ -20,7 +31,7 @@ function resolveEmbedTarget(target: string): string | null {
   const hasExt = stem.includes('.')
   const searchName = hasExt ? stem : `${stem}.md`
   const entry = Object.values(cacheStore.files).find(
-    e => e.kind === 'file' && e.name === searchName,
+    (e) => e.kind === 'file' && e.name === searchName,
   )
   return entry?.path ?? null
 }
@@ -35,7 +46,10 @@ export function clearEmbedUrlCache() {
 
 // ── File loading ──────────────────────────────────────────────────────────────
 
-async function getFile(path: string, root: FileSystemDirectoryHandle): Promise<File> {
+async function getFile(
+  path: string,
+  root: FileSystemDirectoryHandle,
+): Promise<File> {
   const parts = path.split('/')
   let dir: FileSystemDirectoryHandle = root
   for (let i = 0; i < parts.length - 1; i++) {
@@ -44,7 +58,10 @@ async function getFile(path: string, root: FileSystemDirectoryHandle): Promise<F
   return (await dir.getFileHandle(parts[parts.length - 1])).getFile()
 }
 
-async function getImageDataUrl(path: string, root: FileSystemDirectoryHandle): Promise<string> {
+async function getImageDataUrl(
+  path: string,
+  root: FileSystemDirectoryHandle,
+): Promise<string> {
   const cached = imageUrlCache.get(path)
   if (cached) return cached
   const file = await getFile(path, root)
@@ -81,7 +98,10 @@ function markdownToHtml(md: string): string {
   for (const line of lines) {
     if (line.startsWith('```')) {
       if (!inCode) {
-        if (inPara) { html += '</p>'; inPara = false }
+        if (inPara) {
+          html += '</p>'
+          inPara = false
+        }
         html += '<pre><code>'
         inCode = true
       } else {
@@ -90,28 +110,43 @@ function markdownToHtml(md: string): string {
       }
       continue
     }
-    if (inCode) { html += esc(line) + '\n'; continue }
+    if (inCode) {
+      html += esc(line) + '\n'
+      continue
+    }
 
     if (!line.trim()) {
-      if (inPara) { html += '</p>'; inPara = false }
+      if (inPara) {
+        html += '</p>'
+        inPara = false
+      }
       continue
     }
 
     const hm = line.match(/^(#{1,6})\s+(.*)/)
     if (hm) {
-      if (inPara) { html += '</p>'; inPara = false }
+      if (inPara) {
+        html += '</p>'
+        inPara = false
+      }
       html += `<h${hm[1].length} class="cm-embed-h">${inlineHtml(hm[2])}</h${hm[1].length}>`
       continue
     }
 
     const lm = line.match(/^[-*+]\s+(.*)/)
     if (lm) {
-      if (inPara) { html += '</p>'; inPara = false }
+      if (inPara) {
+        html += '</p>'
+        inPara = false
+      }
       html += `<div class="cm-embed-li">• ${inlineHtml(lm[1])}</div>`
       continue
     }
 
-    if (!inPara) { html += '<p>'; inPara = true } else html += ' '
+    if (!inPara) {
+      html += '<p>'
+      inPara = true
+    } else html += ' '
     html += inlineHtml(line)
   }
 
@@ -126,7 +161,12 @@ function markdownToHtml(md: string): string {
 // in a "missing" state after the file tree becomes available.
 
 class EmbedWidget extends WidgetType {
-  constructor(readonly target: string, readonly resolved: string) { super() }
+  constructor(
+    readonly target: string,
+    readonly resolved: string,
+  ) {
+    super()
+  }
 
   eq(other: EmbedWidget) {
     return other.target === this.target && other.resolved === this.resolved
@@ -137,15 +177,21 @@ class EmbedWidget extends WidgetType {
     const el = document.createElement('div')
     el.className = 'cm-embed'
 
-    const ext = this.resolved.slice(this.resolved.lastIndexOf('.')).toLowerCase()
+    const ext = this.resolved
+      .slice(this.resolved.lastIndexOf('.'))
+      .toLowerCase()
     if (IMAGE_EXTS.has(ext)) {
       const img = document.createElement('img')
       img.className = 'cm-embed-img'
       img.alt = this.target
       el.appendChild(img)
       getImageDataUrl(this.resolved, root)
-        .then(url => { img.src = url })
-        .catch(() => { el.textContent = `[图片加载失败: ${this.target}]` })
+        .then((url) => {
+          img.src = url
+        })
+        .catch(() => {
+          el.textContent = `[图片加载失败: ${this.target}]`
+        })
     } else {
       el.className += ' cm-embed-md'
       const title = document.createElement('div')
@@ -156,14 +202,20 @@ class EmbedWidget extends WidgetType {
       el.appendChild(title)
       el.appendChild(body)
       getFile(this.resolved, root)
-        .then(async f => { body.innerHTML = markdownToHtml(await f.text()) })
-        .catch(() => { body.textContent = `[文件加载失败: ${this.target}]` })
+        .then(async (f) => {
+          body.innerHTML = markdownToHtml(await f.text())
+        })
+        .catch(() => {
+          body.textContent = `[文件加载失败: ${this.target}]`
+        })
     }
 
     return el
   }
 
-  ignoreEvent() { return false }
+  ignoreEvent() {
+    return false
+  }
 }
 
 // ── ViewPlugin ────────────────────────────────────────────────────────────────
@@ -176,7 +228,8 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
-      from, to,
+      from,
+      to,
       enter(node) {
         if (node.name !== 'WikiEmbed') return
         if (sel.from <= node.to && sel.to >= node.from) return false
@@ -185,7 +238,8 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
         const c = node.node.cursor()
         if (c.firstChild()) {
           do {
-            if (c.name === 'WikiEmbedTarget') target = state.doc.sliceString(c.from, c.to).trim()
+            if (c.name === 'WikiEmbedTarget')
+              target = state.doc.sliceString(c.from, c.to).trim()
           } while (c.nextSibling())
         }
         if (!target) return false
@@ -195,7 +249,11 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
         const resolved = resolveEmbedTarget(target)
         if (!resolved) return false
 
-        builder.add(node.from, node.to, Decoration.replace({ widget: new EmbedWidget(target, resolved) }))
+        builder.add(
+          node.from,
+          node.to,
+          Decoration.replace({ widget: new EmbedWidget(target, resolved) }),
+        )
         return false
       },
     })
@@ -207,14 +265,16 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
 export const embedPreviewPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
-    constructor(view: EditorView) { this.decorations = buildEmbedDecos(view) }
+    constructor(view: EditorView) {
+      this.decorations = buildEmbedDecos(view)
+    }
     update(update: ViewUpdate) {
       if (update.docChanged || update.selectionSet || update.viewportChanged) {
         this.decorations = buildEmbedDecos(update.view)
       }
     }
   },
-  { decorations: v => v.decorations },
+  { decorations: (v) => v.decorations },
 )
 
 // ── Theme ─────────────────────────────────────────────────────────────────────

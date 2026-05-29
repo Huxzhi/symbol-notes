@@ -1,14 +1,14 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
+import { cacheStore } from '../../stores/cacheStore'
+import type { ViewComponentProps } from '../../stores/types'
+import { workspaceActions } from '../../stores/workspaceStore'
 import {
   buildCalendarGrid,
   buildDayData,
   buildTaskDayData,
   toIsoDate,
   WEEKDAYS_LONG,
-} from '../../lib/calendarUtils'
-import { cacheStore } from '../../stores/cacheStore'
-import type { ViewComponentProps } from '../../stores/types'
-import { workspaceActions } from '../../stores/workspaceStore'
+} from './calendarUtils'
 
 export function CalendarViewer(_props: ViewComponentProps) {
   const now = new Date()
