@@ -95,7 +95,14 @@ export function WorkspaceTabsView(props: {
             setInsertBeforeId('__end__')
 
             if (props.area !== 'main') {
-              if (state.sourceArea !== 'main' && state.sourceArea !== props.area) {
+              if (state.sourceArea === props.area) {
+                workspaceActions.reorderSidebarLeafInTabs(
+                  props.area as 'left' | 'right',
+                  props.node.id,
+                  state.leafId,
+                  beforeId,
+                )
+              } else if (state.sourceArea !== 'main') {
                 workspaceActions.moveSidebarLeaf(
                   state.leafId,
                   state.sourceArea as 'left' | 'right',

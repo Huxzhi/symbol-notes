@@ -495,6 +495,12 @@ export const workspaceActions = {
     )
   },
 
+  reorderSidebarLeafInTabs(side: 'left' | 'right', tabsId: string, leafId: string, insertBeforeLeafId: string | null): void {
+    setRoot(side, 'children', (children: WorkspaceNode[]) =>
+      children.map(node => reorderLeafInTabsTree(node, tabsId, leafId, insertBeforeLeafId)),
+    )
+  },
+
   moveLeafToTabs(leafId: string, targetTabsId: string, insertBeforeLeafId: string | null): void {
     const root = activeLayout().root.main
     const leaf = findLeafInTree(root, leafId)
