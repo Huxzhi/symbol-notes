@@ -150,6 +150,12 @@ export function WorkspaceTabsView(props: {
                         ? 'bg-(--bg-base) text-(--text) border-b-2 border-b-(--accent) -mb-px'
                         : 'text-(--text-3) hover:bg-(--bg-hover)'}
                       ${isBeingDragged() ? 'opacity-40' : ''}`}
+                    onMouseDown={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault()
+                        if (!isPanelLeaf()) workspaceActions.closeLeaf(leaf.id)
+                      }
+                    }}
                     onClick={() => {
                       if (isPanelLeaf()) {
                         workspaceActions.activateSidebarLeafById(leaf.id)
