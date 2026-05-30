@@ -3,7 +3,15 @@ import { createStore, produce } from 'solid-js/store'
 import { loadFromStorage, saveToStorage } from '../lib/localStorage'
 import { getFileViewForExt, getView } from '../lib/pluginRegistry'
 import { setRuntimeStore } from './runtimeStore'
-import { mapNode, findParentTabs, findTabsById } from './workspaceTreeHelpers'
+import {
+  mapNode,
+  findParentTabs,
+  findTabsById,
+  removeLeafFromTree,
+  insertLeafIntoTabs,
+  reorderLeafInTabsTree,
+  splitTabsWithLeaf,
+} from './workspaceTreeHelpers'
 import type {
   ViewState,
   WorkspaceLayout,
@@ -479,6 +487,63 @@ export const workspaceActions = {
       ),
     )
     return newLeafId
+  },
+
+  reorderLeafInTabs(tabsId: string, leafId: string, insertBeforeLeafId: string | null): void {
+    setRoot('main', (root: WorkspaceNode) =>
+      reorderLeafInTabsTree(root, tabsId, leafId, insertBeforeLeafId),
+    )
+  },
+
+  moveLeafToTabs(leafId: string, targetTabsId: string, insertBeforeLeafId: string | null): void {
+    const root = activeLayout().root.main
+    const leaf = findLeafInTree(root, leafId)
+    if (!leaf) return
+    const afterRemove = removeLeafFromTree(root, leafId) ??
+      ({ type: 'tabs', id: ROOT_TABS_ID, activeLeafId: null, children: [] } as WorkspaceTabs)
+    const updated = insertLeafIntoTabs(afterRemove, targetTabsId, leaf, insertBeforeLeafId)
+    setRoot('main', updated)
+    setLayout('activeLeafId', leafId)
+  },
+
+  moveLeafAsSplit(leafId: string, targetTabsId: string, side: 'left' | 'right' | 'bottom'): void {
+    const root = activeLayout().root.main
+    const leaf = findLeafInTree(root, leafId)
+    if (!leaf) return
+    const sourceTabs = findParentTabs(root, leafId)
+    if (sourceTabs && sourceTabs.id === targetTabsId && sourceTabs.children.length === 1) return
+    const afterRemove = removeLeafFromTree(root, leafId) ??
+      ({ type: 'tabs', id: ROOT_TABS_ID, activeLeafId: null, children: [] } as WorkspaceTabs)
+    const actualTargetId = findTabsById(afterRemove, targetTabsId) ? targetTabsId : ROOT_TABS_ID
+    const updated = splitTabsWithLeaf(afterRemove, actualTargetId, leaf, side)
+    setRoot('main', updated)
+    setLayout('activeLeafId', leafId)
+  },
+
+  moveSidebarLeaf(leafId: string, fromSide: 'left' | 'right', toSide: 'left' | 'right'): void {
+    const root = activeLayout().root
+    let movedLeaf: WorkspaceLeaf | null = null
+    const updatedFrom = root[fromSide].children.map((node) => {
+      if (node.type !== 'tabs') return node
+      const tabs = node as WorkspaceTabs
+      const found = tabs.children.find(l => l.id === leafId)
+      if (!found) return node
+      movedLeaf = found
+      const remaining = tabs.children.filter(l => l.id !== leafId)
+      const nextActive = tabs.activeLeafId === leafId
+        ? (remaining[remaining.length - 1]?.id ?? null)
+        : tabs.activeLeafId
+      return { ...tabs, children: remaining, activeLeafId: nextActive }
+    })
+    if (!movedLeaf) return
+    const leaf = movedLeaf
+    const updatedTo = root[toSide].children.map((node) =>
+      node.type === 'tabs'
+        ? { ...(node as WorkspaceTabs), children: [...(node as WorkspaceTabs).children, leaf], activeLeafId: leaf.id }
+        : node,
+    )
+    setRoot(fromSide, 'children', updatedFrom)
+    setRoot(toSide, 'children', updatedTo)
   },
 
   createLayout(name: string): string {
