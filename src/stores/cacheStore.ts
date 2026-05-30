@@ -5,7 +5,7 @@ import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
 import type { ParseResult } from '../lib/parseMarkdown'
 import { hashContent, getCachedMeta, setCachedMeta } from '../services/fileCacheService'
-import { extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName } from '../lib/knowledgeUtils'
+import { extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName, buildBacklinkMap, buildTagMap, buildTaskMap } from '../lib/knowledgeUtils'
 import type { CacheState, FileMeta, TaskItem } from './types'
 
 const [cacheStore, setCacheStore] = createStore<CacheState>({
@@ -16,16 +16,25 @@ const [cacheStore, setCacheStore] = createStore<CacheState>({
 })
 
 export async function initCacheStore(): Promise<void> {
-  const saved = await get<CacheState>('sn-cache')
-  if (saved) setCacheStore(reconcile(saved))
+  const saved = await get<{ files: Record<string, FileMeta> }>('sn-cache')
+  if (!saved?.files) return
+  const mdFiles = Object.fromEntries(
+    Object.entries(saved.files).filter(([p]) => p.endsWith('.md')),
+  )
+  setCacheStore(reconcile({
+    files: saved.files,
+    backlinkMap: buildBacklinkMap(mdFiles),
+    tagMap: buildTagMap(mdFiles),
+    taskMap: buildTaskMap(mdFiles),
+  }))
 }
 
 let _saveTimer: ReturnType<typeof setTimeout> | null = null
 createRoot(() => {
   createEffect(() => {
-    const snapshot = JSON.parse(JSON.stringify(cacheStore)) as CacheState
+    const files = JSON.parse(JSON.stringify(cacheStore.files)) as Record<string, FileMeta>
     if (_saveTimer) clearTimeout(_saveTimer)
-    _saveTimer = setTimeout(() => set('sn-cache', snapshot), 500)
+    _saveTimer = setTimeout(() => set('sn-cache', { files }), 500)
   })
 })
 
