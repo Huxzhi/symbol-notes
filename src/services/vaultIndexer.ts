@@ -2,10 +2,11 @@ import { vaultStore, setVaultStore } from '../stores/vaultStore'
 import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
+import { readFile } from './fileIO'
 import {
   hashContent, getCachedMeta, setCachedMeta, pruneCache,
-  readFile, loadAllFileStats, setFileStatEntry, pruneFileStatCache,
-} from './fileCacheService'
+  loadAllFileStats, setFileStatEntry, pruneFileStatCache,
+} from './indexStorage'
 import {
   extractTags, extractAliases, mergeTagsWithBody, buildBacklinkMap, buildTagMap,
   extractDateString, extractDateFromName, buildTaskMap,

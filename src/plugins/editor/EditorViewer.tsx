@@ -30,7 +30,7 @@ import {
   setFrontmatterField,
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/wikiLinkParser'
-import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileCacheService'
+import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileIO'
 import { settingsStore } from '../../stores/settingsStore'
 import { runtimeStore, setRuntimeStore } from '../../stores/runtimeStore'
 import type { ViewComponentProps } from '../../stores/types'

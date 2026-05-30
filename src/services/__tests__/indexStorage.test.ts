@@ -15,12 +15,8 @@ vi.mock('idb-keyval', () => ({
   getMany: mockGetMany,
 }))
 
-vi.mock('../../stores/runtimeStore', () => ({
-  runtimeStore: { rootHandle: null },
-}))
-
 const { loadAllFileStats, setFileStatEntry, deleteFileStatEntry, pruneFileStatCache } =
-  await import('../fileCacheService')
+  await import('../indexStorage')
 
 describe('file-stat-cache', () => {
   beforeEach(() => {

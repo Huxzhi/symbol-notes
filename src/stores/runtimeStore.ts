@@ -1,13 +1,8 @@
 import { get, set } from 'idb-keyval'
 import { createStore, produce } from 'solid-js/store'
 import { vaultActions, vaultStore, setVaultStore } from './vaultStore'
-import {
-  clearContentCache,
-  deleteFileStatEntry,
-  invalidateFile,
-  readFile,
-  writeFile,
-} from '../services/fileCacheService'
+import { clearContentCache, invalidateFile, readFile, writeFile } from '../services/fileIO'
+import { deleteFileStatEntry } from '../services/indexStorage'
 import { clearEmbedUrlCache } from '../lib/embedExtension'
 import type { FileMeta, RuntimeState } from './types'
 
@@ -39,7 +34,7 @@ export const appActions = {
     setRuntimeStore('rootHandle', handle)
     const { workspaceActions } = await import('./workspaceStore')
     workspaceActions.clearAllLeaves()
-    const { scanAndIndex } = await import('../services/indexService')
+    const { scanAndIndex } = await import('../services/vaultIndexer')
     await scanAndIndex()
   },
 
@@ -51,7 +46,7 @@ export const appActions = {
       if (perm !== 'granted') return
       clearContentCache()
       setRuntimeStore('rootHandle', handle)
-      const { scanAndIndex } = await import('../services/indexService')
+      const { scanAndIndex } = await import('../services/vaultIndexer')
       await scanAndIndex()
     } catch { /* handle invalidated */ }
   },

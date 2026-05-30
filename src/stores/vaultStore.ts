@@ -4,7 +4,7 @@ import { get, set } from 'idb-keyval'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
 import type { ParseResult } from '../lib/parseMarkdown'
-import { hashContent, getCachedMeta, setCachedMeta } from '../services/fileCacheService'
+import { hashContent, getCachedMeta, setCachedMeta } from '../services/indexStorage'
 import { extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName, buildBacklinkMap, buildTagMap, buildTaskMap } from '../lib/knowledgeUtils'
 import type { VaultState, FileMeta, TaskItem } from './types'
 
