@@ -1,17 +1,12 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import { get, set } from 'idb-keyval'
-import { EditorState } from '@codemirror/state'
-import { markdown } from '@codemirror/lang-markdown'
-import { GFM } from '@lezer/markdown'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { wikiLinkParser } from '../lib/wikiLinkParser'
-import { outLinksField } from '../lib/outLinksField'
-import { inlineTagsField } from '../lib/inlineTagsField'
+import { parseMarkdown } from '../lib/parseMarkdown'
+import type { ParseResult } from '../lib/parseMarkdown'
 import { hashContent, getCachedMeta, setCachedMeta } from '../services/fileCacheService'
 import { extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName } from '../lib/knowledgeUtils'
-import { tasksField } from '../lib/tasksField'
-import type { CacheState, FileMeta, Task, TaskItem } from './types'
+import type { CacheState, FileMeta, TaskItem } from './types'
 
 const [cacheStore, setCacheStore] = createStore<CacheState>({
   files: {},
@@ -36,30 +31,7 @@ createRoot(() => {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface CmParsed { outLinks: string[]; inlineTags: string[]; tasks?: TaskItem[] }
-
 type ContentFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'tasks'>
-
-// ── Internal helpers ──────────────────────────────────────────────────────────
-
-function parseWithCm6(content: string): CmParsed {
-  const state = EditorState.create({
-    doc: content,
-    extensions: [
-      markdown({ extensions: [GFM, wikiLinkParser] }),
-      outLinksField,
-      inlineTagsField,
-      tasksField,
-    ],
-  })
-  return {
-    outLinks: state.field(outLinksField)
-      .filter(l => l.type === 'wiki')
-      .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`),
-    inlineTags: state.field(inlineTagsField).map(m => m.tag),
-    tasks: state.field(tasksField),
-  }
-}
 
 function applyContent(path: string, hash: string, content: ContentFields): void {
   const prev = cacheStore.files[path]
@@ -99,7 +71,7 @@ function applyContent(path: string, hash: string, content: ContentFields): void 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 export const cacheActions = {
-  async reindexFile(path: string, content: string, cmParsed?: CmParsed): Promise<void> {
+  async reindexFile(path: string, content: string, cmParsed?: ParseResult): Promise<void> {
     const hash = hashContent(content)
     const cached = await getCachedMeta(hash)
     let fields: ContentFields
@@ -107,8 +79,7 @@ export const cacheActions = {
       fields = cached
     } else {
       const { frontmatter } = parseFrontmatter(content)
-      const { outLinks, inlineTags } = cmParsed ?? parseWithCm6(content)
-      const rawTasks: TaskItem[] = cmParsed?.tasks ?? parseWithCm6(content).tasks!
+      const { outLinks, inlineTags, tasks: rawTasks } = cmParsed ?? parseMarkdown(content)
       const existingMtime = cacheStore.files[path]?.mtime ?? Date.now()
       const created = extractDateString(frontmatter.created)
                    ?? new Date(existingMtime).toISOString().slice(0, 10)

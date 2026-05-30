@@ -1,12 +1,7 @@
-import { EditorState } from '@codemirror/state'
-import { markdown } from '@codemirror/lang-markdown'
-import { GFM } from '@lezer/markdown'
 import { cacheStore, setCacheStore } from '../stores/cacheStore'
 import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { wikiLinkParser } from '../lib/wikiLinkParser'
-import { outLinksField } from '../lib/outLinksField'
-import { inlineTagsField } from '../lib/inlineTagsField'
+import { parseMarkdown } from '../lib/parseMarkdown'
 import {
   hashContent, getCachedMeta, setCachedMeta, pruneCache,
   readFile, loadAllFileStats, setFileStatEntry, pruneFileStatCache,
@@ -15,22 +10,9 @@ import {
   extractTags, extractAliases, mergeTagsWithBody, buildBacklinkMap, buildTagMap,
   extractDateString, extractDateFromName, buildTaskMap,
 } from '../lib/knowledgeUtils'
-import { tasksField } from '../lib/tasksField'
 import type { FileMeta, TaskItem } from '../stores/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function createHeadlessState(content: string): EditorState {
-  return EditorState.create({
-    doc: content,
-    extensions: [
-      markdown({ extensions: [GFM, wikiLinkParser] }),
-      outLinksField,
-      inlineTagsField,
-      tasksField,
-    ],
-  })
-}
 
 function idle(): Promise<void> {
   return new Promise(resolve => {
@@ -151,12 +133,8 @@ async function runPhase1(
         continue
       }
 
-      const state = createHeadlessState(content)
       const { frontmatter } = parseFrontmatter(content)
-      const inlineTags = state.field(inlineTagsField).map(m => m.tag)
-      const outLinks = state.field(outLinksField)
-        .filter(l => l.type === 'wiki')
-        .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`)
+      const { outLinks, inlineTags, tasks: rawTaskItems } = parseMarkdown(content)
 
       const created = extractDateString(frontmatter.created)
                    ?? new Date(entry.mtime).toISOString().slice(0, 10)
@@ -164,7 +142,7 @@ async function runPhase1(
       const filename = path.split('/').at(-1) ?? ''
       const dated = extractDateFromName(filename) ?? created
 
-      const tasks: TaskItem[] = state.field(tasksField).map(t => ({
+      const tasks: TaskItem[] = rawTaskItems.map(t => ({
         ...t,
         dueDate: t.dueDate ?? dated,
         completedDate: t.checked ? (t.completedDate ?? dated) : null,
