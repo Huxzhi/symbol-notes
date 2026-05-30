@@ -3,6 +3,7 @@ import { createStore, produce } from 'solid-js/store'
 import { loadFromStorage, saveToStorage } from '../lib/localStorage'
 import { getFileViewForExt, getView } from '../lib/pluginRegistry'
 import { setRuntimeStore } from './runtimeStore'
+import { mapNode, findParentTabs, findTabsById } from './workspaceTreeHelpers'
 import type {
   ViewState,
   WorkspaceLayout,
@@ -170,49 +171,6 @@ function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | nu
 const setLayout = (...args: any[]) => (setWorkspaceStore as any)('layouts', workspaceStore.activeLayoutId, ...args)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const setRoot = (...args: any[]) => setLayout('root', ...args)
-
-function findParentTabs(root: WorkspaceNode, leafId: string): WorkspaceTabs | null {
-  if (root.type === 'tabs') {
-    if (root.children.some(l => l.id === leafId)) return root
-    return null
-  }
-  if (root.type === 'split') {
-    for (const child of root.children) {
-      const found = findParentTabs(child, leafId)
-      if (found) return found
-    }
-  }
-  return null
-}
-
-function mapNode(
-  root: WorkspaceNode,
-  id: string,
-  updater: (n: WorkspaceNode) => WorkspaceNode,
-): WorkspaceNode {
-  if ((root as { id: string }).id === id) return updater(root)
-  if (root.type === 'split') {
-    return { ...root, children: root.children.map(c => mapNode(c, id, updater)) }
-  }
-  if (root.type === 'tabs') {
-    return {
-      ...root,
-      children: root.children.map(c => c.id === id ? (updater(c) as WorkspaceLeaf) : c),
-    }
-  }
-  return root
-}
-
-function findTabsById(root: WorkspaceNode, tabsId: string): WorkspaceTabs | null {
-  if (root.type === 'tabs' && root.id === tabsId) return root
-  if (root.type === 'split') {
-    for (const child of root.children) {
-      const found = findTabsById(child, tabsId)
-      if (found) return found
-    }
-  }
-  return null
-}
 
 // ── Actions ──────────────────────────────────────────────────────────────────
 
