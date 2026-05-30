@@ -69,10 +69,6 @@ export interface TaskItem {
   fields: Record<string, string>  // all other [key::value] inline fields
 }
 
-export interface Task extends TaskItem {
-  path: string                    // source file path, injected by indexService / buildTaskMap
-}
-
 // ── File cache ───────────────────────────────────────────────────────────────
 // Single source of truth per path. Populated in two phases:
 //   Phase 1 (FS scan): name/path/kind/parent/size/mtime/hash
@@ -100,7 +96,7 @@ export interface CacheState {
   files: Record<string, FileMeta>
   backlinkMap: Record<string, string[]>
   tagMap: Record<string, string[]>
-  taskMap: Task[]
+  taskMap: Record<string, TaskItem[]>
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

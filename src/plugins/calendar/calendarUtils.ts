@@ -1,4 +1,6 @@
-import type { Task } from '../../stores/types'
+import type { TaskItem } from '../../stores/types'
+
+export type Task = TaskItem & { path: string }
 
 export const WEEKDAYS_SHORT = ['一', '二', '三', '四', '五', '六', '日']
 export const WEEKDAYS_LONG = [
@@ -41,11 +43,13 @@ function stemDate(path: string): string | null {
   return null
 }
 
-export function buildTaskDayData(tasks: Task[]): Record<string, Task[]> {
+export function buildTaskDayData(taskMap: Record<string, TaskItem[]>): Record<string, Task[]> {
   const map: Record<string, Task[]> = {}
-  for (const task of tasks) {
-    if (!task.dueDate) continue
-    ;(map[task.dueDate] ??= []).push(task)
+  for (const [path, tasks] of Object.entries(taskMap)) {
+    for (const task of tasks) {
+      if (!task.dueDate) continue
+      ;(map[task.dueDate] ??= []).push({ ...task, path })
+    }
   }
   return map
 }

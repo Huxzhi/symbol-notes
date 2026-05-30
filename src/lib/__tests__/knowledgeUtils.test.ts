@@ -1,5 +1,32 @@
 import { describe, it, expect } from 'vitest'
-import { extractDateFromName } from '../knowledgeUtils'
+import { extractDateFromName, buildTaskMap } from '../knowledgeUtils'
+import type { TaskItem } from '../../stores/types'
+
+const task1: TaskItem = {
+  text: '- [ ] buy milk', cleanText: 'buy milk', checked: false,
+  status: ' ', line: 0, dueDate: null, completedDate: null, fields: {},
+}
+const task2: TaskItem = {
+  text: '- [x] done', cleanText: 'done', checked: true,
+  status: 'x', line: 1, dueDate: null, completedDate: null, fields: {},
+}
+
+describe('buildTaskMap', () => {
+  it('keys result by file path', () => {
+    const map = buildTaskMap({ 'a.md': { tasks: [task1] }, 'b.md': { tasks: [task2] } })
+    expect(map['a.md']).toEqual([task1])
+    expect(map['b.md']).toEqual([task2])
+  })
+
+  it('omits files with no tasks', () => {
+    const map = buildTaskMap({ 'a.md': { tasks: [] }, 'b.md': { tasks: [task1] } })
+    expect(Object.keys(map)).toEqual(['b.md'])
+  })
+
+  it('returns empty object for empty input', () => {
+    expect(buildTaskMap({})).toEqual({})
+  })
+})
 
 describe('extractDateFromName', () => {
   describe('YYYY-MM-DD format', () => {

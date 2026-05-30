@@ -12,7 +12,7 @@ const [cacheStore, setCacheStore] = createStore<CacheState>({
   files: {},
   backlinkMap: {},
   tagMap: {},
-  taskMap: [],
+  taskMap: {},
 })
 
 export async function initCacheStore(): Promise<void> {
@@ -62,10 +62,7 @@ function applyContent(path: string, hash: string, content: ContentFields): void 
       setCacheStore('tagMap', t, (list: string[]) => list ? [...list, path] : [path])
   }
 
-  setCacheStore('taskMap', (list: Task[]) => [
-    ...list.filter(t => t.path !== path),
-    ...(content.tasks ?? []).map(t => ({ ...t, path })),
-  ])
+  setCacheStore('taskMap', path, content.tasks ?? [])
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -119,7 +116,7 @@ export const cacheActions = {
       setCacheStore('backlinkMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
     for (const t of file.tags)
       setCacheStore('tagMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
-    setCacheStore('taskMap', (list: Task[]) => list.filter(t => t.path !== path))
+    setCacheStore('taskMap', path, undefined as unknown as TaskItem[])
     setCacheStore('files', path, undefined as unknown as FileMeta)
   },
 }
