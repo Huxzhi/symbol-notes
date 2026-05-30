@@ -14,7 +14,7 @@ import {
   Show,
 } from 'solid-js'
 import { fileActions } from '../../stores/runtimeStore'
-import { cacheActions, cacheStore, setCacheStore } from '../../stores/cacheStore'
+import { vaultActions, vaultStore, setVaultStore } from '../../stores/vaultStore'
 import { showModal, closeModal } from '../../stores/modalStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
@@ -126,7 +126,7 @@ export function EditorViewer(props: ViewComponentProps) {
           .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
         const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
         const tasks = view.state.field(tasksField)
-        void cacheActions.reindexFile(p, view.state.doc.toString(), {
+        void vaultActions.reindexFile(p, view.state.doc.toString(), {
           outLinks,
           inlineTags,
           tasks,
@@ -152,7 +152,7 @@ export function EditorViewer(props: ViewComponentProps) {
     const p = filePath()
     if (!view || !p) return
 
-    const knownMtime = cacheStore.files[p]?.mtime
+    const knownMtime = vaultStore.files[p]?.mtime
     if (knownMtime) {
       const currentMtime = await getFileMtime(p)
       if (currentMtime > knownMtime) {
@@ -205,7 +205,7 @@ export function EditorViewer(props: ViewComponentProps) {
     }
     await writeFile(p, content)
     const newMtime = await getFileMtime(p)
-    setCacheStore('files', p, 'mtime', newMtime)
+    setVaultStore('files', p, 'mtime', newMtime)
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
     const outLinks = view.state
@@ -214,7 +214,7 @@ export function EditorViewer(props: ViewComponentProps) {
       .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
     const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
     const tasks = view.state.field(tasksField)
-    await cacheActions.reindexFile(p, content, { outLinks, inlineTags, tasks })
+    await vaultActions.reindexFile(p, content, { outLinks, inlineTags, tasks })
   }
 
   async function doReload(p: string): Promise<void> {

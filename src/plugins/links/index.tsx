@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
 import { activeFilePath, activeLayout } from '../../stores/workspaceStore'
-import { cacheStore } from '../../stores/cacheStore'
+import { vaultStore } from '../../stores/vaultStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 import { definePlugin } from '../../lib/pluginRegistry'
 
@@ -15,12 +15,12 @@ function LinksPanel() {
   const backlinks = createMemo(() => {
     const path = activeFilePath()
     if (!path) return []
-    const aliases = cacheStore.files[path]?.aliases ?? []
+    const aliases = vaultStore.files[path]?.aliases ?? []
     const keys = [path, ...aliases, ...aliases.map((a) => `${a}.md`)]
     const seen = new Set<string>()
     const result: string[] = []
     for (const key of keys) {
-      for (const bl of cacheStore.backlinkMap[key] ?? []) {
+      for (const bl of vaultStore.backlinkMap[key] ?? []) {
         if (!seen.has(bl)) {
           seen.add(bl)
           result.push(bl)

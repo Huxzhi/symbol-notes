@@ -6,7 +6,7 @@ export type CachedFields = Pick<FileMeta,
   'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'tasks'
 >
 
-const idbStore = createStore('symbol-notes', 'file-meta-cache')
+const parsedMetaStore = createStore('symbol-notes', 'parsed-meta')
 const fileStatStore = createStore('symbol-notes', 'file-stat-cache')
 
 export interface FileStatEntry {
@@ -64,7 +64,7 @@ export function hashContent(s: string): string {
 
 export async function getCachedMeta(hash: string): Promise<CachedFields | null> {
   try {
-    const entry = await get<CachedFields>(hash, idbStore)
+    const entry = await get<CachedFields>(hash, parsedMetaStore)
     return entry ?? null
   } catch {
     return null
@@ -73,7 +73,7 @@ export async function getCachedMeta(hash: string): Promise<CachedFields | null> 
 
 export async function setCachedMeta(hash: string, meta: CachedFields): Promise<void> {
   try {
-    await set(hash, meta, idbStore)
+    await set(hash, meta, parsedMetaStore)
   } catch {
     // cache write failure is non-fatal
   }
@@ -83,9 +83,9 @@ export async function setCachedMeta(hash: string, meta: CachedFields): Promise<v
 // Call after a full vault scan when the complete set of active hashes is known.
 export async function pruneCache(activeHashes: Set<string>): Promise<void> {
   try {
-    const allKeys = await keys<string>(idbStore)
+    const allKeys = await keys<string>(parsedMetaStore)
     await Promise.all(
-      allKeys.filter(k => !activeHashes.has(k)).map(k => del(k, idbStore)),
+      allKeys.filter(k => !activeHashes.has(k)).map(k => del(k, parsedMetaStore)),
     )
   } catch {
     // GC failure is non-fatal
@@ -94,7 +94,7 @@ export async function pruneCache(activeHashes: Set<string>): Promise<void> {
 
 // ── File content I/O + in-memory cache ──────────────────────────────────────
 
-const contentCache = new Map<string, string>()
+const fileContentCache = new Map<string, string>()
 
 async function resolveFileHandle(path: string, create = false): Promise<FileSystemFileHandle> {
   const { rootHandle } = runtimeStore
@@ -108,11 +108,11 @@ async function resolveFileHandle(path: string, create = false): Promise<FileSyst
 }
 
 export async function readFile(path: string): Promise<string> {
-  const cached = contentCache.get(path)
+  const cached = fileContentCache.get(path)
   if (cached !== undefined) return cached
   const handle = await resolveFileHandle(path)
   const content = await (await handle.getFile()).text()
-  contentCache.set(path, content)
+  fileContentCache.set(path, content)
   return content
 }
 
@@ -121,7 +121,7 @@ export async function writeFile(path: string, content: string, create = false): 
   const writable = await handle.createWritable()
   await writable.write(content)
   await writable.close()
-  contentCache.set(path, content)
+  fileContentCache.set(path, content)
   deleteFileStatEntry(path).catch(() => {})
 }
 
@@ -131,9 +131,9 @@ export async function getFileMtime(path: string): Promise<number> {
 }
 
 export function invalidateFile(path: string): void {
-  contentCache.delete(path)
+  fileContentCache.delete(path)
 }
 
 export function clearContentCache(): void {
-  contentCache.clear()
+  fileContentCache.clear()
 }

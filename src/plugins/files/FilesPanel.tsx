@@ -5,7 +5,7 @@ import { appActions, fileActions } from '../../stores/runtimeStore'
 import { workspaceActions } from '../../stores/workspaceStore'
 
 import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
-import { cacheStore } from '../../stores/cacheStore'
+import { vaultStore } from '../../stores/vaultStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 import { settingsStore } from '../../stores/settingsStore'
 import { showError, showToast } from '../../stores/toastStore'
@@ -33,7 +33,7 @@ function canOpen(name: string): boolean {
 }
 
 function childrenOf(parentPath: string | null): FileMeta[] {
-  return Object.values(cacheStore.files)
+  return Object.values(vaultStore.files)
     .filter((e) => e.parent === parentPath)
     .sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
@@ -261,7 +261,7 @@ export function FilesPanel(props: ViewComponentProps) {
     e.stopPropagation()
     const src = dragSrc()
     if (!src) return
-    const srcEntry = cacheStore.files[src]
+    const srcEntry = vaultStore.files[src]
     if (!isValidMoveDrop(src, path, srcEntry?.parent ?? null)) return
     e.preventDefault()
     e.dataTransfer!.dropEffect = 'move'
@@ -281,7 +281,7 @@ export function FilesPanel(props: ViewComponentProps) {
     setDragSrc(null)
     setDragOver(null)
     if (!src) return
-    const srcEntry = cacheStore.files[src]
+    const srcEntry = vaultStore.files[src]
     if (!isValidMoveDrop(src, destDirPath, srcEntry?.parent ?? null)) return
     const srcName = displayName(srcEntry?.name ?? src.split('/').pop()!)
     const destName = destDirPath.split('/').pop() ?? destDirPath
@@ -296,7 +296,7 @@ export function FilesPanel(props: ViewComponentProps) {
   const handleRootDragOver = (e: DragEvent) => {
     const src = dragSrc()
     if (!src) return
-    const srcEntry = cacheStore.files[src]
+    const srcEntry = vaultStore.files[src]
     if (!isValidMoveDrop(src, null, srcEntry?.parent ?? null)) return
     e.preventDefault()
     e.dataTransfer!.dropEffect = 'move'
@@ -315,7 +315,7 @@ export function FilesPanel(props: ViewComponentProps) {
     setDragSrc(null)
     setDragOver(null)
     if (!src) return
-    const srcEntry = cacheStore.files[src]
+    const srcEntry = vaultStore.files[src]
     if (!isValidMoveDrop(src, null, srcEntry?.parent ?? null)) return
     const srcName = displayName(srcEntry?.name ?? src.split('/').pop()!)
     try {

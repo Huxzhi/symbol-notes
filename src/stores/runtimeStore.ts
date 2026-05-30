@@ -1,6 +1,6 @@
 import { get, set } from 'idb-keyval'
 import { createStore, produce } from 'solid-js/store'
-import { cacheActions, cacheStore, setCacheStore } from './cacheStore'
+import { vaultActions, vaultStore, setVaultStore } from './vaultStore'
 import {
   clearContentCache,
   deleteFileStatEntry,
@@ -100,7 +100,7 @@ async function updateBacklinks(oldPath: string, newPath: string): Promise<void> 
   // We need to check both to catch all referencing files.
   const stem = oldPath.split('/').pop()!
   const keys = oldPath !== stem ? [oldPath, stem] : [oldPath]
-  const backlinks = new Set(keys.flatMap(k => cacheStore.backlinkMap[k] ?? []))
+  const backlinks = new Set(keys.flatMap(k => vaultStore.backlinkMap[k] ?? []))
 
   for (const bPath of backlinks) {
     try {
@@ -108,7 +108,7 @@ async function updateBacklinks(oldPath: string, newPath: string): Promise<void> 
       const updated = replaceWikiLinks(content, oldPath, newPath)
       if (updated !== content) {
         await writeFile(bPath, updated)
-        cacheActions.remapFileLink(bPath, oldPath, newPath)
+        vaultActions.remapFileLink(bPath, oldPath, newPath)
       }
     } catch { /* skip unreadable files */ }
   }
@@ -134,7 +134,7 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
-    setCacheStore('files', path, entry)
+    setVaultStore('files', path, entry)
     return path
   },
 
@@ -152,7 +152,7 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
-    setCacheStore('files', name, entry)
+    setVaultStore('files', name, entry)
   },
 
   async renameFile(oldPath: string, newName: string): Promise<void> {
@@ -162,7 +162,7 @@ export const fileActions = {
     const finalName = newName.endsWith('.md') ? newName : `${newName}.md`
     const newPath = dir ? `${dir}/${finalName}` : finalName
 
-    if (newPath !== oldPath && cacheStore.files[newPath]) {
+    if (newPath !== oldPath && vaultStore.files[newPath]) {
       throw new Error(`已存在同名文件：${finalName}`)
     }
 
@@ -176,8 +176,8 @@ export const fileActions = {
     invalidateFile(oldPath)
     await deleteFileStatEntry(oldPath)
 
-    cacheActions.removeCacheEntry(oldPath)
-    setCacheStore('files', produce((m: Record<string, FileMeta>) => { delete m[oldPath] }))
+    vaultActions.removeVaultEntry(oldPath)
+    setVaultStore('files', produce((m: Record<string, FileMeta>) => { delete m[oldPath] }))
 
     const parent = dir || null
     const entry: FileMeta = {
@@ -186,11 +186,11 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
-    setCacheStore('files', newPath, entry)
+    setVaultStore('files', newPath, entry)
 
     const { workspaceActions } = await import('./workspaceStore')
     workspaceActions.renameLeafPath(oldPath, newPath)
-    await cacheActions.reindexFile(newPath, oldContent)
+    await vaultActions.reindexFile(newPath, oldContent)
     await updateBacklinks(oldPath, newPath)
   },
 
@@ -204,8 +204,8 @@ export const fileActions = {
     await dir.removeEntry(name)
     invalidateFile(path)
     await deleteFileStatEntry(path)
-    cacheActions.removeCacheEntry(path)
-    setCacheStore('files', produce((m: Record<string, FileMeta>) => { delete m[path] }))
+    vaultActions.removeVaultEntry(path)
+    setVaultStore('files', produce((m: Record<string, FileMeta>) => { delete m[path] }))
   },
 
   async deleteFolder(path: string): Promise<void> {
@@ -217,17 +217,17 @@ export const fileActions = {
     for (const part of parts) parentDir = await parentDir.getDirectoryHandle(part)
     await parentDir.removeEntry(name, { recursive: true })
 
-    const toRemove = Object.values(cacheStore.files).filter(
+    const toRemove = Object.values(vaultStore.files).filter(
       e => e.path === path || e.path.startsWith(path + '/'),
     )
     for (const entry of toRemove) {
       if (entry.kind === 'file') {
         invalidateFile(entry.path)
         await deleteFileStatEntry(entry.path)
-        cacheActions.removeCacheEntry(entry.path)
+        vaultActions.removeVaultEntry(entry.path)
       }
     }
-    setCacheStore(
+    setVaultStore(
       'files',
       produce((m: Record<string, FileMeta>) => {
         for (const entry of toRemove) delete m[entry.path]
@@ -274,7 +274,7 @@ export const fileActions = {
     const newPath = destDirPath ? `${destDirPath}/${name}` : name
     if (newPath === srcPath) return
 
-    if (cacheStore.files[newPath]) {
+    if (vaultStore.files[newPath]) {
       throw new Error(`目标位置已存在同名文件：${name}`)
     }
 
@@ -290,8 +290,8 @@ export const fileActions = {
     invalidateFile(srcPath)
     await deleteFileStatEntry(srcPath)
 
-    cacheActions.removeCacheEntry(srcPath)
-    setCacheStore('files', produce((m: Record<string, FileMeta>) => { delete m[srcPath] }))
+    vaultActions.removeVaultEntry(srcPath)
+    setVaultStore('files', produce((m: Record<string, FileMeta>) => { delete m[srcPath] }))
 
     const entry: FileMeta = {
       name, path: newPath, kind: 'file', parent: destDirPath ?? null,
@@ -299,11 +299,11 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
-    setCacheStore('files', newPath, entry)
+    setVaultStore('files', newPath, entry)
 
     const { workspaceActions } = await import('./workspaceStore')
     workspaceActions.renameLeafPath(srcPath, newPath)
-    await cacheActions.reindexFile(newPath, oldContent)
+    await vaultActions.reindexFile(newPath, oldContent)
     await updateBacklinks(srcPath, newPath)
   },
 
@@ -315,11 +315,11 @@ export const fileActions = {
     if (newFolderPath === srcPath) return
     if (newFolderPath.startsWith(srcPath + '/')) return
 
-    if (cacheStore.files[newFolderPath]) {
+    if (vaultStore.files[newFolderPath]) {
       throw new Error(`目标位置已存在同名文件夹：${folderName}`)
     }
 
-    const descendants = Object.values(cacheStore.files).filter(
+    const descendants = Object.values(vaultStore.files).filter(
       e => e.path === srcPath || e.path.startsWith(srcPath + '/'),
     )
     const fileEntries = descendants.filter(e => e.kind === 'file')
@@ -358,8 +358,8 @@ export const fileActions = {
       await deleteFileStatEntry(entry.path)
     }
 
-    // Update cacheStore: remove old entries, insert new ones
-    setCacheStore('files', produce((m: Record<string, FileMeta>) => {
+    // Update vaultStore: remove old entries, insert new ones
+    setVaultStore('files', produce((m: Record<string, FileMeta>) => {
       for (const entry of descendants) delete m[entry.path]
     }))
     for (const entry of descendants) {
@@ -367,7 +367,7 @@ export const fileActions = {
       const newParent = newEntryPath.includes('/')
         ? newEntryPath.slice(0, newEntryPath.lastIndexOf('/'))
         : null
-      setCacheStore('files', newEntryPath, { ...entry, path: newEntryPath, parent: newParent, hash: '' })
+      setVaultStore('files', newEntryPath, { ...entry, path: newEntryPath, parent: newParent, hash: '' })
     }
 
     // Reindex files and update workspace tabs + backlinks
@@ -376,13 +376,13 @@ export const fileActions = {
       const newFilePath = newFolderPath + entry.path.slice(srcPath.length)
       const content = fileContents.get(entry.path) ?? ''
       workspaceActions.renameLeafPath(entry.path, newFilePath)
-      await cacheActions.reindexFile(newFilePath, content)
+      await vaultActions.reindexFile(newFilePath, content)
       await updateBacklinks(entry.path, newFilePath)
     }
   },
 
   async moveEntry(srcPath: string, destDirPath: string | null): Promise<void> {
-    const entry = cacheStore.files[srcPath]
+    const entry = vaultStore.files[srcPath]
     if (!entry) return
     if (entry.kind === 'directory') {
       await fileActions.moveFolder(srcPath, destDirPath)

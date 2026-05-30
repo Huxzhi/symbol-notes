@@ -8,7 +8,7 @@ import {
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
-import { cacheStore } from '../stores/cacheStore'
+import { vaultStore } from '../stores/vaultStore'
 import { runtimeStore } from '../stores/runtimeStore'
 
 import { parseFrontmatter } from './parseFrontmatter'
@@ -30,7 +30,7 @@ function resolveEmbedTarget(target: string): string | null {
   const stem = target.split('/').pop()!
   const hasExt = stem.includes('.')
   const searchName = hasExt ? stem : `${stem}.md`
-  const entry = Object.values(cacheStore.files).find(
+  const entry = Object.values(vaultStore.files).find(
     (e) => e.kind === 'file' && e.name === searchName,
   )
   return entry?.path ?? null

@@ -1,5 +1,5 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { cacheStore } from '../../stores/cacheStore'
+import { vaultStore } from '../../stores/vaultStore'
 import type { ViewComponentProps } from '../../stores/types'
 import { workspaceActions } from '../../stores/workspaceStore'
 import {
@@ -17,8 +17,8 @@ export function CalendarViewer(_props: ViewComponentProps) {
   const [viewYear, setViewYear] = createSignal(now.getFullYear())
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
 
-  const dayData = createMemo(() => buildDayData(cacheStore.files))
-  const taskDayData = createMemo(() => buildTaskDayData(cacheStore.taskMap))
+  const dayData = createMemo(() => buildDayData(vaultStore.files))
+  const taskDayData = createMemo(() => buildTaskDayData(vaultStore.taskMap))
   const calendarGrid = createMemo(() =>
     buildCalendarGrid(viewYear(), viewMonth()),
   )

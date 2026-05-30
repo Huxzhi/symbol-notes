@@ -11,7 +11,7 @@ import { ConfirmModal } from './components/ConfirmModal'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
 import { settingsStore } from './stores/settingsStore'
-import { initCacheStore } from './stores/cacheStore'
+import { initVaultStore } from './stores/vaultStore'
 import { runtimeStore } from './stores/runtimeStore'
 import { FilesPlugin } from './plugins/files'
 import { EditorPlugin } from './plugins/editor'
@@ -47,7 +47,7 @@ export default function App() {
   })
 
   onMount(async () => {
-    await initCacheStore()
+    await initVaultStore()
     await appActions.restoreVault()
   })
 

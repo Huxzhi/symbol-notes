@@ -92,7 +92,7 @@ export interface FileMeta {
   tasks: TaskItem[]      // extracted task items, no path (implicit from record key)
 }
 
-export interface CacheState {
+export interface VaultState {
   files: Record<string, FileMeta>
   backlinkMap: Record<string, string[]>
   tagMap: Record<string, string[]>

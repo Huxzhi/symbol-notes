@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { cacheStore } from '../../stores/cacheStore'
+import { vaultStore } from '../../stores/vaultStore'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { definePlugin } from '../../lib/pluginRegistry'
 
@@ -95,7 +95,7 @@ function TagTreeNode(props: {
 
 function TagsPanel() {
   const [collapsed, setCollapsed] = createSignal(new Set<string>())
-  const roots = createMemo(() => buildTagTree(cacheStore.tagMap))
+  const roots = createMemo(() => buildTagTree(vaultStore.tagMap))
 
   function toggle(tag: string) {
     setCollapsed(prev => {

@@ -1,4 +1,4 @@
-import { cacheStore, setCacheStore } from '../stores/cacheStore'
+import { vaultStore, setVaultStore } from '../stores/vaultStore'
 import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
@@ -100,11 +100,11 @@ async function runPhase1(
     if (session.cancelled) return
     activeHashes.add(hash)
     const cached = await getCachedMeta(hash)
-    if (cached && cacheStore.files[path]?.hash === hash) continue
+    if (cached && vaultStore.files[path]?.hash === hash) continue
     if (cached) {
       const fname = path.split('/').at(-1) ?? ''
       const dated = extractDateFromName(fname) ?? cached.created
-      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cached }))
+      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cached }))
     } else {
       changed.push(path)
     }
@@ -120,7 +120,7 @@ async function runPhase1(
       const hash = hashContent(content)
       activeHashes.add(hash)
 
-      const entry = cacheStore.files[path]
+      const entry = vaultStore.files[path]
       if (entry?.size !== undefined && entry.mtime !== undefined) {
         await setFileStatEntry(path, { size: entry.size, mtime: entry.mtime, hash })
       }
@@ -129,7 +129,7 @@ async function runPhase1(
       if (cachedMeta) {
         const fname = path.split('/').at(-1) ?? ''
         const dated = extractDateFromName(fname) ?? cachedMeta.created
-        setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cachedMeta }))
+        setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cachedMeta }))
         continue
       }
 
@@ -158,18 +158,18 @@ async function runPhase1(
         tasks,
       }
       await setCachedMeta(hash, parsed)
-      setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...parsed }))
+      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...parsed }))
     } catch { /* individual file errors are non-fatal */ }
   }
 }
 
 function runPhase2(): void {
   const mdFiles = Object.fromEntries(
-    Object.entries(cacheStore.files).filter(([p]) => p.endsWith('.md')),
+    Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
   )
-  setCacheStore('backlinkMap', buildBacklinkMap(mdFiles))
-  setCacheStore('tagMap', buildTagMap(mdFiles))
-  setCacheStore('taskMap', buildTaskMap(mdFiles))
+  setVaultStore('backlinkMap', buildBacklinkMap(mdFiles))
+  setVaultStore('tagMap', buildTagMap(mdFiles))
+  setVaultStore('taskMap', buildTaskMap(mdFiles))
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export async function scanAndIndex(): Promise<void> {
   const { files, unchanged, changed, activePaths } = await buildScan(rootHandle, idbStats)
 
   if (session.cancelled) return
-  setCacheStore('files', files)
+  setVaultStore('files', files)
 
   const mdUnchanged = new Map<string, string>()
   const mdChanged: string[] = []
@@ -218,5 +218,5 @@ export async function rescanTree(): Promise<void> {
   if (!rootHandle) return
   const idbStats = await loadAllFileStats()
   const { files } = await buildScan(rootHandle, idbStats)
-  setCacheStore('files', files)
+  setVaultStore('files', files)
 }

@@ -6,22 +6,22 @@ import { parseMarkdown } from '../lib/parseMarkdown'
 import type { ParseResult } from '../lib/parseMarkdown'
 import { hashContent, getCachedMeta, setCachedMeta } from '../services/fileCacheService'
 import { extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName, buildBacklinkMap, buildTagMap, buildTaskMap } from '../lib/knowledgeUtils'
-import type { CacheState, FileMeta, TaskItem } from './types'
+import type { VaultState, FileMeta, TaskItem } from './types'
 
-const [cacheStore, setCacheStore] = createStore<CacheState>({
+const [vaultStore, setVaultStore] = createStore<VaultState>({
   files: {},
   backlinkMap: {},
   tagMap: {},
   taskMap: {},
 })
 
-export async function initCacheStore(): Promise<void> {
-  const saved = await get<{ files: Record<string, FileMeta> }>('sn-cache')
+export async function initVaultStore(): Promise<void> {
+  const saved = await get<{ files: Record<string, FileMeta> }>('vault-files')
   if (!saved?.files) return
   const mdFiles = Object.fromEntries(
     Object.entries(saved.files).filter(([p]) => p.endsWith('.md')),
   )
-  setCacheStore(reconcile({
+  setVaultStore(reconcile({
     files: saved.files,
     backlinkMap: buildBacklinkMap(mdFiles),
     tagMap: buildTagMap(mdFiles),
@@ -32,9 +32,9 @@ export async function initCacheStore(): Promise<void> {
 let _saveTimer: ReturnType<typeof setTimeout> | null = null
 createRoot(() => {
   createEffect(() => {
-    const files = JSON.parse(JSON.stringify(cacheStore.files)) as Record<string, FileMeta>
+    const files = JSON.parse(JSON.stringify(vaultStore.files)) as Record<string, FileMeta>
     if (_saveTimer) clearTimeout(_saveTimer)
-    _saveTimer = setTimeout(() => set('sn-cache', { files }), 500)
+    _saveTimer = setTimeout(() => set('vault-files', { files }), 500)
   })
 })
 
@@ -43,40 +43,40 @@ createRoot(() => {
 type ContentFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'tasks'>
 
 function applyContent(path: string, hash: string, content: ContentFields): void {
-  const prev = cacheStore.files[path]
+  const prev = vaultStore.files[path]
 
   const filename = path.split('/').at(-1) ?? ''
   const dated = extractDateFromName(filename) ?? content.created
-  setCacheStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...content }))
+  setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...content }))
 
   const prevLinks = new Set(prev?.outLinks ?? [])
   const nextLinks = new Set(content.outLinks)
   for (const t of prevLinks) {
     if (!nextLinks.has(t))
-      setCacheStore('backlinkMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+      setVaultStore('backlinkMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
   }
   for (const t of nextLinks) {
     if (!prevLinks.has(t))
-      setCacheStore('backlinkMap', t, (list: string[]) => list ? [...list, path] : [path])
+      setVaultStore('backlinkMap', t, (list: string[]) => list ? [...list, path] : [path])
   }
 
   const prevTags = new Set(prev?.tags ?? [])
   const nextTags = new Set(content.tags)
   for (const t of prevTags) {
     if (!nextTags.has(t))
-      setCacheStore('tagMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+      setVaultStore('tagMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
   }
   for (const t of nextTags) {
     if (!prevTags.has(t))
-      setCacheStore('tagMap', t, (list: string[]) => list ? [...list, path] : [path])
+      setVaultStore('tagMap', t, (list: string[]) => list ? [...list, path] : [path])
   }
 
-  setCacheStore('taskMap', path, content.tasks ?? [])
+  setVaultStore('taskMap', path, content.tasks ?? [])
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-export const cacheActions = {
+export const vaultActions = {
   async reindexFile(path: string, content: string, cmParsed?: ParseResult): Promise<void> {
     const hash = hashContent(content)
     const cached = await getCachedMeta(hash)
@@ -86,7 +86,7 @@ export const cacheActions = {
     } else {
       const { frontmatter } = parseFrontmatter(content)
       const { outLinks, inlineTags, tasks: rawTasks } = cmParsed ?? parseMarkdown(content)
-      const existingMtime = cacheStore.files[path]?.mtime ?? Date.now()
+      const existingMtime = vaultStore.files[path]?.mtime ?? Date.now()
       const created = extractDateString(frontmatter.created)
                    ?? new Date(existingMtime).toISOString().slice(0, 10)
       const updated = extractDateString(frontmatter.updated) ?? null
@@ -112,22 +112,22 @@ export const cacheActions = {
   },
 
   remapFileLink(path: string, oldTarget: string, newTarget: string): void {
-    const file = cacheStore.files[path]
+    const file = vaultStore.files[path]
     if (!file) return
     const outLinks = file.outLinks.map(l => l === oldTarget ? newTarget : l)
     applyContent(path, file.hash, { ...file, outLinks })
   },
 
-  removeCacheEntry(path: string): void {
-    const file = cacheStore.files[path]
+  removeVaultEntry(path: string): void {
+    const file = vaultStore.files[path]
     if (!file) return
     for (const t of file.outLinks)
-      setCacheStore('backlinkMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+      setVaultStore('backlinkMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
     for (const t of file.tags)
-      setCacheStore('tagMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
-    setCacheStore('taskMap', path, undefined as unknown as TaskItem[])
-    setCacheStore('files', path, undefined as unknown as FileMeta)
+      setVaultStore('tagMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+    setVaultStore('taskMap', path, undefined as unknown as TaskItem[])
+    setVaultStore('files', path, undefined as unknown as FileMeta)
   },
 }
 
-export { cacheStore, setCacheStore }
+export { vaultStore, setVaultStore }
