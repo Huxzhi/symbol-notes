@@ -57,7 +57,7 @@ export function SidebarRenderer(props: { node: any; side: 'left' | 'right' }) {
         <For each={sidebar().children}>
           {(node) => (
             <div class="flex-1 min-h-0 overflow-hidden">
-              <WorkspaceNodeRenderer node={node} />
+              <WorkspaceNodeRenderer node={node} area={props.side} />
             </div>
           )}
         </For>

@@ -536,7 +536,7 @@ export const workspaceActions = {
       return { ...tabs, children: remaining, activeLeafId: nextActive }
     })
     if (!movedLeaf) return
-    const leaf = movedLeaf
+    const leaf = movedLeaf as WorkspaceLeaf
     const updatedTo = root[toSide].children.map((node) =>
       node.type === 'tabs'
         ? { ...(node as WorkspaceTabs), children: [...(node as WorkspaceTabs).children, leaf], activeLeafId: leaf.id }

@@ -57,7 +57,7 @@ export default function App() {
         <Ribbon />
         <SidebarRenderer node={activeRoot().left} side="left" />
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-          <WorkspaceNodeRenderer node={activeRoot().main} />
+          <WorkspaceNodeRenderer node={activeRoot().main} area="main" />
         </div>
         <SidebarRenderer node={activeRoot().right} side="right" />
       </div>

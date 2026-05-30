@@ -17,6 +17,7 @@ function getTabLabel(leaf: WorkspaceLeaf): string {
 
 export function WorkspaceTabsView(props: {
   node: WorkspaceTabs
+  area: 'left' | 'main' | 'right'
   isRoot?: boolean
 }) {
   return (
