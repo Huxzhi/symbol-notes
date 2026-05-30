@@ -304,6 +304,16 @@ export function EditorViewer(props: ViewComponentProps) {
     }
   })
 
+  // Auto-save when switching away from this tab
+  createEffect(on(
+    () => props.isActive,
+    (isActive, prevIsActive) => {
+      if (prevIsActive && !isActive && localDirty) {
+        void saveFile()
+      }
+    },
+  ))
+
   // ── Inline file rename ───────────────────────────────────────────────────
   const [editing, setEditing] = createSignal(false)
   const [draft, setDraft] = createSignal('')
