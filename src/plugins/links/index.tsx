@@ -1,8 +1,9 @@
 import { createMemo, For, Show } from 'solid-js'
-import { activeFilePath, activeLayout } from '../../stores/workspaceStore'
+import { activeFilePath, activeLayout, workspaceActions } from '../../stores/workspaceStore'
 import { vaultStore } from '../../stores/vaultStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 import { definePlugin } from '../../lib/pluginRegistry'
+import { buildStemIndex, resolveLink } from '../../lib/knowledgeUtils'
 
 function LinksPanel() {
   const activeLeafRuntime = () => {
@@ -11,6 +12,14 @@ function LinksPanel() {
   }
 
   const outLinks = createMemo(() => activeLeafRuntime()?.outLinks ?? [])
+
+  const stemIndex = createMemo(() => buildStemIndex(vaultStore.files))
+
+  const resolveOutLink = (link: { type: 'wiki' | 'md'; target: string }) => {
+    if (link.type !== 'wiki') return null
+    const target = link.target.endsWith('.md') ? link.target : `${link.target}.md`
+    return resolveLink(target, stemIndex(), vaultStore.files)
+  }
 
   const backlinks = createMemo(() => {
     const path = activeFilePath()
@@ -34,29 +43,39 @@ function LinksPanel() {
         出链 ({outLinks().length})
       </div>
       <For each={outLinks()}>
-        {(link) => (
-          <div class="py-0.5 min-w-0">
+        {(link) => {
+          const resolved = () => resolveOutLink(link)
+          return (
             <div
-              class={`flex items-center gap-1 ${link.type === 'wiki' ? 'text-(--link)' : 'text-(--link-2)'}`}
+              class={`py-0.5 min-w-0 ${resolved() ? 'cursor-pointer hover:bg-(--bg-2) rounded px-1 -mx-1' : 'opacity-50'}`}
+              onClick={() => { const p = resolved(); if (p) workspaceActions.openFile(p) }}
             >
-              <span class="text-(--accent) text-[10px] shrink-0">↗</span>
-              <span class="truncate">{link.label}</span>
-            </div>
-            <Show when={link.label !== link.target}>
-              <div class="text-(--text-4) text-[9px] truncate pl-4 mt-0.5">
-                {link.target}
+              <div
+                class={`flex items-center gap-1 ${link.type === 'wiki' ? 'text-(--link)' : 'text-(--link-2)'}`}
+              >
+                <span class="text-(--accent) text-[10px] shrink-0">↗</span>
+                <span class="truncate">{link.label}</span>
               </div>
-            </Show>
-          </div>
-        )}
+              <Show when={link.label !== link.target}>
+                <div class="text-(--text-4) text-[9px] truncate pl-4 mt-0.5">
+                  {link.target}
+                </div>
+              </Show>
+            </div>
+          )
+        }}
       </For>
       <div class="text-(--text-3) text-[10px] uppercase tracking-widest mt-3 mb-1.5">
         入链 ({backlinks().length})
       </div>
       <For each={backlinks()}>
         {(link) => (
-          <div class="text-(--link-2) py-0.5 flex items-center gap-1">
-            <span class="text-(--accent) text-[10px]">↙</span> {link}
+          <div
+            class="text-(--link-2) py-0.5 flex items-center gap-1 cursor-pointer hover:bg-(--bg-2) rounded px-1 -mx-1"
+            onClick={() => workspaceActions.openFile(link)}
+          >
+            <span class="text-(--accent) text-[10px]">↙</span>
+            <span class="truncate">{link.split('/').pop()?.replace(/\.md$/, '') ?? link}</span>
           </div>
         )}
       </For>
