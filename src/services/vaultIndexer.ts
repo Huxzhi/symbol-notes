@@ -4,11 +4,11 @@ import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
 import { readFile } from './fileIO'
 import {
-  hashContent, getCachedMeta, setCachedMeta, pruneCache,
+  hashContent, getCachedMeta, setCachedMeta, getManyMeta, pruneCache,
   loadAllFileStats, setFileStatEntry, pruneFileStatCache,
 } from './indexStorage'
 import {
-  extractTags, extractAliases, mergeTagsWithBody, buildBacklinkMap, buildTagMap,
+  extractTags, extractAliases, mergeTagsWithBody, buildLinkMaps, buildTagMap,
   extractDateString, extractDateFromName, buildTaskMap,
 } from '../lib/knowledgeUtils'
 import type { FileMeta, TaskItem } from '../stores/types'
@@ -29,8 +29,6 @@ function idle(): Promise<void> {
 
 interface ScanResult {
   files: Record<string, FileMeta>
-  unchanged: Map<string, string>  // path → hash (stat matched IDB)
-  changed: string[]               // paths needing content read
   activePaths: Set<string>
 }
 
@@ -43,25 +41,25 @@ const EMPTY_CONTENT: Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'alias
   tasks: [],
 }
 
+// Pure FS walk — collects stat fields only, no cache comparison.
 async function buildScan(
   dirHandle: FileSystemDirectoryHandle,
-  idbStats: Map<string, { size: number; mtime: number; hash: string }>,
   parentPath: string | null = null,
-  result: ScanResult = { files: {}, unchanged: new Map(), changed: [], activePaths: new Set() },
+  result: ScanResult = { files: {}, activePaths: new Set() },
 ): Promise<ScanResult> {
   for await (const [name, handle] of dirHandle.entries()) {
     if (name.startsWith('.')) continue
     const path = parentPath ? `${parentPath}/${name}` : name
 
     if (handle.kind === 'directory') {
-      const dirMtime = new Date(0).toISOString().slice(0, 10)
+      const epoch = new Date(0).toISOString().slice(0, 10)
       result.files[path] = {
         name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0, hash: '',
         ...EMPTY_CONTENT,
-        created: dirMtime,
-        dated: extractDateFromName(name) ?? dirMtime,
+        created: epoch,
+        dated: extractDateFromName(name) ?? epoch,
       }
-      await buildScan(handle as FileSystemDirectoryHandle, idbStats, path, result)
+      await buildScan(handle as FileSystemDirectoryHandle, path, result)
     } else {
       const file = await (handle as FileSystemFileHandle).getFile()
       const size = file.size
@@ -74,13 +72,6 @@ async function buildScan(
         dated: extractDateFromName(name) ?? mtimeStr,
       }
       result.activePaths.add(path)
-
-      const cached = idbStats.get(path)
-      if (cached && cached.size === size && cached.mtime === mtime) {
-        result.unchanged.set(path, cached.hash)
-      } else {
-        result.changed.push(path)
-      }
     }
   }
   return result
@@ -93,24 +84,29 @@ let currentSession: Session | null = null
 
 async function runPhase1(
   session: Session,
-  unchanged: Map<string, string>,
-  changed: string[],
+  unchanged: string[],   // hash assigned from sn-stat, content not yet loaded
+  changed: string[],     // stat mismatch — need to read file and compute hash
   activeHashes: Set<string>,
 ): Promise<void> {
-  for (const [path, hash] of unchanged) {
+  // unchanged: batch-fetch sn-meta by hash (one IDB transaction for all)
+  const hashes = unchanged.map(p => vaultStore.files[p]?.hash ?? '')
+  hashes.forEach(h => { if (h) activeHashes.add(h) })
+
+  const metas = await getManyMeta(hashes)
+  for (let i = 0; i < unchanged.length; i++) {
     if (session.cancelled) return
-    activeHashes.add(hash)
-    const cached = await getCachedMeta(hash)
-    if (cached && vaultStore.files[path]?.hash === hash) continue
-    if (cached) {
-      const fname = path.split('/').at(-1) ?? ''
-      const dated = extractDateFromName(fname) ?? cached.created
-      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cached }))
+    const path = unchanged[i]
+    const hash = hashes[i]
+    if (!hash) continue
+    const meta = metas[i]
+    if (meta) {
+      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...meta }))
     } else {
-      changed.push(path)
+      changed.push(path)  // sn-meta miss → fall through to full parse
     }
   }
 
+  // changed: size/mtime differ — read file, compute hash, get or build FileMeta
   for (const path of changed) {
     if (session.cancelled) return
     await idle()
@@ -122,15 +118,13 @@ async function runPhase1(
       activeHashes.add(hash)
 
       const entry = vaultStore.files[path]
-      if (entry?.size !== undefined && entry.mtime !== undefined) {
+      if (entry) {
         await setFileStatEntry(path, { size: entry.size, mtime: entry.mtime, hash })
       }
 
       const cachedMeta = await getCachedMeta(hash)
       if (cachedMeta) {
-        const fname = path.split('/').at(-1) ?? ''
-        const dated = extractDateFromName(fname) ?? cachedMeta.created
-        setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...cachedMeta }))
+        setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...cachedMeta }))
         continue
       }
 
@@ -141,7 +135,7 @@ async function runPhase1(
                    ?? new Date(entry.mtime).toISOString().slice(0, 10)
       const updated = extractDateString(frontmatter.updated) ?? null
       const filename = path.split('/').at(-1) ?? ''
-      const dated = extractDateFromName(filename) ?? created
+      const dated = extractDateString(frontmatter.dated) ?? created
 
       const tasks: TaskItem[] = rawTaskItems.map(t => ({
         ...t,
@@ -156,10 +150,11 @@ async function runPhase1(
         aliases: extractAliases(frontmatter.aliases),
         created,
         updated,
+        dated,
         tasks,
       }
       await setCachedMeta(hash, parsed)
-      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...parsed }))
+      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...parsed }))
     } catch { /* individual file errors are non-fatal */ }
   }
 }
@@ -168,7 +163,9 @@ function runPhase2(): void {
   const mdFiles = Object.fromEntries(
     Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
   )
-  setVaultStore('backlinkMap', buildBacklinkMap(mdFiles))
+  const { backlinkMap, unresolvedMap } = buildLinkMaps(mdFiles)
+  setVaultStore('backlinkMap', backlinkMap)
+  setVaultStore('unresolvedMap', unresolvedMap)
   setVaultStore('tagMap', buildTagMap(mdFiles))
   setVaultStore('taskMap', buildTaskMap(mdFiles))
 }
@@ -185,20 +182,32 @@ export async function scanAndIndex(): Promise<void> {
 
   setRuntimeStore('isIndexing', true)
 
-  const idbStats = await loadAllFileStats()
-  const { files, unchanged, changed, activePaths } = await buildScan(rootHandle, idbStats)
+  // FS walk and IDB stat read run in parallel
+  const [{ files, activePaths }, idbStats] = await Promise.all([
+    buildScan(rootHandle),
+    loadAllFileStats(),
+  ])
 
   if (session.cancelled) return
-  setVaultStore('files', files)
 
-  const mdUnchanged = new Map<string, string>()
+  // Compare size+mtime against stat cache:
+  //   match   → assign cached hash directly (no file read needed)
+  //   no match → needs file read to compute hash
+  const mdUnchanged: string[] = []
   const mdChanged: string[] = []
-  for (const [path, hash] of unchanged) {
-    if (path.endsWith('.md')) mdUnchanged.set(path, hash)
+
+  for (const [path, file] of Object.entries(files)) {
+    if (file.kind !== 'file' || !path.endsWith('.md')) continue
+    const stat = idbStats.get(path)
+    if (stat && stat.size === file.size && stat.mtime === file.mtime) {
+      files[path] = { ...file, hash: stat.hash }
+      mdUnchanged.push(path)
+    } else {
+      mdChanged.push(path)
+    }
   }
-  for (const path of changed) {
-    if (path.endsWith('.md')) mdChanged.push(path)
-  }
+
+  setVaultStore('files', files)
 
   const activeHashes = new Set<string>()
   await runPhase1(session, mdUnchanged, mdChanged, activeHashes)
@@ -217,7 +226,6 @@ export async function scanAndIndex(): Promise<void> {
 export async function rescanTree(): Promise<void> {
   const { rootHandle } = runtimeStore
   if (!rootHandle) return
-  const idbStats = await loadAllFileStats()
-  const { files } = await buildScan(rootHandle, idbStats)
+  const { files } = await buildScan(rootHandle)
   setVaultStore('files', files)
 }
