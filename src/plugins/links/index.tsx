@@ -16,15 +16,13 @@ function LinksPanel() {
     const path = activeFilePath()
     if (!path) return []
     const aliases = vaultStore.files[path]?.aliases ?? []
-    const keys = [path, ...aliases, ...aliases.map((a) => `${a}.md`)]
+    // backlinkMap[path] covers stem-resolved links; alias keys cover [[Alias Name]] links
+    const keys = [path, ...aliases.map((a) => `${a}.md`)]
     const seen = new Set<string>()
     const result: string[] = []
     for (const key of keys) {
       for (const bl of vaultStore.backlinkMap[key] ?? []) {
-        if (!seen.has(bl)) {
-          seen.add(bl)
-          result.push(bl)
-        }
+        if (!seen.has(bl)) { seen.add(bl); result.push(bl) }
       }
     }
     return result
