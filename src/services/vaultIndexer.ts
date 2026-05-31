@@ -1,7 +1,7 @@
 import { vaultStore, setVaultStore } from '../stores/vaultStore'
 import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { parseMarkdown } from '../lib/parseMarkdown'
+import { createMarkdownParser } from '../lib/parseMarkdown'
 import { readFile } from './fileIO'
 import {
   hashContent, getCachedMeta, setCachedMeta, getManyMeta, pruneCache,
@@ -88,6 +88,7 @@ async function runPhase1(
   changed: string[],     // stat mismatch — need to read file and compute hash
   activeHashes: Set<string>,
 ): Promise<void> {
+  const parser = createMarkdownParser()
   // unchanged: batch-fetch sn-meta by hash (one IDB transaction for all)
   const hashes = unchanged.map(p => vaultStore.files[p]?.hash ?? '')
   hashes.forEach(h => { if (h) activeHashes.add(h) })
@@ -129,7 +130,7 @@ async function runPhase1(
       }
 
       const { frontmatter } = parseFrontmatter(content)
-      const { outLinks, inlineTags, tasks: rawTaskItems } = parseMarkdown(content)
+      const { outLinks, inlineTags, tasks: rawTaskItems } = parser.parse(content)
 
       const created = extractDateString(frontmatter.created)
                    ?? new Date(entry.mtime).toISOString().slice(0, 10)
@@ -193,11 +194,15 @@ export async function scanAndIndex(): Promise<void> {
   // Compare size+mtime against stat cache:
   //   match   → assign cached hash directly (no file read needed)
   //   no match → needs file read to compute hash
+  // Files over MAX_PARSE_BYTES are skipped entirely — left with EMPTY_CONTENT,
+  // opened directly from the file handle by the editor.
+  const MAX_PARSE_BYTES = 20 * 1024 * 1024
   const mdUnchanged: string[] = []
   const mdChanged: string[] = []
 
   for (const [path, file] of Object.entries(files)) {
     if (file.kind !== 'file' || !path.endsWith('.md')) continue
+    if (file.size > MAX_PARSE_BYTES) continue
     const stat = idbStats.get(path)
     if (stat && stat.size === file.size && stat.mtime === file.mtime) {
       files[path] = { ...file, hash: stat.hash }
