@@ -14,6 +14,9 @@ describe('formatDate', () => {
   it('handles format without separators', () => {
     expect(formatDate(new Date(2026, 4, 29), 'YYYYMMDD')).toBe('20260529')
   })
+  it('replaces all occurrences for folder-grouped format', () => {
+    expect(formatDate(new Date(2026, 4, 29), 'YYYY/MM/YYYY-MM-DD')).toBe('2026/05/2026-05-29')
+  })
 })
 
 describe('todayPath', () => {
