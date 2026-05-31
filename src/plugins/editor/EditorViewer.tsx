@@ -30,6 +30,7 @@ import {
   setFrontmatterField,
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/wikiLinkParser'
+import { extractDateFromName } from '../../lib/knowledgeUtils'
 import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileIO'
 import { settingsStore } from '../../stores/settingsStore'
 import { runtimeStore, setRuntimeStore } from '../../stores/runtimeStore'
@@ -177,30 +178,35 @@ export function EditorViewer(props: ViewComponentProps) {
     let content = view.state.doc.toString()
     if (settingsStore.autoTimestamps) {
       const ts = formatTimestamp(Date.now())
-      const withUpdated = setFrontmatterField(content, 'updated', ts)
-      if (withUpdated !== content) {
+      const { frontmatter } = parseFrontmatter(content)
+      const filename = p.split('/').at(-1) ?? ''
+      const dateFromName = extractDateFromName(filename)
+      let newContent = setFrontmatterField(content, 'updated', ts)
+      if (dateFromName && !frontmatter.dated)
+        newContent = setFrontmatterField(newContent, 'dated', dateFromName)
+      if (newContent !== content) {
         let from = 0
         while (
           from < content.length &&
-          from < withUpdated.length &&
-          content[from] === withUpdated[from]
+          from < newContent.length &&
+          content[from] === newContent[from]
         )
           from++
         let toOld = content.length
-        let toNew = withUpdated.length
+        let toNew = newContent.length
         while (
           toOld > from &&
           toNew > from &&
-          content[toOld - 1] === withUpdated[toNew - 1]
+          content[toOld - 1] === newContent[toNew - 1]
         ) {
           toOld--
           toNew--
         }
         view.dispatch({
-          changes: { from, to: toOld, insert: withUpdated.slice(from, toNew) },
+          changes: { from, to: toOld, insert: newContent.slice(from, toNew) },
           annotations: Transaction.remote.of(true),
         })
-        content = withUpdated
+        content = newContent
       }
     }
     await writeFile(p, content)
@@ -214,7 +220,7 @@ export function EditorViewer(props: ViewComponentProps) {
       .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
     const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
     const tasks = view.state.field(tasksField)
-    await vaultActions.reindexFile(p, content, { outLinks, inlineTags, tasks })
+    await vaultActions.reindexFile(p, content, { outLinks, inlineTags, tasks }, true)
   }
 
   async function doReload(p: string): Promise<void> {
