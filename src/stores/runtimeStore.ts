@@ -88,15 +88,19 @@ function replaceWikiLinks(content: string, oldPath: string, newPath: string): st
   return result
 }
 
-async function updateBacklinks(oldPath: string, newPath: string): Promise<void> {
-  // backlinkMap is keyed by link target as written in the file.
-  // [[notes/todo]] → key 'notes/todo.md' (full-path link)
-  // [[todo]]       → key 'todo.md'       (stem-only link)
-  // We need to check both to catch all referencing files.
-  const stem = oldPath.split('/').pop()!
-  const keys = oldPath !== stem ? [oldPath, stem] : [oldPath]
-  const backlinks = new Set(keys.flatMap(k => vaultStore.backlinkMap[k] ?? []))
+function resolveUnresolved(newPath: string): void {
+  const stem = newPath.split('/').pop()!
+  const keysToCheck = newPath !== stem ? [newPath, stem] : [newPath]
+  for (const key of keysToCheck) {
+    const sources = vaultStore.unresolvedMap[key] ?? []
+    if (sources.length === 0) continue
+    setVaultStore('backlinkMap', newPath, (list: string[]) => [...(list ?? []), ...sources])
+    setVaultStore('unresolvedMap', key, [])
+  }
+}
 
+async function updateBacklinks(oldPath: string, newPath: string): Promise<void> {
+  const backlinks = vaultStore.backlinkMap[oldPath] ?? []
   for (const bPath of backlinks) {
     try {
       const content = await readFile(bPath)
@@ -130,6 +134,7 @@ export const fileActions = {
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setVaultStore('files', path, entry)
+    resolveUnresolved(path)
     return path
   },
 
