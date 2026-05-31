@@ -81,20 +81,21 @@ export interface FileMeta {
   parent: string | null
   size: number
   mtime: number
-  hash: string           // djb2 content hash; '' until content is indexed
+  hash: string           // content hash (two-variant djb2, 64-bit); '' until indexed
   frontmatter: Record<string, unknown>
   outLinks: string[]
   tags: string[]
   aliases: string[]
   created: string        // YYYY-MM-DD: frontmatter.created → mtime (never null)
   updated: string | null // YYYY-MM-DD: frontmatter.updated → null if absent
-  dated: string          // YYYY-MM-DD: filename date → created (never null)
+  dated: string          // YYYY-MM-DD: frontmatter.dated → created (never null)
   tasks: TaskItem[]      // extracted task items, no path (implicit from record key)
 }
 
 export interface VaultState {
   files: Record<string, FileMeta>
   backlinkMap: Record<string, string[]>
+  unresolvedMap: Record<string, string[]>
   tagMap: Record<string, string[]>
   taskMap: Record<string, TaskItem[]>
 }

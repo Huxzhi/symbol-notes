@@ -1,53 +1,27 @@
-import { createRoot, createEffect } from 'solid-js'
-import { createStore, reconcile } from 'solid-js/store'
-import { get, set } from 'idb-keyval'
+import { createStore } from 'solid-js/store'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
 import type { ParseResult } from '../lib/parseMarkdown'
-import { hashContent, getCachedMeta, setCachedMeta } from '../services/indexStorage'
-import { extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName, buildBacklinkMap, buildTagMap, buildTaskMap } from '../lib/knowledgeUtils'
+import { hashContent, getCachedMeta, setCachedMeta, setFileStatEntry } from '../services/indexStorage'
+import { extractTags, extractAliases, mergeTagsWithBody, extractDateString } from '../lib/knowledgeUtils'
 import type { VaultState, FileMeta, TaskItem } from './types'
 
 const [vaultStore, setVaultStore] = createStore<VaultState>({
   files: {},
   backlinkMap: {},
+  unresolvedMap: {},
   tagMap: {},
   taskMap: {},
 })
 
-export async function initVaultStore(): Promise<void> {
-  const saved = await get<{ files: Record<string, FileMeta> }>('vault-files')
-  if (!saved?.files) return
-  const mdFiles = Object.fromEntries(
-    Object.entries(saved.files).filter(([p]) => p.endsWith('.md')),
-  )
-  setVaultStore(reconcile({
-    files: saved.files,
-    backlinkMap: buildBacklinkMap(mdFiles),
-    tagMap: buildTagMap(mdFiles),
-    taskMap: buildTaskMap(mdFiles),
-  }))
-}
-
-let _saveTimer: ReturnType<typeof setTimeout> | null = null
-createRoot(() => {
-  createEffect(() => {
-    const files = JSON.parse(JSON.stringify(vaultStore.files)) as Record<string, FileMeta>
-    if (_saveTimer) clearTimeout(_saveTimer)
-    _saveTimer = setTimeout(() => set('vault-files', { files }), 500)
-  })
-})
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ContentFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'tasks'>
+type ContentFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'dated' | 'tasks'>
 
 function applyContent(path: string, hash: string, content: ContentFields): void {
   const prev = vaultStore.files[path]
 
-  const filename = path.split('/').at(-1) ?? ''
-  const dated = extractDateFromName(filename) ?? content.created
-  setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, dated, ...content }))
+  setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...content }))
 
   const prevLinks = new Set(prev?.outLinks ?? [])
   const nextLinks = new Set(content.outLinks)
@@ -77,7 +51,7 @@ function applyContent(path: string, hash: string, content: ContentFields): void 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 export const vaultActions = {
-  async reindexFile(path: string, content: string, cmParsed?: ParseResult): Promise<void> {
+  async reindexFile(path: string, content: string, cmParsed?: ParseResult, persistStat = false): Promise<void> {
     const hash = hashContent(content)
     const cached = await getCachedMeta(hash)
     let fields: ContentFields
@@ -91,7 +65,7 @@ export const vaultActions = {
                    ?? new Date(existingMtime).toISOString().slice(0, 10)
       const updated = extractDateString(frontmatter.updated) ?? null
       const filename = path.split('/').at(-1) ?? ''
-      const dated = extractDateFromName(filename) ?? created
+      const dated = extractDateString(frontmatter.dated) ?? created
       const tasks: TaskItem[] = rawTasks.map(t => ({
         ...t,
         dueDate: t.dueDate ?? dated,
@@ -104,11 +78,18 @@ export const vaultActions = {
         aliases: extractAliases(frontmatter.aliases),
         created,
         updated,
+        dated,
         tasks,
       }
       await setCachedMeta(hash, fields)
     }
     applyContent(path, hash, fields)
+    if (persistStat) {
+      const entry = vaultStore.files[path]
+      if (entry?.kind === 'file') {
+        await setFileStatEntry(path, { size: entry.size, mtime: entry.mtime, hash })
+      }
+    }
   },
 
   remapFileLink(path: string, oldTarget: string, newTarget: string): void {
