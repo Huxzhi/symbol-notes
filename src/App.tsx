@@ -1,30 +1,48 @@
+import { SettingsIcon } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
-import { appActions } from './stores/runtimeStore'
-import { activeRoot } from './stores/workspaceStore'
-import { registerPlugin, startPlugins } from './lib/pluginRegistry'
+import { ConfirmModal } from './components/ConfirmModal'
+import { ContextMenu } from './components/ContextMenu'
 import { Ribbon } from './components/Ribbon'
 import { Settings } from './components/Settings'
 import { StatusBar } from './components/StatusBar'
-import { ContextMenu } from './components/ContextMenu'
 import { ToastContainer } from './components/ToastContainer'
-import { ConfirmModal } from './components/ConfirmModal'
 import { SidebarRenderer } from './components/workspace/SidebarRenderer'
 import { WorkspaceNodeRenderer } from './components/workspace/WorkspaceNodeRenderer'
-import { settingsStore } from './stores/settingsStore'
-import { initVaultStore } from './stores/vaultStore'
-import { runtimeStore } from './stores/runtimeStore'
-import { FilesPlugin } from './plugins/files'
-import { EditorPlugin } from './plugins/editor'
-import { LinksPlugin } from './plugins/links'
-import { OutlinePlugin } from './plugins/outline'
-import { TagsPlugin } from './plugins/tags'
-import { SearchPlugin } from './plugins/search'
-import { AppPlugin } from './plugins/app'
+import {
+  definePlugin,
+  registerPlugin,
+  startPlugins,
+} from './lib/pluginRegistry'
+
 import { CalendarPlugin } from './plugins/calendar'
 import { DailyNotePlugin } from './plugins/daily-note'
+import { EditorPlugin } from './plugins/editor'
+import { FilesPlugin } from './plugins/files'
+import { LinksPlugin } from './plugins/links'
+import { OutlinePlugin } from './plugins/outline'
+import { SearchPlugin } from './plugins/search'
+import { TagsPlugin } from './plugins/tags'
+import { appActions, runtimeStore } from './stores/runtimeStore'
+import { settingsStore } from './stores/settingsStore'
+import { activeRoot } from './stores/workspaceStore'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
+
+const AppPlugin = definePlugin({
+  id: 'app',
+  name: '应用',
+  core: true,
+  setup(ctx) {
+    ctx.ribbon({
+      id: 'settings',
+      title: '设置',
+      getIcon: () => <SettingsIcon size={18} />,
+      onClick: () => appActions.toggleSettings(),
+      position: 'bottom',
+    })
+  },
+})
 
 registerPlugin(FilesPlugin)
 registerPlugin(EditorPlugin)
@@ -46,20 +64,28 @@ export default function App() {
     customStyleEl.textContent = settingsStore.customCSS
   })
 
-  onMount(async () => {
-    await initVaultStore()
-    await appActions.restoreVault()
+  onMount(() => {
+    void appActions.restoreVault()
   })
 
   return (
     <div class="h-full flex flex-col bg-(--bg-base) text-(--text) overflow-hidden">
       <div class="flex flex-1 overflow-hidden">
         <Ribbon />
-        <SidebarRenderer node={activeRoot().left} side="left" />
+        <SidebarRenderer
+          node={activeRoot().left}
+          side="left"
+        />
         <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-          <WorkspaceNodeRenderer node={activeRoot().main} area="main" />
+          <WorkspaceNodeRenderer
+            node={activeRoot().main}
+            area="main"
+          />
         </div>
-        <SidebarRenderer node={activeRoot().right} side="right" />
+        <SidebarRenderer
+          node={activeRoot().right}
+          side="right"
+        />
       </div>
       <StatusBar />
       <Show when={runtimeStore.showSettings}>

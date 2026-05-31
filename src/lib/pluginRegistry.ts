@@ -255,6 +255,10 @@ function loadPlugin(def: PluginDef): () => void {
   })
 }
 
+
+
+
+
 export function startPlugins(): void {
   createRoot(() => {
     for (const def of _registered()) {
