@@ -45,21 +45,51 @@ export function mergeTagsWithBody(fmTags: string[], bodyEtags: string[]): string
   return [...set]
 }
 
-// Accept any record whose entries have outLinks / tags — compatible with FileMeta
-export function buildBacklinkMap(
-  files: Record<string, { outLinks: string[] }>,
-): Record<string, string[]> {
-  const map: Record<string, string[]> = {}
+export function buildStemIndex(files: Record<string, unknown>): Map<string, string[]> {
+  const index = new Map<string, string[]>()
   for (const path of Object.keys(files)) {
-    if (!map[path]) map[path] = []
+    if (!path.endsWith('.md')) continue
+    const stem = path.split('/').pop()!
+    const list = index.get(stem)
+    if (list) list.push(path)
+    else index.set(stem, [path])
   }
-  for (const [path, meta] of Object.entries(files)) {
-    for (const link of meta.outLinks) {
-      if (!map[link]) map[link] = []
-      if (!map[link].includes(path)) map[link].push(path)
+  return index
+}
+
+export function resolveLink(
+  target: string,
+  stemIndex: Map<string, string[]>,
+  files: Record<string, unknown>,
+): string | null {
+  if (target in files) return target
+
+  const stem = target.split('/').pop()!
+  const candidates = stemIndex.get(stem) ?? []
+  if (candidates.length === 1) return candidates[0]
+
+  const pathMatches = candidates.filter(c => c === target || c.endsWith('/' + target))
+  return pathMatches.length === 1 ? pathMatches[0] : null
+}
+
+export function buildLinkMaps(
+  files: Record<string, { outLinks: string[] }>,
+): { backlinkMap: Record<string, string[]>; unresolvedMap: Record<string, string[]> } {
+  const stemIndex = buildStemIndex(files)
+  const backlinkMap: Record<string, string[]> = {}
+  const unresolvedMap: Record<string, string[]> = {}
+
+  for (const [src, meta] of Object.entries(files)) {
+    for (const target of meta.outLinks) {
+      const resolved = resolveLink(target, stemIndex, files)
+      if (resolved) {
+        ;(backlinkMap[resolved] ??= []).push(src)
+      } else {
+        ;(unresolvedMap[target] ??= []).push(src)
+      }
     }
   }
-  return map
+  return { backlinkMap, unresolvedMap }
 }
 
 import type { TaskItem } from '../stores/types'
