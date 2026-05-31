@@ -3,7 +3,7 @@ import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
 import type { ParseResult } from '../lib/parseMarkdown'
 import { hashContent, getCachedMeta, setCachedMeta, setFileStatEntry } from '../services/indexStorage'
-import { extractTags, extractAliases, mergeTagsWithBody, extractDateString } from '../lib/knowledgeUtils'
+import { extractTags, extractAliases, mergeTagsWithBody, extractDateString, buildStemIndex, resolveLink } from '../lib/knowledgeUtils'
 import type { VaultState, FileMeta, TaskItem } from './types'
 
 const [vaultStore, setVaultStore] = createStore<VaultState>({
@@ -20,18 +20,29 @@ type ContentFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'alias
 
 function applyContent(path: string, hash: string, content: ContentFields): void {
   const prev = vaultStore.files[path]
-
   setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...content }))
+
+  const stemIndex = buildStemIndex(vaultStore.files)
 
   const prevLinks = new Set(prev?.outLinks ?? [])
   const nextLinks = new Set(content.outLinks)
   for (const t of prevLinks) {
-    if (!nextLinks.has(t))
-      setVaultStore('backlinkMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+    if (!nextLinks.has(t)) {
+      const resolved = resolveLink(t, stemIndex, vaultStore.files)
+      if (resolved)
+        setVaultStore('backlinkMap', resolved, (list: string[]) => list?.filter(p => p !== path) ?? [])
+      else
+        setVaultStore('unresolvedMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+    }
   }
   for (const t of nextLinks) {
-    if (!prevLinks.has(t))
-      setVaultStore('backlinkMap', t, (list: string[]) => list ? [...list, path] : [path])
+    if (!prevLinks.has(t)) {
+      const resolved = resolveLink(t, stemIndex, vaultStore.files)
+      if (resolved)
+        setVaultStore('backlinkMap', resolved, (list: string[]) => list ? [...list, path] : [path])
+      else
+        setVaultStore('unresolvedMap', t, (list: string[]) => list ? [...list, path] : [path])
+    }
   }
 
   const prevTags = new Set(prev?.tags ?? [])
@@ -102,8 +113,24 @@ export const vaultActions = {
   removeVaultEntry(path: string): void {
     const file = vaultStore.files[path]
     if (!file) return
-    for (const t of file.outLinks)
-      setVaultStore('backlinkMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+
+    // Move all files that linked TO this path into unresolvedMap
+    const backlinks = vaultStore.backlinkMap[path] ?? []
+    if (backlinks.length > 0) {
+      setVaultStore('unresolvedMap', path, (list: string[]) => [...(list ?? []), ...backlinks])
+      setVaultStore('backlinkMap', path, [])
+    }
+
+    // Remove this file's own outLinks from backlinkMap/unresolvedMap
+    const stemIndex = buildStemIndex(vaultStore.files)
+    for (const t of file.outLinks) {
+      const resolved = resolveLink(t, stemIndex, vaultStore.files)
+      if (resolved)
+        setVaultStore('backlinkMap', resolved, (list: string[]) => list?.filter(p => p !== path) ?? [])
+      else
+        setVaultStore('unresolvedMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
+    }
+
     for (const t of file.tags)
       setVaultStore('tagMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
     setVaultStore('taskMap', path, undefined as unknown as TaskItem[])
