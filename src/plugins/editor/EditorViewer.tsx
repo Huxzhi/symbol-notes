@@ -30,7 +30,9 @@ import {
   setFrontmatterField,
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/wikiLinkParser'
-import { extractDateFromName } from '../../lib/knowledgeUtils'
+import { extractDateFromName, buildStemIndex, resolveLink } from '../../lib/knowledgeUtils'
+import { workspaceActions } from '../../stores/workspaceStore'
+import { syntaxTree } from '@codemirror/language'
 import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileIO'
 import { settingsStore } from '../../stores/settingsStore'
 import { runtimeStore, setRuntimeStore } from '../../stores/runtimeStore'
@@ -58,6 +60,7 @@ function buildEditorState(
   doc: string,
   onDocChange: (u: ViewUpdate) => void,
   onKeyDown: (e: KeyboardEvent) => void,
+  onMouseDown: (e: MouseEvent, view: EditorView) => boolean,
 ): EditorState {
   return EditorState.create({
     doc,
@@ -79,7 +82,7 @@ function buildEditorState(
       tasksField,
       headingsField,
       EditorView.updateListener.of(onDocChange),
-      EditorView.domEventHandlers({ keydown: onKeyDown }),
+      EditorView.domEventHandlers({ keydown: onKeyDown, mousedown: onMouseDown }),
       EditorView.lineWrapping,
     ],
   })
@@ -147,6 +150,47 @@ export function EditorViewer(props: ViewComponentProps) {
       e.preventDefault()
       void saveFile()
     }
+  }
+
+  function handleMouseDown(e: MouseEvent, cmView: EditorView): boolean {
+    const pos = cmView.posAtCoords({ x: e.clientX, y: e.clientY })
+    if (pos === null) return false
+
+    const sel = cmView.state.selection.main
+    let targetText: string | null = null
+
+    syntaxTree(cmView.state).iterate({
+      from: Math.max(0, pos - 1),
+      to: Math.min(cmView.state.doc.length, pos + 1),
+      enter(node) {
+        if (node.name === 'WikiLink') {
+          // Only navigate when link is in rendered state (cursor not overlapping)
+          if (sel.from > node.to || sel.to < node.from) {
+            const c = node.node.cursor()
+            if (c.firstChild()) {
+              do {
+                if (c.name === 'WikiLinkTarget') {
+                  targetText = cmView.state.doc.sliceString(c.from, c.to)
+                }
+              } while (c.nextSibling())
+            }
+          }
+          return false
+        }
+      },
+    })
+
+    if (!targetText) return false
+
+    const clean = (targetText as string).split('#')[0].trim()
+    const withExt = clean.endsWith('.md') ? clean : `${clean}.md`
+    const stemIndex = buildStemIndex(vaultStore.files)
+    const resolved = resolveLink(withExt, stemIndex, vaultStore.files)
+    if (!resolved) return false
+
+    e.preventDefault()
+    workspaceActions.openFile(resolved)
+    return true
   }
 
   async function saveFile(): Promise<void> {
@@ -227,7 +271,7 @@ export function EditorViewer(props: ViewComponentProps) {
     if (!view) return
     invalidateFile(p)
     const newContent = await loadFileContent(p)
-    const newState = buildEditorState(newContent, handleDocChange, handleKeyDown)
+    const newState = buildEditorState(newContent, handleDocChange, handleKeyDown, handleMouseDown)
     view.setState(newState)
     view.scrollDOM.scrollTop = 0
     localDirty = false
@@ -249,7 +293,7 @@ export function EditorViewer(props: ViewComponentProps) {
       const doc = await loadFileContent(p)
       if (view) return
       view = new EditorView({
-        state: buildEditorState(doc, handleDocChange, handleKeyDown),
+        state: buildEditorState(doc, handleDocChange, handleKeyDown, handleMouseDown),
         parent: container,
       })
       if (filePath() === p && props.isActive) {
@@ -285,6 +329,7 @@ export function EditorViewer(props: ViewComponentProps) {
       newContent,
       handleDocChange,
       handleKeyDown,
+      handleMouseDown,
     )
     view.setState(newState)
     view.scrollDOM.scrollTop = 0
