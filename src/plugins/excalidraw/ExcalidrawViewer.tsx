@@ -19,6 +19,9 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
   let currentData: ExcalidrawData | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let localDirty = false
+  // Excalidraw fires onChange once on mount with the restored initial state.
+  // We skip that first call to avoid an immediate no-op save.
+  let mountChangeSkipped = false
 
   function setDirty(dirty: boolean) {
     localDirty = dirty
@@ -35,7 +38,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
   async function doSave(): Promise<void> {
     const p = filePath()
     if (!p || !currentData) return
-    await writeFile(p, serializeExcalidrawMd(currentData, currentMode))
+    await writeFile(p, serializeExcalidrawMd(currentData, currentMode), true)
     setDirty(false)
   }
 
@@ -49,6 +52,10 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function handleChange(elements: any[], appState: any, files: any) {
+    if (!mountChangeSkipped) {
+      mountChangeSkipped = true
+      return
+    }
     currentData = {
       type: 'excalidraw',
       version: 2,
