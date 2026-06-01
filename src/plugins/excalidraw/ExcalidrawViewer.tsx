@@ -95,6 +95,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
         import('react-dom/client'),
         import('react'),
         import('@excalidraw/excalidraw'),
+        import('@excalidraw/excalidraw/index.css'),
       ])
       // restoreElements normalises fractional indices — required when loading
       // files saved by Obsidian's Excalidraw plugin (0.18 validates strictly)
