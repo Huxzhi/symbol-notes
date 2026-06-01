@@ -1,7 +1,7 @@
 import { createEffect, on, onCleanup, onMount } from 'solid-js'
 import { readFile, writeFile } from '../../services/fileIO'
 import { loadFromStorage } from '../../lib/localStorage'
-import { setRuntimeStore } from '../../stores/runtimeStore'
+import { setRuntimeStore, runtimeStore } from '../../stores/runtimeStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {
   parseExcalidrawMd,
@@ -99,9 +99,15 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     }, 1000)
   }
 
-  onMount(async () => {
-    const p = filePath()
-    if (!p) return
+  // Mirror EditorViewer: wait for rootHandle before loading — workspace restores
+  // tabs from localStorage before the vault permission is granted, so onMount
+  // alone would fire with rootHandle === null.
+  createEffect(on(
+    () => runtimeStore.rootHandle,
+    async (rootHandle) => {
+      if (!rootHandle || reactRoot) return
+      const p = filePath()
+      if (!p) return
 
     let data: ExcalidrawData
     let mode: ExcalidrawMode
@@ -151,7 +157,8 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     } catch (err) {
       container.textContent = `[绘图组件加载失败: ${err instanceof Error ? err.message : String(err)}]`
     }
-  })
+    },
+  ))
 
   onCleanup(() => {
     if (saveTimer !== null) {
