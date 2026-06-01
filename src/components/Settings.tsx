@@ -65,7 +65,7 @@ export function Settings() {
         {/* Header */}
         <div class="flex items-center justify-between px-5 py-3.5 border-b border-(--border)] shrink-0">
           <h2 class="text-[14px] font-semibold t-base">设置</h2>
-          <button class="interactive w-6 h-6 flex items-center justify-center rounded text-[13px]" onClick={close}>✕</button>
+          <button class="w-6 h-6 flex items-center justify-center rounded text-[13px] text-(--text-3) cursor-pointer transition-[background,color] duration-150 hover:bg-(--bg-hover) hover:text-(--text)" onClick={close}>✕</button>
         </div>
 
         {/* Body */}
@@ -232,7 +232,7 @@ export function Settings() {
         {/* Footer — hidden for plugin settings tabs (they save immediately) */}
         <Show when={!isPluginTab()}>
           <div class="flex justify-end gap-2 px-5 py-3 border-t border-(--border)] shrink-0">
-            <button class="interactive px-4 py-1.5 text-[12px] rounded border border-(--border)]" onClick={close}>取消</button>
+            <button class="px-4 py-1.5 text-[12px] rounded border border-(--border)] text-(--text-3) cursor-pointer transition-[background,color] duration-150 hover:bg-(--bg-hover) hover:text-(--text)" onClick={close}>取消</button>
             <button class="px-4 py-1.5 text-[12px] rounded bg-(--accent) text-white cursor-pointer hover:bg-(--accent-2) transition-colors" onClick={apply}>应用</button>
           </div>
         </Show>
