@@ -1,9 +1,9 @@
 import { FolderOpen } from 'lucide-solid'
-import { createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, JSX, Show } from 'solid-js'
+import { createVirtualizer } from '@tanstack/solid-virtual'
 
 import { appActions, fileActions } from '../../stores/runtimeStore'
 import { workspaceActions } from '../../stores/workspaceStore'
-
 import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
 import { vaultStore } from '../../stores/vaultStore'
 import { runtimeStore } from '../../stores/runtimeStore'
@@ -12,61 +12,46 @@ import { showError, showToast } from '../../stores/toastStore'
 import { getFileViewForPath } from '../../lib/pluginRegistry'
 import type { FileMeta, ViewComponentProps } from '../../stores/types'
 import { activeFilePath } from '../../stores/workspaceStore'
+import { flattenTree, resolveDropTarget, isOtherFile, type FlatRow } from './treeUtils'
 
 export function toggleInArray(arr: string[], val: string): string[] {
   return arr.includes(val) ? arr.filter((p) => p !== val) : [...arr, val]
 }
 
-const MD_EXT = '.md'
+const ROW_HEIGHT = 22
 
 function displayName(name: string): string {
   if (name.endsWith('.excalidraw.md')) return name.slice(0, -14)
   return name.endsWith('.md') ? name.slice(0, -3) : name
 }
 
-function isOtherFile(name: string): boolean {
-  return !name.endsWith(MD_EXT)
-}
-
 function canOpen(path: string): boolean {
   return getFileViewForPath(path) !== undefined
 }
 
-function childrenOf(parentPath: string | null): FileMeta[] {
-  return Object.values(vaultStore.files)
-    .filter((e) => e.parent === parentPath)
-    .sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
-      return a.name.localeCompare(b.name)
-    })
-}
-
-function FileTreeNode(props: {
-  entry: FileMeta
-  depth: number
+function FileRow(props: {
+  row: FlatRow
+  style: JSX.CSSProperties
   collapsedFolders: string[]
   onToggle: (path: string) => void
   dragSrc: () => string | null
   dragOver: () => string | null
   onDragStart: (e: DragEvent, entry: FileMeta) => void
   onDragEnd: () => void
-  onDirDragOver: (e: DragEvent, path: string) => void
-  onDirDragLeave: (e: DragEvent, path: string) => void
-  onDirDrop: (e: DragEvent, destDirPath: string) => void
+  onRowDragOver: (e: DragEvent, entry: FileMeta) => void
+  onRowDragLeave: (e: DragEvent) => void
+  onRowDrop: (e: DragEvent, entry: FileMeta) => void
 }) {
-  const isActive = () => activeFilePath() === props.entry.path
-  const isOther = () =>
-    props.entry.kind === 'file' && isOtherFile(props.entry.name)
-  const show = () =>
-    props.entry.kind === 'directory' ||
-    !isOtherFile(props.entry.name) ||
-    settingsStore.showOtherFiles
+  const entry = () => props.row.entry
+  const isActive = () => activeFilePath() === entry().path
+  const isOther = () => entry().kind === 'file' && isOtherFile(entry().name)
   const isCollapsed = () =>
-    props.entry.kind === 'directory' &&
-    props.collapsedFolders.includes(props.entry.path)
+    entry().kind === 'directory' && props.collapsedFolders.includes(entry().path)
   const isRenaming = () =>
     runtimeStore.fileOp?.type === 'rename' &&
-    (runtimeStore.fileOp as { path: string }).path === props.entry.path
+    (runtimeStore.fileOp as { path: string }).path === entry().path
+  const isDragTarget = () =>
+    entry().kind === 'directory' && props.dragOver() === entry().path
 
   const [renameValue, setRenameValue] = createSignal('')
 
@@ -77,7 +62,7 @@ function FileTreeNode(props: {
       return
     }
     try {
-      await fileActions.commitRename(props.entry.path, val)
+      await fileActions.commitRename(entry().path, val)
     } catch (err) {
       showError(err instanceof Error ? err.message : '重命名失败')
     }
@@ -88,121 +73,77 @@ function FileTreeNode(props: {
     else if (e.key === 'Escape') fileActions.cancelOp()
   }
 
-  const isDragTarget = () =>
-    props.entry.kind === 'directory' && props.dragOver() === props.entry.path
-
   return (
-    <Show when={show()}>
-      <div
-        class={
-          isDragTarget()
-            ? 'outline outline-(--accent-2) -outline-offset-1 bg-(--bg-hover)'
-            : ''
+    <div
+      data-ctx={entry().kind === 'directory' ? 'directory' : 'file'}
+      data-path={entry().path}
+      draggable={true}
+      style={{
+        ...props.style,
+        'padding-left': `${6 + props.row.depth * 14}px`,
+      }}
+      class={`flex items-center gap-1 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none
+        ${
+          isActive()
+            ? 'bg-(--bg-hover) border-l-2 border-(--accent) text-(--text)'
+            : isOther()
+              ? 'text-(--text-4) border-l-2 border-transparent'
+              : 'text-(--text-2) border-l-2 border-transparent'
         }
-        onDragOver={
-          props.entry.kind === 'directory'
-            ? (e) => props.onDirDragOver(e, props.entry.path)
-            : undefined
+        ${props.dragSrc() === entry().path ? 'opacity-50' : ''}
+        ${isDragTarget() ? 'outline outline-(--accent-2) -outline-offset-1 bg-(--bg-hover) border-(--accent-2)!' : ''}
+      `}
+      onClick={() => {
+        if (isRenaming()) return
+        if (entry().kind === 'directory') {
+          props.onToggle(entry().path)
+          return
         }
-        onDragLeave={
-          props.entry.kind === 'directory'
-            ? (e) => props.onDirDragLeave(e, props.entry.path)
-            : undefined
-        }
-        onDrop={
-          props.entry.kind === 'directory'
-            ? (e) => props.onDirDrop(e, props.entry.path)
-            : undefined
+        if (!canOpen(entry().path)) return
+        workspaceActions.openFile(entry().path)
+      }}
+      onDblClick={() => {
+        if (isRenaming()) return
+        if (entry().kind !== 'file') return
+        if (!canOpen(entry().path)) return
+        workspaceActions.openFile(entry().path, { newTab: true, pin: true })
+      }}
+      onDragStart={(e) => props.onDragStart(e, entry())}
+      onDragEnd={props.onDragEnd}
+      onDragOver={(e) => props.onRowDragOver(e, entry())}
+      onDragLeave={props.onRowDragLeave}
+      onDrop={(e) => props.onRowDrop(e, entry())}
+    >
+      <Show when={entry().kind === 'directory'}>
+        <span class="text-[9px] text-(--text-3)">
+          {isCollapsed() ? '▸' : '▾'}
+        </span>
+      </Show>
+      <Show
+        when={isRenaming()}
+        fallback={
+          <span class={isActive() ? 'text-(--accent)' : ''}>
+            {displayName(entry().name)}
+          </span>
         }
       >
-        <div
-          data-ctx={props.entry.kind === 'directory' ? 'directory' : 'file'}
-          data-path={props.entry.path}
-          draggable={true}
-          class={`flex items-center gap-1 py-0.5 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none
-            ${
-              isActive()
-                ? 'bg-(--bg-hover) border-l-2 border-(--accent) text-(--text)'
-                : isOther()
-                  ? 'text-(--text-4) border-l-2 border-transparent'
-                  : 'text-(--text-2) border-l-2 border-transparent'
-            }
-            ${props.dragSrc() === props.entry.path ? 'opacity-50' : ''}
-            ${isDragTarget() ? 'border-(--accent-2)!' : ''}
-          `}
-          style={{ 'padding-left': `${6 + props.depth * 14}px` }}
-          onClick={() => {
-            if (isRenaming()) return
-            if (props.entry.kind === 'directory') {
-              props.onToggle(props.entry.path)
-              return
-            }
-            if (!canOpen(props.entry.path)) return
-            workspaceActions.openFile(props.entry.path)
+        <input
+          class="flex-1 bg-(--bg-hover) border border-(--accent) rounded px-1 py-0 text-[11px] text-(--text) outline-none min-w-0"
+          value={renameValue()}
+          onInput={(e) => setRenameValue(e.currentTarget.value)}
+          onKeyDown={onRenameKeyDown}
+          onBlur={() => void confirmRename()}
+          ref={(el) => {
+            setRenameValue(displayName(entry().name))
+            setTimeout(() => {
+              el?.focus()
+              el?.select()
+            }, 0)
           }}
-          onDblClick={() => {
-            if (isRenaming()) return
-            if (props.entry.kind !== 'file') return
-            if (!canOpen(props.entry.path)) return
-            workspaceActions.openFile(props.entry.path, {
-              newTab: true,
-              pin: true,
-            })
-          }}
-          onDragStart={(e) => props.onDragStart(e, props.entry)}
-          onDragEnd={props.onDragEnd}
-        >
-          <Show when={props.entry.kind === 'directory'}>
-            <span class="text-[9px] text-(--text-3)">
-              {isCollapsed() ? '▸' : '▾'}
-            </span>
-          </Show>
-          <Show
-            when={isRenaming()}
-            fallback={
-              <span class={isActive() ? 'text-(--accent)' : ''}>
-                {displayName(props.entry.name)}
-              </span>
-            }
-          >
-            <input
-              class="flex-1 bg-(--bg-hover) border border-(--accent) rounded px-1 py-0 text-[11px] text-(--text) outline-none min-w-0"
-              value={renameValue()}
-              onInput={(e) => setRenameValue(e.currentTarget.value)}
-              onKeyDown={onRenameKeyDown}
-              onBlur={() => void confirmRename()}
-              ref={(el) => {
-                setRenameValue(displayName(props.entry.name))
-                setTimeout(() => {
-                  el?.focus()
-                  el?.select()
-                }, 0)
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </Show>
-        </div>
-        <Show when={props.entry.kind === 'directory' && !isCollapsed()}>
-          <For each={childrenOf(props.entry.path)}>
-            {(child) => (
-              <FileTreeNode
-                entry={child}
-                depth={props.depth + 1}
-                collapsedFolders={props.collapsedFolders}
-                onToggle={props.onToggle}
-                dragSrc={props.dragSrc}
-                dragOver={props.dragOver}
-                onDragStart={props.onDragStart}
-                onDragEnd={props.onDragEnd}
-                onDirDragOver={props.onDirDragOver}
-                onDirDragLeave={props.onDirDragLeave}
-                onDirDrop={props.onDirDrop}
-              />
-            )}
-          </For>
-        </Show>
-      </div>
-    </Show>
+          onClick={(e) => e.stopPropagation()}
+        />
+      </Show>
+    </div>
   )
 }
 
@@ -220,32 +161,44 @@ export function FilesPanel(props: ViewComponentProps) {
     })
   }
 
+  const flatRows = createMemo(() =>
+    flattenTree(null, 0, collapsedFolders(), vaultStore.files, settingsStore.showOtherFiles)
+  )
+
+  let scrollEl!: HTMLDivElement
+
+  const virtualizer = createVirtualizer({
+    get count() { return flatRows().length },
+    getScrollElement: () => scrollEl,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  })
+
   const [dragSrc, setDragSrc] = createSignal<string | null>(null)
   const [dragOver, setDragOver] = createSignal<string | null>(null)
+
+  createEffect(() => {
+    const op = runtimeStore.fileOp
+    if (op?.type === 'rename') {
+      const path = (op as { path: string }).path
+      const idx = flatRows().findIndex(r => r.entry.path === path)
+      if (idx !== -1) virtualizer.scrollToIndex(idx, { align: 'auto' })
+    }
+  })
 
   const handleDragStart = (e: DragEvent, entry: FileMeta) => {
     setDragSrc(entry.path)
     e.dataTransfer!.setData('application/x-symbol-notes-file', entry.path)
-    e.dataTransfer!.setData(
-      'text/plain',
-      computeWikiLink(entry.name, entry.kind),
-    )
+    e.dataTransfer!.setData('text/plain', computeWikiLink(entry.name, entry.kind))
     e.dataTransfer!.effectAllowed = 'copyMove'
 
     const ghost = document.createElement('div')
     ghost.textContent = displayName(entry.name)
     Object.assign(ghost.style, {
-      position: 'fixed',
-      top: '-100px',
-      left: '-100px',
-      padding: '2px 8px',
-      borderRadius: '4px',
-      fontSize: '11px',
-      background: 'var(--bg-hover)',
-      color: 'var(--text)',
-      border: '1px solid var(--accent)',
-      whiteSpace: 'nowrap',
-      pointerEvents: 'none',
+      position: 'fixed', top: '-100px', left: '-100px',
+      padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+      background: 'var(--bg-hover)', color: 'var(--text)',
+      border: '1px solid var(--accent)', whiteSpace: 'nowrap', pointerEvents: 'none',
     })
     document.body.appendChild(ghost)
     e.dataTransfer!.setDragImage(ghost, ghost.offsetWidth / 2, 12)
@@ -257,36 +210,40 @@ export function FilesPanel(props: ViewComponentProps) {
     setDragOver(null)
   }
 
-  const handleDirDragOver = (e: DragEvent, path: string) => {
+  let dragLeaveTimer: ReturnType<typeof setTimeout> | null = null
+
+  const handleRowDragOver = (e: DragEvent, entry: FileMeta) => {
     e.stopPropagation()
     const src = dragSrc()
     if (!src) return
+    const target = resolveDropTarget(entry)
     const srcEntry = vaultStore.files[src]
-    if (!isValidMoveDrop(src, path, srcEntry?.parent ?? null)) return
+    if (!isValidMoveDrop(src, target, srcEntry?.parent ?? null)) return
     e.preventDefault()
     e.dataTransfer!.dropEffect = 'move'
-    setDragOver(path)
+    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null }
+    setDragOver(target)
   }
 
-  const handleDirDragLeave = (e: DragEvent, path: string) => {
-    const rel = e.relatedTarget as Node | null
-    if (rel && (e.currentTarget as Element).contains(rel)) return
-    if (dragOver() === path) setDragOver(null)
+  const handleRowDragLeave = (_e: DragEvent) => {
+    dragLeaveTimer = setTimeout(() => setDragOver(null), 0)
   }
 
-  const handleDirDrop = async (e: DragEvent, destDirPath: string) => {
+  const handleRowDrop = async (e: DragEvent, entry: FileMeta) => {
     e.preventDefault()
     e.stopPropagation()
     const src = dragSrc()
+    const target = resolveDropTarget(entry)
     setDragSrc(null)
     setDragOver(null)
+    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null }
     if (!src) return
     const srcEntry = vaultStore.files[src]
-    if (!isValidMoveDrop(src, destDirPath, srcEntry?.parent ?? null)) return
+    if (!isValidMoveDrop(src, target, srcEntry?.parent ?? null)) return
     const srcName = displayName(srcEntry?.name ?? src.split('/').pop()!)
-    const destName = destDirPath.split('/').pop() ?? destDirPath
+    const destName = target ? (target.split('/').pop() ?? target) : '根目录'
     try {
-      await fileActions.moveEntry(src, destDirPath)
+      await fileActions.moveEntry(src, target)
       showToast(`已移动 ${srcName} → ${destName}`)
     } catch (err) {
       showError(err instanceof Error ? err.message : '移动失败')
@@ -300,6 +257,7 @@ export function FilesPanel(props: ViewComponentProps) {
     if (!isValidMoveDrop(src, null, srcEntry?.parent ?? null)) return
     e.preventDefault()
     e.dataTransfer!.dropEffect = 'move'
+    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null }
     setDragOver('__root__')
   }
 
@@ -354,10 +312,7 @@ export function FilesPanel(props: ViewComponentProps) {
           onClick={() => void appActions.openVault()}
           title={runtimeStore.rootHandle ? '切换文件夹' : '打开文件夹'}
         >
-          <FolderOpen
-            size={12}
-            class="shrink-0 text-(--accent) group-hover:text-(--accent-2)"
-          />
+          <FolderOpen size={12} class="shrink-0 text-(--accent) group-hover:text-(--accent-2)" />
           <span class="truncate text-[10px] text-(--accent) font-bold tracking-widest uppercase group-hover:text-(--accent-2)">
             {runtimeStore.rootHandle?.name ?? '打开文件夹'}
           </span>
@@ -366,28 +321,19 @@ export function FilesPanel(props: ViewComponentProps) {
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors text-[13px]"
             title="新建文件夹"
-            onClick={() => {
-              setCreateValue('')
-              fileActions.beginCreate('folder')
-            }}
-          >
-            ⊞
-          </button>
+            onClick={() => { setCreateValue(''); fileActions.beginCreate('folder') }}
+          >⊞</button>
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors"
             title="新建文件"
-            onClick={() => {
-              setCreateValue('')
-              fileActions.beginCreate('file')
-            }}
-          >
-            +
-          </button>
+            onClick={() => { setCreateValue(''); fileActions.beginCreate('file') }}
+          >+</button>
         </Show>
       </div>
 
       <div
-        class={`overflow-y-auto flex-1 py-1 ${dragOver() === '__root__' ? 'outline outline-1 outline-(--accent-2) outline-offset-[-2px]' : ''}`}
+        ref={scrollEl}
+        class={`overflow-y-auto flex-1 ${dragOver() === '__root__' ? 'outline outline-1 outline-(--accent-2) outline-offset-[-2px]' : ''}`}
         onDragOver={handleRootDragOver}
         onDragLeave={handleRootDragLeave}
         onDrop={handleRootDrop}
@@ -409,31 +355,44 @@ export function FilesPanel(props: ViewComponentProps) {
               onKeyDown={onCreateKeyDown}
               onBlur={() => void confirmCreate()}
               ref={(el) => {
-                const prefix =
-                  (fileOp() as { prefix?: string } | null)?.prefix ?? ''
+                const prefix = (fileOp() as { prefix?: string } | null)?.prefix ?? ''
                 setCreateValue(prefix)
                 setTimeout(() => el?.focus(), 0)
               }}
             />
           </div>
         </Show>
-        <For each={childrenOf(null)}>
-          {(entry) => (
-            <FileTreeNode
-              entry={entry}
-              depth={0}
-              collapsedFolders={collapsedFolders()}
-              onToggle={handleToggle}
-              dragSrc={dragSrc}
-              dragOver={dragOver}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDirDragOver={handleDirDragOver}
-              onDirDragLeave={handleDirDragLeave}
-              onDirDrop={handleDirDrop}
-            />
-          )}
-        </For>
+
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            position: 'relative',
+            'margin-top': '4px',
+          }}
+        >
+          <For each={virtualizer.getVirtualItems()}>
+            {(vItem) => (
+              <FileRow
+                row={flatRows()[vItem.index]}
+                style={{
+                  position: 'absolute',
+                  top: `${vItem.start}px`,
+                  height: `${ROW_HEIGHT}px`,
+                  width: '100%',
+                }}
+                collapsedFolders={collapsedFolders()}
+                onToggle={handleToggle}
+                dragSrc={dragSrc}
+                dragOver={dragOver}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onRowDragOver={handleRowDragOver}
+                onRowDragLeave={handleRowDragLeave}
+                onRowDrop={handleRowDrop}
+              />
+            )}
+          </For>
+        </div>
       </div>
     </div>
   )
