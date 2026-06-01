@@ -1,4 +1,4 @@
-import type { WorkspaceLeaf, WorkspaceTabs, WorkspaceSplit, WorkspaceNode } from './types'
+import type { WorkspaceLeaf, WorkspaceTabs, WorkspaceSplit, WorkspaceNode, ViewState } from './types'
 
 export function mapNode(
   root: WorkspaceNode,
@@ -16,6 +16,27 @@ export function mapNode(
     }
   }
   return root
+}
+
+export function patchLeafViewState(
+  nodes: WorkspaceNode[],
+  leafId: string,
+  viewState: ViewState,
+): boolean {
+  for (const node of nodes) {
+    if (node.type === 'leaf' && node.id === leafId) {
+      (node as WorkspaceLeaf).viewState = viewState
+      return true
+    }
+    if (node.type === 'tabs') {
+      const leaf = node.children.find(c => c.id === leafId)
+      if (leaf) { leaf.viewState = viewState; return true }
+    }
+    if (node.type === 'split') {
+      if (patchLeafViewState(node.children, leafId, viewState)) return true
+    }
+  }
+  return false
 }
 
 export function findTabsById(root: WorkspaceNode, tabsId: string): WorkspaceTabs | null {

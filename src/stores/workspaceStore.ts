@@ -5,6 +5,7 @@ import { getFileViewForPath, getView } from '../lib/pluginRegistry'
 import { setRuntimeStore } from './runtimeStore'
 import {
   mapNode,
+  patchLeafViewState,
   findParentTabs,
   findTabsById,
   removeLeafFromTree,
@@ -268,20 +269,11 @@ export const workspaceActions = {
   },
 
   setLeafViewState(leafId: string, viewState: ViewState): void {
-    const root = activeLayout().root
-    const update = (n: WorkspaceNode) => ({ ...(n as WorkspaceLeaf), viewState })
-    type Area = [nodes: WorkspaceNode[], save: (updated: WorkspaceNode[]) => void]
-    const areas: Area[] = [
-      [[root.main], ([n]) => setRoot('main', n)],
-      [root.left.children, (cs) => setRoot('left', 'children', cs)],
-      [root.right.children, (cs) => setRoot('right', 'children', cs)],
-    ]
-    for (const [nodes, save] of areas) {
-      if (nodes.some(n => findLeafInTree(n, leafId))) {
-        save(nodes.map(n => mapNode(n, leafId, update)))
-        return
-      }
-    }
+    setRoot(produce((root: WorkspaceRoot) => {
+      patchLeafViewState([root.main], leafId, viewState) ||
+      patchLeafViewState(root.left.children, leafId, viewState) ||
+      patchLeafViewState(root.right.children, leafId, viewState)
+    }))
   },
 
   setLeafPinned(leafId: string, pinned: boolean): void {
