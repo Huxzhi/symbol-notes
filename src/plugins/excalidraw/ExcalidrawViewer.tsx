@@ -1,6 +1,7 @@
 import { createEffect, on, onCleanup, onMount } from 'solid-js'
 import { readFile, writeFile } from '../../services/fileIO'
 import { setRuntimeStore } from '../../stores/runtimeStore'
+import { settingsStore } from '../../stores/settingsStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {
   parseExcalidrawMd,
@@ -117,15 +118,20 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
           excalidrawAPI: (api: any) => { excalidrawAPI = api },
           initialData: {
             elements,
-            // Restore full appState including scroll/zoom from previous session
-            appState: { ...data.appState, theme: (data.appState.theme as string) ?? 'dark' },
+            // Restore full appState; fall back to app theme for new files
+            appState: {
+              ...data.appState,
+              theme: (data.appState.theme as string)
+                ?? (settingsStore.theme === 'light' ? 'light' : 'dark'),
+            },
             files: data.files,
           },
+          // No controlled `theme` prop — Excalidraw manages it internally,
+          // so the hamburger menu "Toggle dark mode" works and persists via getSceneData
           onChange: () => {
             setDirty(true)
             scheduleSave()
           },
-          theme: (data.appState.theme as 'light' | 'dark' | undefined) ?? 'dark',
         }),
       )
     } catch (err) {
