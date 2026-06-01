@@ -1,7 +1,7 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { loadFromStorage, saveToStorage } from '../lib/localStorage'
-import { getFileViewForExt, getView } from '../lib/pluginRegistry'
+import { getFileViewForPath, getView } from '../lib/pluginRegistry'
 import { setRuntimeStore } from './runtimeStore'
 import {
   mapNode,
@@ -327,8 +327,7 @@ export const workspaceActions = {
     path: string,
     options?: { area?: 'left' | 'main' | 'right'; newTab?: boolean; pin?: boolean },
   ): void {
-    const ext = path.slice(path.lastIndexOf('.')).toLowerCase()
-    const def = getFileViewForExt(ext)
+    const def = getFileViewForPath(path)
     if (!def) return
     const viewState: ViewState = { type: def.type, state: { file: path } }
     const area = options?.area ?? 'main'
@@ -374,8 +373,7 @@ export const workspaceActions = {
   },
 
   renameLeafPath(oldPath: string, newPath: string): void {
-    const ext = newPath.slice(newPath.lastIndexOf('.')).toLowerCase()
-    const def = getFileViewForExt(ext)
+    const def = getFileViewForPath(newPath)
     const newType = def?.type ?? 'markdown'
     setRoot('main', (root: WorkspaceNode) => {
       function walk(node: WorkspaceNode): WorkspaceNode {

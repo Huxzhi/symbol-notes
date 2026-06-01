@@ -9,7 +9,7 @@ import { vaultStore } from '../../stores/vaultStore'
 import { runtimeStore } from '../../stores/runtimeStore'
 import { settingsStore } from '../../stores/settingsStore'
 import { showError, showToast } from '../../stores/toastStore'
-import { getFileViewForExt } from '../../lib/pluginRegistry'
+import { getFileViewForPath } from '../../lib/pluginRegistry'
 import type { FileMeta, ViewComponentProps } from '../../stores/types'
 import { activeFilePath } from '../../stores/workspaceStore'
 
@@ -20,16 +20,16 @@ export function toggleInArray(arr: string[], val: string): string[] {
 const MD_EXT = '.md'
 
 function displayName(name: string): string {
-  return name.endsWith(MD_EXT) ? name.slice(0, -3) : name
+  if (name.endsWith('.excalidraw.md')) return name.slice(0, -14)
+  return name.endsWith('.md') ? name.slice(0, -3) : name
 }
 
 function isOtherFile(name: string): boolean {
   return !name.endsWith(MD_EXT)
 }
 
-function canOpen(name: string): boolean {
-  const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
-  return getFileViewForExt(ext) !== undefined
+function canOpen(path: string): boolean {
+  return getFileViewForPath(path) !== undefined
 }
 
 function childrenOf(parentPath: string | null): FileMeta[] {
@@ -137,13 +137,13 @@ function FileTreeNode(props: {
               props.onToggle(props.entry.path)
               return
             }
-            if (!canOpen(props.entry.name)) return
+            if (!canOpen(props.entry.path)) return
             workspaceActions.openFile(props.entry.path)
           }}
           onDblClick={() => {
             if (isRenaming()) return
             if (props.entry.kind !== 'file') return
-            if (!canOpen(props.entry.name)) return
+            if (!canOpen(props.entry.path)) return
             workspaceActions.openFile(props.entry.path, {
               newTab: true,
               pin: true,

@@ -13,7 +13,7 @@ export interface FileViewDef {
   type: string
   getDisplayText(path: string): string
   getIcon?(): JSX.Element
-  canAcceptFile(ext: string): boolean
+  canAcceptFile(path: string): boolean
   component: Component<ViewComponentProps>
 }
 
@@ -52,9 +52,9 @@ export function getView(type: string): ViewDef | undefined {
   return _viewRegistry().get(type)
 }
 
-export function getFileViewForExt(ext: string): FileViewDef | undefined {
+export function getFileViewForPath(path: string): FileViewDef | undefined {
   for (const def of _viewRegistry().values()) {
-    if (def.kind === 'file' && def.canAcceptFile(ext)) return def as FileViewDef
+    if (def.kind === 'file' && def.canAcceptFile(path)) return def as FileViewDef
   }
   return undefined
 }

@@ -16,7 +16,7 @@ export const EditorPlugin = definePlugin({
       kind: 'file',
       type: 'markdown',
       getDisplayText: (p) => p.split('/').pop()!,
-      canAcceptFile: (ext) => ext === '.md',
+      canAcceptFile: (p) => p.endsWith('.md') && !p.endsWith('.excalidraw.md'),
       component: EditorViewer,
     })
 
