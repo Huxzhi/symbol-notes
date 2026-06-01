@@ -1,4 +1,4 @@
-import { createEffect, on, onCleanup, onMount } from 'solid-js'
+import { createEffect, on, onCleanup, onMount, createMemo } from 'solid-js'
 import { readFile, writeFile } from '../../services/fileIO'
 import { loadFromStorage } from '../../lib/localStorage'
 import { setRuntimeStore, runtimeStore } from '../../stores/runtimeStore'
@@ -43,7 +43,9 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
   let excalidrawAPI: any = null
   let currentMode: ExcalidrawMode = 'parsed'
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let saveTimerPath: string | null = null   // path captured at schedule time
   let localDirty = false
+  let loadedPath: string | null = null      // path currently loaded in excalidrawAPI
 
   function setDirty(dirty: boolean) {
     localDirty = dirty
@@ -73,9 +75,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     }
   }
 
-  async function doSave(): Promise<void> {
-    const p = filePath()
-    if (!p) return
+  async function doSave(p: string): Promise<void> {
     const data = getSceneData()
     if (!data) return
     // Persist global config (theme + grid) back to plugin settings so the
@@ -91,24 +91,25 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     setDirty(false)
   }
 
+  function cancelPendingSave() {
+    if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
+    saveTimerPath = null
+  }
+
   function scheduleSave() {
-    if (saveTimer !== null) clearTimeout(saveTimer)
+    cancelPendingSave()
+    const p = filePath()
+    if (!p) return
+    saveTimerPath = p
     saveTimer = setTimeout(() => {
       saveTimer = null
-      void doSave()
+      const savedPath = saveTimerPath
+      saveTimerPath = null
+      if (savedPath) void doSave(savedPath)
     }, 1000)
   }
 
-  // Mirror EditorViewer: wait for rootHandle before loading — workspace restores
-  // tabs from localStorage before the vault permission is granted, so onMount
-  // alone would fire with rootHandle === null.
-  createEffect(on(
-    () => runtimeStore.rootHandle,
-    async (rootHandle) => {
-      if (!rootHandle || reactRoot) return
-      const p = filePath()
-      if (!p) return
-
+  async function loadFile(p: string) {
     let data: ExcalidrawData
     let mode: ExcalidrawMode
     try {
@@ -122,6 +123,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     }
 
     currentMode = mode
+    loadedPath = p
 
     try {
       const [{ createRoot }, { createElement }, { Excalidraw, restoreElements }] = await Promise.all([
@@ -132,22 +134,22 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
       ])
       const elements = restoreElements(data.elements as any, null)
       const cfg = getPluginConfig()
-      reactRoot = createRoot(container)
+
+      if (!reactRoot) reactRoot = createRoot(container)
       reactRoot.render(
         createElement(Excalidraw as any, {
+          key: p,
           excalidrawAPI: (api: any) => { excalidrawAPI = api },
           initialData: {
             elements,
-            // File-saved values take priority; fall back to plugin config defaults
             appState: {
               gridSize: cfg.gridSize > 0 ? cfg.gridSize : null,
               viewBackgroundColor: cfg.viewBackgroundColor,
               theme: cfg.defaultTheme,
-              ...data.appState,  // overrides with per-file saved state (if present)
+              ...data.appState,
             },
             files: data.files,
           },
-          // No controlled `theme` prop — hamburger "Toggle dark mode" works freely
           onChange: () => {
             setDirty(true)
             scheduleSave()
@@ -157,17 +159,42 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     } catch (err) {
       container.textContent = `[绘图组件加载失败: ${err instanceof Error ? err.message : String(err)}]`
     }
+  }
+
+  // Wait for rootHandle before first load
+  createEffect(on(
+    () => runtimeStore.rootHandle,
+    async (rootHandle) => {
+      if (!rootHandle || reactRoot) return
+      const p = filePath()
+      if (!p) return
+      await loadFile(p)
+    },
+  ))
+
+  // Reload when filePath changes (same tab, different excalidraw file)
+  createEffect(on(
+    filePath,
+    async (p, prevP) => {
+      if (!p || p === prevP || !reactRoot) return
+      // Save the previous file before switching
+      if (localDirty && prevP && prevP === loadedPath) {
+        cancelPendingSave()
+        await doSave(prevP)
+      } else {
+        cancelPendingSave()
+      }
+      setDirty(false)
+      await loadFile(p)
     },
   ))
 
   onCleanup(() => {
-    if (saveTimer !== null) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-    }
+    cancelPendingSave()
     reactRoot?.unmount()
     reactRoot = null
     excalidrawAPI = null
+    loadedPath = null
   })
 
   // Ctrl+S
@@ -176,8 +203,9 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
       if (!props.isActive) return
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
-        if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
-        void doSave()
+        cancelPendingSave()
+        const p = loadedPath
+        if (p) void doSave(p)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -185,17 +213,16 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
   })
 
   // 切换 tab 时自动保存
-  createEffect(
-    on(
-      () => props.isActive,
-      (isActive, prevIsActive) => {
-        if (prevIsActive && !isActive && localDirty) {
-          if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
-          void doSave()
-        }
-      },
-    ),
-  )
+  createEffect(on(
+    () => props.isActive,
+    (isActive, prevIsActive) => {
+      if (prevIsActive && !isActive && localDirty) {
+        cancelPendingSave()
+        const p = loadedPath
+        if (p) void doSave(p)
+      }
+    },
+  ))
 
   return (
     <div
