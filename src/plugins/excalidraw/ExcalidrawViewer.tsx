@@ -15,13 +15,11 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
   let container!: HTMLDivElement
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let reactRoot: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let excalidrawAPI: any = null
   let currentMode: ExcalidrawMode = 'parsed'
-  let currentData: ExcalidrawData | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let localDirty = false
-  // Excalidraw fires onChange once on mount with the restored initial state.
-  // We skip that first call to avoid an immediate no-op save.
-  let mountChangeSkipped = false
 
   function setDirty(dirty: boolean) {
     localDirty = dirty
@@ -35,10 +33,28 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     }
   }
 
+  function getSceneData(): ExcalidrawData | null {
+    if (!excalidrawAPI) return null
+    const appState = excalidrawAPI.getAppState()
+    return {
+      type: 'excalidraw',
+      version: 2,
+      source: 'symbol-notes',
+      elements: excalidrawAPI.getSceneElements(),
+      appState: {
+        gridSize: appState.gridSize ?? null,
+        viewBackgroundColor: appState.viewBackgroundColor ?? '#1e1e2e',
+      },
+      files: excalidrawAPI.getFiles() ?? {},
+    }
+  }
+
   async function doSave(): Promise<void> {
     const p = filePath()
-    if (!p || !currentData) return
-    await writeFile(p, serializeExcalidrawMd(currentData, currentMode), true)
+    if (!p) return
+    const data = getSceneData()
+    if (!data) return
+    await writeFile(p, serializeExcalidrawMd(data, currentMode), true)
     setDirty(false)
   }
 
@@ -48,27 +64,6 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
       saveTimer = null
       void doSave()
     }, 1000)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function handleChange(elements: any[], appState: any, files: any) {
-    if (!mountChangeSkipped) {
-      mountChangeSkipped = true
-      return
-    }
-    currentData = {
-      type: 'excalidraw',
-      version: 2,
-      source: 'symbol-notes',
-      elements,
-      appState: {
-        gridSize: appState.gridSize ?? null,
-        viewBackgroundColor: appState.viewBackgroundColor ?? '#ffffff',
-      },
-      files: files ?? {},
-    }
-    setDirty(true)
-    scheduleSave()
   }
 
   onMount(async () => {
@@ -87,7 +82,6 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
       return
     }
 
-    currentData = data
     currentMode = mode
 
     try {
@@ -97,20 +91,23 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
         import('@excalidraw/excalidraw'),
         import('@excalidraw/excalidraw/index.css'),
       ])
-      // restoreElements normalises fractional indices — required when loading
-      // files saved by Obsidian's Excalidraw plugin (0.18 validates strictly)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const elements = restoreElements(data.elements as any, null)
       reactRoot = createRoot(container)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       reactRoot.render(
         createElement(Excalidraw as any, {
+          // Use API ref to read scene data on save — avoids the onChange-on-mount skip hack
+          excalidrawAPI: (api: any) => { excalidrawAPI = api },
           initialData: {
             elements,
-            appState: data.appState,
+            appState: { ...data.appState, theme: 'dark' },
             files: data.files,
           },
-          onChange: handleChange,
+          // onChange only marks dirty + schedules save; actual data read at save time
+          onChange: () => {
+            setDirty(true)
+            scheduleSave()
+          },
+          theme: 'dark',
         }),
       )
     } catch (err) {
@@ -125,18 +122,16 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     }
     reactRoot?.unmount()
     reactRoot = null
+    excalidrawAPI = null
   })
 
-  // Ctrl+S — window 级别，isActive 时生效
+  // Ctrl+S
   onMount(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!props.isActive) return
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
-        if (saveTimer !== null) {
-          clearTimeout(saveTimer)
-          saveTimer = null
-        }
+        if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
         void doSave()
       }
     }
@@ -150,10 +145,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
       () => props.isActive,
       (isActive, prevIsActive) => {
         if (prevIsActive && !isActive && localDirty) {
-          if (saveTimer !== null) {
-            clearTimeout(saveTimer)
-            saveTimer = null
-          }
+          if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
           void doSave()
         }
       },
