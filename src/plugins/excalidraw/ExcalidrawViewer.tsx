@@ -154,14 +154,13 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
 
   return (
     <div
-      class="flex-1 w-full overflow-hidden"
-      style={{ height: '100%', isolation: 'isolate' }}
+      class="flex flex-col flex-1 overflow-hidden"
       onDragStart={(e) => e.stopPropagation()}
       onDragEnd={(e) => e.stopPropagation()}
       onDragOver={(e) => e.stopPropagation()}
       onDrop={(e) => e.stopPropagation()}
     >
-      <div ref={container} class="w-full h-full" />
+      <div ref={container} class="flex-1 min-h-0" />
     </div>
   )
 }
