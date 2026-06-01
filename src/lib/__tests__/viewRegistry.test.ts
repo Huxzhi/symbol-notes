@@ -2,17 +2,17 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   registerView,
   getView,
-  getFileViewForExt,
+  getFileViewForPath,
   _clearViewRegistryForTest,
 } from '../pluginRegistry'
 
 beforeEach(() => _clearViewRegistryForTest())
 
-const makeFileDef = (type: string, ext: string) => ({
+const makeFileDef = (type: string, match: string) => ({
   kind: 'file' as const,
   type,
   getDisplayText: (p: string) => p.split('/').pop()!,
-  canAcceptFile: (e: string) => e === ext,
+  canAcceptFile: (p: string) => p.endsWith(match),
   component: (() => null) as any,
 })
 
@@ -27,15 +27,23 @@ describe('getView', () => {
   })
 })
 
-describe('getFileViewForExt', () => {
+describe('getFileViewForPath', () => {
   it('returns undefined when no match', () => {
-    expect(getFileViewForExt('.xyz')).toBeUndefined()
+    expect(getFileViewForPath('notes/file.xyz')).toBeUndefined()
   })
   it('matches by extension', () => {
     const def = makeFileDef('markdown', '.md')
     registerView(def)
-    expect(getFileViewForExt('.md')).toBe(def)
-    expect(getFileViewForExt('.png')).toBeUndefined()
+    expect(getFileViewForPath('notes/file.md')).toBe(def)
+    expect(getFileViewForPath('notes/file.png')).toBeUndefined()
+  })
+  it('compound extension takes priority when registered first', () => {
+    const excalidrawDef = makeFileDef('excalidraw', '.excalidraw.md')
+    const mdDef = makeFileDef('markdown', '.md')
+    registerView(excalidrawDef)
+    registerView(mdDef)
+    expect(getFileViewForPath('drawing.excalidraw.md')).toBe(excalidrawDef)
+    expect(getFileViewForPath('notes/file.md')).toBe(mdDef)
   })
   it('ignores page defs', () => {
     registerView({
@@ -44,6 +52,6 @@ describe('getFileViewForExt', () => {
       getDisplayText: () => '日历',
       component: (() => null) as any,
     })
-    expect(getFileViewForExt('.md')).toBeUndefined()
+    expect(getFileViewForPath('file.md')).toBeUndefined()
   })
 })
