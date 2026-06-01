@@ -32,23 +32,44 @@
 
 ## 2. 文件格式
 
+Obsidian Excalidraw 有两种存储模式，通过 frontmatter 的 `excalidraw-plugin` 字段区分：
+
+| 模式 | frontmatter 值 | 代码块标记 | 内容 |
+|------|---------------|-----------|------|
+| 明文 | `parsed` | ` ```json ` | 原始 JSON 字符串 |
+| 压缩 | `compressed` | ` ```compressed-json ` | LZ-String base64 压缩字符串 |
+
+**读时自动识别模式，写时保留原文件的模式。** 新建文件默认用 `parsed`（可读性好，方便 git diff）。
+
+### 依赖
+
+压缩模式需要 `lz-string` 包（~5KB，无依赖）：
+
+```json
+"lz-string": "^1.5.0"
+```
+
 ### 解析（`.excalidraw.md` → `ExcalidrawData`）
 
-从文件内容中用正则提取 `%%...%%` 块内的 JSON：
-
 ```
-/%%\s*\n```json\s*\n([\s\S]*?)\n```\s*\n%%/
+1. 从 frontmatter 读取 mode = 'parsed' | 'compressed'
+2. 正则提取 %%...%% 块内容：
+   parsed:     /%%[\s\S]*?```json\s*\n([\s\S]*?)\n```[\s\S]*?%%/
+   compressed: /%%[\s\S]*?```compressed-json\s*\n([\s\S]*?)\n```[\s\S]*?%%/
+3. parsed:     直接 JSON.parse(match)
+   compressed: JSON.parse(LZString.decompressFromBase64(match))
+4. 返回 { data: ExcalidrawData, mode }
 ```
 
-若匹配失败（格式损坏），抛出错误并显示提示。
+若匹配失败或解析出错，抛出错误并显示提示，不挂载 Excalidraw 组件。
 
 ### 序列化（`ExcalidrawData` → `.excalidraw.md`）
 
-重建完整 Obsidian 格式：
+接收 `(data, mode)` 两个参数，重建完整 Obsidian 格式：
 
 ```markdown
 ---
-excalidraw-plugin: parsed
+excalidraw-plugin: <parsed|compressed>
 tags: [excalidraw]
 ---
 ==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this panel. ⚠==
@@ -58,15 +79,15 @@ tags: [excalidraw]
 
 %%
 # Drawing
-```json
-{...JSON...}
+```<json|compressed-json>
+<原始 JSON 字符串 | LZString.compressToBase64(JSON.stringify(data))>
 ```
 %%
 ```
 
-**Text Elements 生成规则**：遍历 `elements`，过滤 `type === 'text'` 且 `text` 非空的条目，输出 `${element.id}:: ${element.text}`，每条一行。这是 Obsidian 全文搜索所依赖的区域。
+**Text Elements 生成规则**：遍历 `elements`，过滤 `type === 'text'` 且 `text` 非空的条目，输出 `${element.id}:: ${element.text}`，每条一行。两种模式均需生成，供 Obsidian 全文搜索使用。
 
-### 空白文件模板（新建时写入）
+### 空白文件模板（新建时写入，默认 parsed 模式）
 
 ```markdown
 ---
@@ -158,12 +179,13 @@ onCleanup
 ```json
 "react": "^18",
 "react-dom": "^18",
-"@excalidraw/excalidraw": "latest"
+"@excalidraw/excalidraw": "latest",
+"lz-string": "^1.5.0"
 ```
 
-三个包均通过动态 `import()` 加载，仅在首次打开 `.excalidraw.md` 文件时触发，不影响初始 bundle。
+`react`、`react-dom`、`@excalidraw/excalidraw` 通过动态 `import()` 加载，仅在首次打开 `.excalidraw.md` 文件时触发，不影响初始 bundle。`lz-string` 体积极小（~5KB），可静态 import。
 
-`@types/react` 和 `@types/react-dom` 加入 `devDependencies`。
+`@types/react`、`@types/react-dom`、`@types/lz-string` 加入 `devDependencies`。
 
 ---
 
