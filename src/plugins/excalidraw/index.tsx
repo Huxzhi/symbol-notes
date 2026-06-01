@@ -1,6 +1,7 @@
 import { PenLine } from 'lucide-solid'
 import { definePlugin } from '../../lib/pluginRegistry'
 import type { SettingsTabProps } from '../../lib/pluginRegistry'
+import { loadFromStorage, saveToStorage } from '../../lib/localStorage'
 import { fileActions } from '../../stores/runtimeStore'
 import { vaultStore } from '../../stores/vaultStore'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -90,6 +91,17 @@ function ExcalidrawSettings(props: SettingsTabProps) {
 
     </div>
   )
+}
+
+// ── Config updater (called from ExcalidrawViewer on save) ────────────────────
+// Writes directly to localStorage so theme/grid changes in Excalidraw UI
+// are persisted as global defaults for the next file opened.
+
+export function updateExcalidrawPluginConfig(patch: Partial<ExcalidrawPluginConfig>): void {
+  const current = loadFromStorage<Record<string, unknown>>(
+    'sn-plugin-excalidraw', {}, (v) => typeof v === 'object' && v !== null,
+  ) ?? {}
+  saveToStorage('sn-plugin-excalidraw', { ...current, ...patch })
 }
 
 // ── File creation helpers ─────────────────────────────────────────────────────

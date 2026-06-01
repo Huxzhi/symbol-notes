@@ -9,7 +9,7 @@ import {
   type ExcalidrawData,
   type ExcalidrawMode,
 } from './excalidrawFormat'
-import { EXCALIDRAW_DEFAULTS, type ExcalidrawPluginConfig } from './index'
+import { EXCALIDRAW_DEFAULTS, type ExcalidrawPluginConfig, updateExcalidrawPluginConfig } from './index'
 
 function getPluginConfig(): ExcalidrawPluginConfig {
   return {
@@ -78,6 +78,15 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     if (!p) return
     const data = getSceneData()
     if (!data) return
+    // Persist global config (theme + grid) back to plugin settings so the
+    // next file opened inherits the user's current Excalidraw preferences
+    if (excalidrawAPI) {
+      const s = excalidrawAPI.getAppState()
+      updateExcalidrawPluginConfig({
+        defaultTheme: (s.theme as 'dark' | 'light') ?? 'dark',
+        gridSize: s.gridSize ?? 0,
+      })
+    }
     await writeFile(p, serializeExcalidrawMd(data, currentMode), true)
     setDirty(false)
   }
