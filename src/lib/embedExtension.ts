@@ -1,5 +1,7 @@
-import { syntaxTree } from '@codemirror/language'
-import { RangeSetBuilder } from '@codemirror/state'
+import { markdown } from '@codemirror/lang-markdown'
+import { syntaxHighlighting, syntaxTree } from '@codemirror/language'
+import { languages } from '@codemirror/language-data'
+import { EditorState, RangeSetBuilder } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
@@ -8,10 +10,13 @@ import {
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
+import { GFM } from '@lezer/markdown'
 import { vaultStore } from '../stores/vaultStore'
 import { runtimeStore } from '../stores/runtimeStore'
-
+import { darkHighlightStyle, darkTheme } from './cmTheme'
+import { livePreviewExtension } from './livePreviewExtension'
 import { parseFrontmatter } from './parseFrontmatter'
+import { wikiEmbedParser, wikiLinkParser } from './wikiLinkParser'
 
 export const IMAGE_EXTS = new Set([
   '.png',
@@ -75,85 +80,17 @@ async function getImageDataUrl(
   return dataUrl
 }
 
-// ── Markdown → safe HTML ──────────────────────────────────────────────────────
+// ── Embedded CM6 read-only theme ─────────────────────────────────────────────
 
-function esc(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function inlineHtml(text: string): string {
-  return esc(text)
-    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
-    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
-}
-
-function markdownToHtml(md: string): string {
-  const { body } = parseFrontmatter(md)
-  const lines = body.split('\n')
-  let html = ''
-  let inPara = false
-  let inCode = false
-
-  for (const line of lines) {
-    if (line.startsWith('```')) {
-      if (!inCode) {
-        if (inPara) {
-          html += '</p>'
-          inPara = false
-        }
-        html += '<pre><code>'
-        inCode = true
-      } else {
-        html += '</code></pre>'
-        inCode = false
-      }
-      continue
-    }
-    if (inCode) {
-      html += esc(line) + '\n'
-      continue
-    }
-
-    if (!line.trim()) {
-      if (inPara) {
-        html += '</p>'
-        inPara = false
-      }
-      continue
-    }
-
-    const hm = line.match(/^(#{1,6})\s+(.*)/)
-    if (hm) {
-      if (inPara) {
-        html += '</p>'
-        inPara = false
-      }
-      html += `<h${hm[1].length} class="cm-embed-h">${inlineHtml(hm[2])}</h${hm[1].length}>`
-      continue
-    }
-
-    const lm = line.match(/^[-*+]\s+(.*)/)
-    if (lm) {
-      if (inPara) {
-        html += '</p>'
-        inPara = false
-      }
-      html += `<div class="cm-embed-li">• ${inlineHtml(lm[1])}</div>`
-      continue
-    }
-
-    if (!inPara) {
-      html += '<p>'
-      inPara = true
-    } else html += ' '
-    html += inlineHtml(line)
-  }
-
-  if (inPara) html += '</p>'
-  if (inCode) html += '</code></pre>'
-  return html
-}
+const embedReadOnlyTheme = EditorView.theme({
+  '&': { background: 'transparent !important' },
+  '.cm-scroller': { overflow: 'auto', maxHeight: '320px' },
+  '.cm-content': { padding: '8px 10px', fontSize: '13px', lineHeight: '1.65' },
+  '.cm-line': { padding: '0' },
+  // hide cursor and selection in read-only view
+  '.cm-cursor': { display: 'none !important' },
+  '.cm-selectionBackground': { display: 'none !important' },
+})
 
 // ── Widget ────────────────────────────────────────────────────────────────────
 // resolved is pre-computed in buildEmbedDecos; if resolution fails we skip
@@ -161,6 +98,8 @@ function markdownToHtml(md: string): string {
 // in a "missing" state after the file tree becomes available.
 
 class EmbedWidget extends WidgetType {
+  private cmView: EditorView | null = null
+
   constructor(
     readonly target: string,
     readonly resolved: string,
@@ -180,41 +119,59 @@ class EmbedWidget extends WidgetType {
     const ext = this.resolved
       .slice(this.resolved.lastIndexOf('.'))
       .toLowerCase()
+
     if (IMAGE_EXTS.has(ext)) {
       const img = document.createElement('img')
       img.className = 'cm-embed-img'
       img.alt = this.target
       el.appendChild(img)
       getImageDataUrl(this.resolved, root)
-        .then((url) => {
-          img.src = url
-        })
-        .catch(() => {
-          el.textContent = `[图片加载失败: ${this.target}]`
-        })
+        .then((url) => { img.src = url })
+        .catch(() => { el.textContent = `[图片加载失败: ${this.target}]` })
     } else {
       el.className += ' cm-embed-md'
-      const title = document.createElement('div')
-      title.className = 'cm-embed-md-title'
-      title.textContent = this.resolved.split('/').pop()!.replace(/\.md$/, '')
-      const body = document.createElement('div')
-      body.className = 'cm-embed-md-body'
-      el.appendChild(title)
-      el.appendChild(body)
+      const titleBar = document.createElement('div')
+      titleBar.className = 'cm-embed-md-title'
+      titleBar.textContent = this.resolved.split('/').pop()!.replace(/\.md$/, '')
+      el.appendChild(titleBar)
+
+      const editorHost = document.createElement('div')
+      editorHost.className = 'cm-embed-md-body'
+      el.appendChild(editorHost)
+
       getFile(this.resolved, root)
         .then(async (f) => {
-          body.innerHTML = markdownToHtml(await f.text())
+          const { body } = parseFrontmatter(await f.text())
+          const state = EditorState.create({
+            doc: body.replace(/^\n/, ''),
+            extensions: [
+              markdown({ codeLanguages: languages, extensions: [GFM, wikiLinkParser, wikiEmbedParser] }),
+              syntaxHighlighting(darkHighlightStyle),
+              darkTheme,
+              embedReadOnlyTheme,
+              livePreviewExtension,
+              EditorState.readOnly.of(true),
+              EditorView.editable.of(false),
+              EditorView.lineWrapping,
+            ],
+          })
+          this.cmView = new EditorView({ state, parent: editorHost })
         })
         .catch(() => {
-          body.textContent = `[文件加载失败: ${this.target}]`
+          editorHost.textContent = `[文件加载失败: ${this.target}]`
         })
     }
 
     return el
   }
 
+  destroy(_dom: HTMLElement) {
+    this.cmView?.destroy()
+    this.cmView = null
+  }
+
   ignoreEvent() {
-    return false
+    return true
   }
 }
 
@@ -310,29 +267,6 @@ export const embedTheme = EditorView.baseTheme({
     borderBottom: '1px solid var(--border)',
   },
   '.cm-embed-md-body': {
-    padding: '8px 10px',
-    fontSize: '13px',
-    lineHeight: '1.65',
     color: 'var(--text-2)',
-    maxHeight: '320px',
-    overflowY: 'auto',
-  },
-  '.cm-embed-md-body p': { margin: '0 0 6px' },
-  '.cm-embed-md-body p:last-child': { margin: '0' },
-  '.cm-embed-h': { fontWeight: '700', margin: '4px 0', color: 'var(--text)' },
-  '.cm-embed-li': { paddingBottom: '2px' },
-  '.cm-embed-md-body pre': {
-    background: 'var(--bg-base)',
-    borderRadius: '4px',
-    padding: '8px',
-    fontSize: '11px',
-    overflowX: 'auto',
-    margin: '4px 0',
-  },
-  '.cm-embed-md-body code': {
-    background: 'var(--bg-hover)',
-    padding: '1px 4px',
-    borderRadius: '3px',
-    fontSize: '11px',
   },
 })
