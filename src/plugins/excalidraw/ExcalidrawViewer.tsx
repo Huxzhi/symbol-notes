@@ -1,7 +1,7 @@
 import { createEffect, on, onCleanup, onMount } from 'solid-js'
 import { readFile, writeFile } from '../../services/fileIO'
+import { loadFromStorage } from '../../lib/localStorage'
 import { setRuntimeStore } from '../../stores/runtimeStore'
-import { settingsStore } from '../../stores/settingsStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {
   parseExcalidrawMd,
@@ -9,6 +9,16 @@ import {
   type ExcalidrawData,
   type ExcalidrawMode,
 } from './excalidrawFormat'
+import { EXCALIDRAW_DEFAULTS, type ExcalidrawPluginConfig } from './index'
+
+function getPluginConfig(): ExcalidrawPluginConfig {
+  return {
+    ...EXCALIDRAW_DEFAULTS,
+    ...(loadFromStorage<Record<string, unknown>>(
+      'sn-plugin-excalidraw', {}, (v) => typeof v === 'object' && v !== null,
+    ) ?? {}),
+  } as ExcalidrawPluginConfig
+}
 
 // Injected once per session — wraps Excalidraw CSS in @layer so unlayered app
 // CSS always wins, preventing class name collisions (e.g. .interactive)
@@ -112,22 +122,23 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
         ensureExcalidrawCss(),
       ])
       const elements = restoreElements(data.elements as any, null)
+      const cfg = getPluginConfig()
       reactRoot = createRoot(container)
       reactRoot.render(
         createElement(Excalidraw as any, {
           excalidrawAPI: (api: any) => { excalidrawAPI = api },
           initialData: {
             elements,
-            // Restore full appState; fall back to app theme for new files
+            // File-saved values take priority; fall back to plugin config defaults
             appState: {
-              ...data.appState,
-              theme: (data.appState.theme as string)
-                ?? (settingsStore.theme === 'light' ? 'light' : 'dark'),
+              gridSize: cfg.gridSize > 0 ? cfg.gridSize : null,
+              viewBackgroundColor: cfg.viewBackgroundColor,
+              theme: cfg.defaultTheme,
+              ...data.appState,  // overrides with per-file saved state (if present)
             },
             files: data.files,
           },
-          // No controlled `theme` prop — Excalidraw manages it internally,
-          // so the hamburger menu "Toggle dark mode" works and persists via getSceneData
+          // No controlled `theme` prop — hamburger "Toggle dark mode" works freely
           onChange: () => {
             setDirty(true)
             scheduleSave()
