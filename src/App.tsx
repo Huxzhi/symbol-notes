@@ -17,6 +17,7 @@ import {
 import { CalendarPlugin } from './plugins/calendar'
 import { DailyNotePlugin } from './plugins/daily-note'
 import { EditorPlugin } from './plugins/editor'
+import { ExcalidrawPlugin } from './plugins/excalidraw'
 import { FilesPlugin } from './plugins/files'
 import { LinksPlugin } from './plugins/links'
 import { OutlinePlugin } from './plugins/outline'
@@ -45,6 +46,7 @@ const AppPlugin = definePlugin({
 })
 
 registerPlugin(FilesPlugin)
+registerPlugin(ExcalidrawPlugin)
 registerPlugin(EditorPlugin)
 registerPlugin(LinksPlugin)
 registerPlugin(OutlinePlugin)
