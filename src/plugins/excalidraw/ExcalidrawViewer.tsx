@@ -66,14 +66,8 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
       source: 'symbol-notes',
       elements: excalidrawAPI.getSceneElements(),
       appState: {
-        // Obsidian-compatible fields
         gridSize: s.gridSize ?? null,
-        viewBackgroundColor: s.viewBackgroundColor ?? '#1e1e2e',
-        // Viewport persistence (Obsidian ignores unknown fields)
-        scrollX: s.scrollX,
-        scrollY: s.scrollY,
-        zoom: s.zoom,
-        theme: s.theme ?? 'dark',
+        viewBackgroundColor: s.viewBackgroundColor,
       },
       files: excalidrawAPI.getFiles() ?? {},
     }
