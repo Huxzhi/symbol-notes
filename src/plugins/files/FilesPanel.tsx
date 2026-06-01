@@ -82,7 +82,7 @@ function FileRow(props: {
         ...props.style,
         'padding-left': `${6 + props.row.depth * 14}px`,
       }}
-      class={`flex items-center gap-1 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none
+      class={`flex items-center gap-1 text-[11px] cursor-pointer hover:bg-(--bg-hover) select-none overflow-hidden
         ${
           isActive()
             ? 'bg-(--bg-hover) border-l-2 border-(--accent) text-(--text)'
@@ -122,7 +122,7 @@ function FileRow(props: {
       <Show
         when={isRenaming()}
         fallback={
-          <span class={isActive() ? 'text-(--accent)' : ''}>
+          <span class={`truncate min-w-0 ${isActive() ? 'text-(--accent)' : ''}`}>
             {displayName(entry().name)}
           </span>
         }
@@ -370,7 +370,7 @@ export function FilesPanel(props: ViewComponentProps) {
             'margin-top': '4px',
           }}
         >
-          <For each={virtualizer.getVirtualItems()}>
+          <For each={virtualizer.getVirtualItems().filter(v => v.index < flatRows().length)}>
             {(vItem) => (
               <FileRow
                 row={flatRows()[vItem.index]}
