@@ -9,6 +9,19 @@ import {
   type ExcalidrawMode,
 } from './excalidrawFormat'
 
+// Injected once per session — wraps Excalidraw CSS in @layer so unlayered app
+// CSS always wins, preventing class name collisions (e.g. .interactive)
+let excalidrawCssInjected = false
+async function ensureExcalidrawCss() {
+  if (excalidrawCssInjected) return
+  excalidrawCssInjected = true
+  const { default: css } = await import('@excalidraw/excalidraw/index.css?inline')
+  const style = document.createElement('style')
+  style.dataset.excalidrawCss = ''
+  style.textContent = `@layer excalidraw { ${css} }`
+  document.head.appendChild(style)
+}
+
 export function ExcalidrawViewer(props: ViewComponentProps) {
   const filePath = () => props.viewState.file as string | undefined
 
@@ -35,15 +48,21 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
 
   function getSceneData(): ExcalidrawData | null {
     if (!excalidrawAPI) return null
-    const appState = excalidrawAPI.getAppState()
+    const s = excalidrawAPI.getAppState()
     return {
       type: 'excalidraw',
       version: 2,
       source: 'symbol-notes',
       elements: excalidrawAPI.getSceneElements(),
       appState: {
-        gridSize: appState.gridSize ?? null,
-        viewBackgroundColor: appState.viewBackgroundColor ?? '#1e1e2e',
+        // Obsidian-compatible fields
+        gridSize: s.gridSize ?? null,
+        viewBackgroundColor: s.viewBackgroundColor ?? '#1e1e2e',
+        // Viewport persistence (Obsidian ignores unknown fields)
+        scrollX: s.scrollX,
+        scrollY: s.scrollY,
+        zoom: s.zoom,
+        theme: s.theme ?? 'dark',
       },
       files: excalidrawAPI.getFiles() ?? {},
     }
@@ -89,25 +108,24 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
         import('react-dom/client'),
         import('react'),
         import('@excalidraw/excalidraw'),
-        import('@excalidraw/excalidraw/index.css'),
+        ensureExcalidrawCss(),
       ])
       const elements = restoreElements(data.elements as any, null)
       reactRoot = createRoot(container)
       reactRoot.render(
         createElement(Excalidraw as any, {
-          // Use API ref to read scene data on save — avoids the onChange-on-mount skip hack
           excalidrawAPI: (api: any) => { excalidrawAPI = api },
           initialData: {
             elements,
-            appState: { ...data.appState, theme: 'dark' },
+            // Restore full appState including scroll/zoom from previous session
+            appState: { ...data.appState, theme: (data.appState.theme as string) ?? 'dark' },
             files: data.files,
           },
-          // onChange only marks dirty + schedules save; actual data read at save time
           onChange: () => {
             setDirty(true)
             scheduleSave()
           },
-          theme: 'dark',
+          theme: (data.appState.theme as 'light' | 'dark' | undefined) ?? 'dark',
         }),
       )
     } catch (err) {
