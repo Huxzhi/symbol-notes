@@ -84,17 +84,21 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     currentMode = mode
 
     try {
-      const [{ createRoot }, { createElement }, { Excalidraw }] = await Promise.all([
+      const [{ createRoot }, { createElement }, { Excalidraw, restoreElements }] = await Promise.all([
         import('react-dom/client'),
         import('react'),
         import('@excalidraw/excalidraw'),
       ])
+      // restoreElements normalises fractional indices — required when loading
+      // files saved by Obsidian's Excalidraw plugin (0.18 validates strictly)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const elements = restoreElements(data.elements as any, null)
       reactRoot = createRoot(container)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       reactRoot.render(
         createElement(Excalidraw as any, {
           initialData: {
-            elements: data.elements,
+            elements,
             appState: data.appState,
             files: data.files,
           },
