@@ -113,7 +113,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
 
       {/* Calendar grid */}
       <div
-        class="flex-1 grid grid-cols-7 border-l border-t border-(--border)] overflow-hidden"
+        class="flex-1 min-h-0 grid grid-cols-7 border-l border-t border-(--border)] overflow-hidden"
         style={{ 'grid-auto-rows': '1fr' }}
       >
         <For each={calendarGrid()}>
