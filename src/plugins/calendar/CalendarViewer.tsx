@@ -156,7 +156,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
                   <For each={dated()}>
                     {(path) => (
                       <button
-                        class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
                         onClick={() => workspaceActions.openFile(path)}
                         title={path}
                       >
@@ -167,7 +167,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
                   <For each={created()}>
                     {(path) => (
                       <button
-                        class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
                         onClick={() => workspaceActions.openFile(path)}
                         title={path}
                       >
@@ -178,7 +178,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
                   <For each={updated()}>
                     {(path) => (
                       <button
-                        class="text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
                         onClick={() => workspaceActions.openFile(path)}
                         title={path}
                       >
@@ -189,7 +189,7 @@ export function CalendarViewer(_props: ViewComponentProps) {
                   <For each={tasks()}>
                     {(task) => (
                       <button
-                        class={`text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate
+                        class={`shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate
                           ${
                             task.checked
                               ? 'bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through'
