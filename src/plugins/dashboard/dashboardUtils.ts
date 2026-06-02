@@ -36,3 +36,32 @@ export function monthFilePath(folder: string, date: Date): string {
   const name = `${getMonthString(date)}.md`
   return folder ? `${folder}/${name}` : name
 }
+
+// ── Weekly task data (dashboard-specific) ─────────────────────────────────────
+
+import type { TaskItem } from '../../stores/types'
+
+export type WeekTask = TaskItem & { path: string }
+
+function stemDate(path: string): string | null {
+  const stem = path.split('/').pop()?.replace(/\.md$/, '') ?? ''
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(stem)
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null
+}
+
+export function buildWeekTaskData(
+  taskMap: Record<string, TaskItem[]>,
+): Record<string, WeekTask[]> {
+  const map: Record<string, WeekTask[]> = {}
+  for (const [path, tasks] of Object.entries(taskMap)) {
+    const fileStemDate = stemDate(path)
+    for (const task of tasks) {
+      // Use explicit [due::...] if present; fall back to file's stem date.
+      // Never use the mtime/created fallback — it causes all tasks to pile up on one day.
+      const date = task.fields['due'] ?? fileStemDate
+      if (!date) continue
+      ;(map[date] ??= []).push({ ...task, path })
+    }
+  }
+  return map
+}

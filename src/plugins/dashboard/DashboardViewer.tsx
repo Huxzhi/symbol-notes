@@ -21,8 +21,8 @@ import { fileActions } from '../../stores/runtimeStore'
 import { vaultStore } from '../../stores/vaultStore'
 import { workspaceActions } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
-import { buildTaskDayData } from '../calendar/calendarUtils'
-import type { Task } from '../calendar/calendarUtils'
+import { buildWeekTaskData } from './dashboardUtils'
+import type { WeekTask } from './dashboardUtils'
 import { todayPath } from '../daily-note/formatDate'
 import {
   getISOWeekDates,
@@ -155,7 +155,7 @@ function WeekTaskGrid(props: {
   today: string
   onTaskClick: (path: string) => void
 }) {
-  const taskDayData = () => buildTaskDayData(vaultStore.taskMap)
+  const taskDayData = () => buildWeekTaskData(vaultStore.taskMap)
 
   return (
     <div class="grid grid-cols-7 gap-px bg-(--border) rounded overflow-hidden border border-(--border)">
@@ -186,7 +186,7 @@ function WeekTaskGrid(props: {
                 </span>
               </div>
               <For each={tasks()}>
-                {(task: Task) => (
+                {(task: WeekTask) => (
                   <button
                     class={`text-left text-[10px] leading-snug truncate px-0.5 rounded transition-colors hover:bg-(--bg-hover) ${
                       task.checked ? 'line-through text-(--text-4)' : 'text-(--text-2)'

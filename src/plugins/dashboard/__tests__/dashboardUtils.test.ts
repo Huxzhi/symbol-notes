@@ -6,7 +6,23 @@ import {
   getMonthString,
   weekFilePath,
   monthFilePath,
+  buildWeekTaskData,
 } from '../dashboardUtils'
+import type { TaskItem } from '../../../stores/types'
+
+function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
+  return {
+    text: 'do thing',
+    cleanText: 'do thing',
+    checked: false,
+    status: ' ',
+    line: 0,
+    dueDate: null,
+    completedDate: null,
+    fields: {},
+    ...overrides,
+  }
+}
 
 describe('getISOWeek', () => {
   it('returns correct week for mid-year Tuesday', () => {
@@ -85,5 +101,41 @@ describe('monthFilePath', () => {
 
   it('omits prefix when folder is empty string', () => {
     expect(monthFilePath('', new Date(2026, 5, 2))).toBe('2026-06.md')
+  })
+})
+
+describe('buildWeekTaskData', () => {
+  it('uses explicit [due::...] field regardless of file name', () => {
+    const task = makeTask({ fields: { due: '2026-06-03' }, dueDate: '2026-06-03' })
+    const result = buildWeekTaskData({ 'notes/todo.md': [task] })
+    expect(result['2026-06-03']).toHaveLength(1)
+    expect(result['2026-06-03'][0].path).toBe('notes/todo.md')
+  })
+
+  it('uses file stem date when no explicit due field', () => {
+    const task = makeTask({ dueDate: '2026-06-01', fields: {} })
+    const result = buildWeekTaskData({ 'journal/2026-06-01.md': [task] })
+    expect(result['2026-06-01']).toHaveLength(1)
+  })
+
+  it('skips tasks in non-dated files that have no explicit due field', () => {
+    // This is the bug fix: tasks in todo.md should NOT appear just because
+    // their dueDate fallback equals today's mtime
+    const task = makeTask({ dueDate: '2026-06-02', fields: {} })
+    const result = buildWeekTaskData({ 'todo.md': [task] })
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  it('explicit due field takes priority over stem date', () => {
+    const task = makeTask({ fields: { due: '2026-06-05' }, dueDate: '2026-06-05' })
+    const result = buildWeekTaskData({ 'journal/2026-06-01.md': [task] })
+    expect(result['2026-06-05']).toHaveLength(1)
+    expect(result['2026-06-01']).toBeUndefined()
+  })
+
+  it('attaches path to each task', () => {
+    const task = makeTask({ fields: { due: '2026-06-02' }, dueDate: '2026-06-02' })
+    const result = buildWeekTaskData({ 'work/tasks.md': [task] })
+    expect(result['2026-06-02'][0].path).toBe('work/tasks.md')
   })
 })
