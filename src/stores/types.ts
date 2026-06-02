@@ -1,6 +1,6 @@
 import type { EditorView } from '@codemirror/view'
-import type { OutLink } from '../lib/outLinksField'
-import type { Heading } from '../lib/headingsField'
+import type { OutLink } from '../lib/cm6/outLinksField'
+import type { Heading } from '../lib/cm6/headingsField'
 
 // ── Workspace tree ──────────────────────────────────────────────────────────
 

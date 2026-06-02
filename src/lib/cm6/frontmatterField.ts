@@ -6,7 +6,7 @@ import {
 } from '@codemirror/view'
 import { EditorSelection, RangeSetBuilder, StateField } from '@codemirror/state'
 import type { EditorState } from '@codemirror/state'
-import { parseYamlSubset } from './parseFrontmatter'
+import { parseYamlSubset } from '../parseFrontmatter'
 
 interface FrontmatterRange {
   blockFrom: number

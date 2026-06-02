@@ -3,7 +3,7 @@ import { createStore, produce } from 'solid-js/store'
 import { vaultActions, vaultStore, setVaultStore } from './vaultStore'
 import { clearContentCache, invalidateFile, readFile, writeFile } from '../services/fileIO'
 import { deleteFileStatEntry } from '../services/indexStorage'
-import { clearEmbedUrlCache } from '../lib/embedExtension'
+import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
 import type { FileMeta, RuntimeState } from './types'
 
 declare global {

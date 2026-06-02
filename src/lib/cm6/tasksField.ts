@@ -1,7 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
 import { StateField } from '@codemirror/state'
 import type { EditorState } from '@codemirror/state'
-import type { TaskItem } from '../stores/types'
+import type { TaskItem } from '../../stores/types'
 
 const INLINE_FIELD_RE = /\[([^\]]+?)::([^\]]*)\]/g
 // Matches list task markers not handled by GFM: - [/], - [-], - [>] etc.

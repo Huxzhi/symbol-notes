@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { syntaxTree } from '@codemirror/language'
-import { wikiLinkParser } from '../wikiLinkParser'
+import { wikiLinkParser } from '../cm6/wikiLinkParser'
 
 function getNodeNames(doc: string): string[] {
   const state = EditorState.create({

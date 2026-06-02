@@ -9,16 +9,13 @@ import {
 import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting } from '@codemirror/language'
-import { EditorState, RangeSetBuilder, StateField } from '@codemirror/state'
-import {
-  Decoration,
-  type DecorationSet,
-  EditorView,
-} from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
 import { GFM } from '@lezer/markdown'
-import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
-import { livePreviewExtension } from '../../lib/livePreviewExtension'
-import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
+import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
+import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
+import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
+import { hideFrontmatterExtension } from '../../lib/cm6/hideFrontmatterExtension'
 import { loadFromStorage } from '../../lib/localStorage'
 import { readFile, writeFile } from '../../services/fileIO'
 import { fileActions } from '../../stores/runtimeStore'
@@ -34,30 +31,6 @@ import {
   monthFilePath,
   weekFilePath,
 } from './dashboardUtils'
-
-// ── Frontmatter hide decoration ───────────────────────────────────────────────
-
-function buildFrontmatterDeco(docStr: string): DecorationSet {
-  if (!docStr.startsWith('---')) return Decoration.none
-  const end = docStr.indexOf('\n---', 3)
-  if (end === -1) return Decoration.none
-  // Hide through the trailing newline after closing ---
-  const hideEnd = end + 4 < docStr.length && docStr[end + 4] === '\n' ? end + 5 : end + 4
-  const builder = new RangeSetBuilder<Decoration>()
-  builder.add(0, hideEnd, Decoration.replace({}))
-  return builder.finish()
-}
-
-// StateField (not ViewPlugin) is required for decorations that replace line breaks.
-const hideFrontmatterExtension = StateField.define<DecorationSet>({
-  create(state) {
-    return buildFrontmatterDeco(state.doc.toString())
-  },
-  update(deco, tr) {
-    return tr.docChanged ? buildFrontmatterDeco(tr.newDoc.toString()) : deco
-  },
-  provide: (f) => EditorView.decorations.from(f),
-})
 
 // ── PlanEditor ────────────────────────────────────────────────────────────────
 

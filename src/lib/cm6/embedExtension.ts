@@ -11,11 +11,11 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { GFM } from '@lezer/markdown'
-import { vaultStore } from '../stores/vaultStore'
-import { runtimeStore } from '../stores/runtimeStore'
+import { vaultStore } from '../../stores/vaultStore'
+import { runtimeStore } from '../../stores/runtimeStore'
 import { darkHighlightStyle, darkTheme } from './cmTheme'
 import { livePreviewExtension } from './livePreviewExtension'
-import { parseFrontmatter } from './parseFrontmatter'
+import { parseFrontmatter } from '../parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from './wikiLinkParser'
 
 export const IMAGE_EXTS = new Set([

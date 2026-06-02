@@ -1,10 +1,10 @@
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { wikiLinkParser } from './wikiLinkParser'
-import { outLinksField } from './outLinksField'
-import { inlineTagsField } from './inlineTagsField'
-import { tasksField } from './tasksField'
+import { wikiLinkParser } from './cm6/wikiLinkParser'
+import { outLinksField } from './cm6/outLinksField'
+import { inlineTagsField } from './cm6/inlineTagsField'
+import { tasksField } from './cm6/tasksField'
 import type { TaskItem } from '../stores/types'
 
 export interface ParseResult {
