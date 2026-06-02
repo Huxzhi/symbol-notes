@@ -70,10 +70,21 @@ export function buildDayData(
       typeof fm.updated === 'string' && fm.updated.length >= 10
         ? fm.updated.slice(0, 10)
         : null
-    if (c) (created[c] ??= []).push(path)
-    if (u && u !== c) (updated[u] ??= []).push(path)
-    const d = stemDate(path)
-    if (d) (dated[d] ??= []).push(path)
+
+    // frontmatter.dated takes precedence over stem date
+    const fmDated =
+      typeof fm.dated === 'string' && fm.dated.length >= 10
+        ? fm.dated.slice(0, 10)
+        : null
+    const d = fmDated ?? stemDate(path)
+
+    if (d) {
+      // Dated file: only appears on its dated date, not in created/updated
+      ;(dated[d] ??= []).push(path)
+    } else {
+      if (c) (created[c] ??= []).push(path)
+      if (u && u !== c) (updated[u] ??= []).push(path)
+    }
   }
   return { created, updated, dated }
 }
