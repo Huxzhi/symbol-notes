@@ -34,7 +34,7 @@ import {
 // ── Read-only CM6 theme for plan preview panels ───────────────────────────────
 
 const planReadOnlyTheme = EditorView.theme({
-  '&': { background: 'transparent', height: '100%' },
+  '&': { background: 'transparent' },
   '.cm-scroller': { padding: '4px 8px', boxSizing: 'border-box' },
   '.cm-cursor, .cm-selectionBackground, .cm-focused .cm-selectionBackground': {
     display: 'none !important',
@@ -55,10 +55,11 @@ function ReadOnlyPlan(props: {
 
   const fileExists = () => !!vaultStore.files[props.path]
 
+  // Source includes file existence so the resource refetches when the vault
+  // finishes indexing the file (fetchers run outside SolidJS tracking).
   const [content] = createResource(
-    () => props.path,
+    () => (vaultStore.files[props.path] ? props.path : null),
     async (path) => {
-      if (!vaultStore.files[path]) return null
       try {
         return await readFile(path)
       } catch {
@@ -74,7 +75,7 @@ function ReadOnlyPlan(props: {
     cmView?.destroy()
     cmView = null
 
-    if (!text) return
+    if (text === null) return
 
     const state = EditorState.create({
       doc: text,
