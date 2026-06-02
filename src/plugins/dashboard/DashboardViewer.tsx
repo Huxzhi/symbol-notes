@@ -9,13 +9,11 @@ import {
 import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting } from '@codemirror/language'
-import { EditorState, RangeSetBuilder } from '@codemirror/state'
+import { EditorState, RangeSetBuilder, StateField } from '@codemirror/state'
 import {
   Decoration,
   type DecorationSet,
   EditorView,
-  ViewPlugin,
-  type ViewUpdate,
 } from '@codemirror/view'
 import { GFM } from '@lezer/markdown'
 import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
@@ -50,19 +48,16 @@ function buildFrontmatterDeco(docStr: string): DecorationSet {
   return builder.finish()
 }
 
-const hideFrontmatterExtension = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
-    constructor(view: EditorView) {
-      this.decorations = buildFrontmatterDeco(view.state.doc.toString())
-    }
-    update(update: ViewUpdate) {
-      if (update.docChanged)
-        this.decorations = buildFrontmatterDeco(update.view.state.doc.toString())
-    }
+// StateField (not ViewPlugin) is required for decorations that replace line breaks.
+const hideFrontmatterExtension = StateField.define<DecorationSet>({
+  create(state) {
+    return buildFrontmatterDeco(state.doc.toString())
   },
-  { decorations: (v) => v.decorations },
-)
+  update(deco, tr) {
+    return tr.docChanged ? buildFrontmatterDeco(tr.newDoc.toString()) : deco
+  },
+  provide: (f) => EditorView.decorations.from(f),
+})
 
 // ── PlanEditor ────────────────────────────────────────────────────────────────
 
