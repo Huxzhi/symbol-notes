@@ -16,9 +16,9 @@ import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
 import { livePreviewExtension } from '../../lib/livePreviewExtension'
 import { embedPreviewPlugin, embedTheme } from '../../lib/embedExtension'
 import { loadFromStorage } from '../../lib/localStorage'
-import { readFile } from '../../services/fileIO'
+import { readFile, writeFile } from '../../services/fileIO'
 import { fileActions } from '../../stores/runtimeStore'
-import { vaultStore } from '../../stores/vaultStore'
+import { vaultStore, vaultActions } from '../../stores/vaultStore'
 import { workspaceActions } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import { buildWeekTaskData } from './dashboardUtils'
@@ -31,20 +31,20 @@ import {
   weekFilePath,
 } from './dashboardUtils'
 
-// ── Read-only CM6 theme for plan preview panels ───────────────────────────────
+// ── Frontmatter stripping ─────────────────────────────────────────────────────
 
-const planReadOnlyTheme = EditorView.theme({
-  '&': { background: 'transparent' },
-  '.cm-scroller': { padding: '4px 8px', boxSizing: 'border-box' },
-  '.cm-cursor, .cm-selectionBackground, .cm-focused .cm-selectionBackground': {
-    display: 'none !important',
-  },
-  '.cm-content': { caretColor: 'transparent' },
-})
+function splitFrontmatter(content: string): { header: string; body: string } {
+  if (!content.startsWith('---')) return { header: '', body: content }
+  const end = content.indexOf('\n---', 3)
+  if (end === -1) return { header: '', body: content }
+  const header = content.slice(0, end + 4)
+  const body = content.slice(end + 4).replace(/^\n/, '')
+  return { header, body }
+}
 
-// ── ReadOnlyPlan ──────────────────────────────────────────────────────────────
+// ── PlanEditor ────────────────────────────────────────────────────────────────
 
-function ReadOnlyPlan(props: {
+function PlanEditor(props: {
   path: string
   label: string
   onOpen: () => void
@@ -52,11 +52,12 @@ function ReadOnlyPlan(props: {
 }) {
   let editorHost!: HTMLDivElement
   let cmView: EditorView | null = null
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let currentHeader = ''
 
   const fileExists = () => !!vaultStore.files[props.path]
 
-  // Source includes file existence so the resource refetches when the vault
-  // finishes indexing the file (fetchers run outside SolidJS tracking).
+  // Source includes file existence so the resource refetches when vault indexes the file.
   const [content] = createResource(
     () => (vaultStore.files[props.path] ? props.path : null),
     async (path) => {
@@ -68,34 +69,51 @@ function ReadOnlyPlan(props: {
     },
   )
 
+  function scheduleSave() {
+    if (saveTimer !== null) clearTimeout(saveTimer)
+    saveTimer = setTimeout(async () => {
+      saveTimer = null
+      if (!cmView) return
+      const body = cmView.state.doc.toString()
+      const full = currentHeader ? currentHeader + '\n' + body : body
+      await writeFile(props.path, full)
+      vaultActions.reindexFile(props.path, full).catch(() => {})
+    }, 500)
+  }
+
   createEffect(() => {
     const text = content()
     if (text === undefined) return
 
+    if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
     cmView?.destroy()
     cmView = null
 
     if (text === null) return
 
+    const { header, body } = splitFrontmatter(text)
+    currentHeader = header
+
     const state = EditorState.create({
-      doc: text,
+      doc: body,
       extensions: [
         markdown({ codeLanguages: languages, extensions: [GFM] }),
         syntaxHighlighting(darkHighlightStyle),
         darkTheme,
-        planReadOnlyTheme,
         embedTheme,
         embedPreviewPlugin,
         livePreviewExtension,
-        EditorState.readOnly.of(true),
-        EditorView.editable.of(false),
         EditorView.lineWrapping,
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) scheduleSave()
+        }),
       ],
     })
     cmView = new EditorView({ state, parent: editorHost })
   })
 
   onCleanup(() => {
+    if (saveTimer !== null) clearTimeout(saveTimer)
     cmView?.destroy()
     cmView = null
   })
@@ -266,14 +284,14 @@ export function DashboardViewer(
       {/* Today + Weekly plans — equal-width columns */}
       <div class="flex flex-1 min-h-0 border-b border-(--border) overflow-hidden">
         <div class="flex-1 border-r border-(--border) min-w-0 overflow-hidden">
-          <ReadOnlyPlan
+          <PlanEditor
             path={todayFilePath()}
             label="今日计划"
             onOpen={() => workspaceActions.openFile(todayFilePath())}
           />
         </div>
         <div class="flex-1 min-w-0 overflow-hidden">
-          <ReadOnlyPlan
+          <PlanEditor
             path={weeklyPath()}
             label="本周计划"
             onOpen={() => workspaceActions.openFile(weeklyPath())}
@@ -284,7 +302,7 @@ export function DashboardViewer(
 
       {/* Monthly plan */}
       <div class="flex-1 min-h-0 overflow-hidden">
-        <ReadOnlyPlan
+        <PlanEditor
           path={monthlyPath()}
           label="月度计划"
           onOpen={() => workspaceActions.openFile(monthlyPath())}
