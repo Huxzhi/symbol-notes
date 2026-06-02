@@ -9,8 +9,14 @@ import {
 import { markdown } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting } from '@codemirror/language'
-import { EditorState } from '@codemirror/state'
-import { EditorView } from '@codemirror/view'
+import { EditorState, RangeSetBuilder } from '@codemirror/state'
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  ViewPlugin,
+  type ViewUpdate,
+} from '@codemirror/view'
 import { GFM } from '@lezer/markdown'
 import { darkHighlightStyle, darkTheme } from '../../lib/cmTheme'
 import { livePreviewExtension } from '../../lib/livePreviewExtension'
@@ -31,16 +37,32 @@ import {
   weekFilePath,
 } from './dashboardUtils'
 
-// ── Frontmatter stripping ─────────────────────────────────────────────────────
+// ── Frontmatter hide decoration ───────────────────────────────────────────────
 
-function splitFrontmatter(content: string): { header: string; body: string } {
-  if (!content.startsWith('---')) return { header: '', body: content }
-  const end = content.indexOf('\n---', 3)
-  if (end === -1) return { header: '', body: content }
-  const header = content.slice(0, end + 4)
-  const body = content.slice(end + 4).replace(/^\n/, '')
-  return { header, body }
+function buildFrontmatterDeco(docStr: string): DecorationSet {
+  if (!docStr.startsWith('---')) return Decoration.none
+  const end = docStr.indexOf('\n---', 3)
+  if (end === -1) return Decoration.none
+  // Hide through the trailing newline after closing ---
+  const hideEnd = end + 4 < docStr.length && docStr[end + 4] === '\n' ? end + 5 : end + 4
+  const builder = new RangeSetBuilder<Decoration>()
+  builder.add(0, hideEnd, Decoration.replace({}))
+  return builder.finish()
 }
+
+const hideFrontmatterExtension = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet
+    constructor(view: EditorView) {
+      this.decorations = buildFrontmatterDeco(view.state.doc.toString())
+    }
+    update(update: ViewUpdate) {
+      if (update.docChanged)
+        this.decorations = buildFrontmatterDeco(update.view.state.doc.toString())
+    }
+  },
+  { decorations: (v) => v.decorations },
+)
 
 // ── PlanEditor ────────────────────────────────────────────────────────────────
 
@@ -53,7 +75,6 @@ function PlanEditor(props: {
   let editorHost!: HTMLDivElement
   let cmView: EditorView | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
-  let currentHeader = ''
 
   const fileExists = () => !!vaultStore.files[props.path]
 
@@ -74,8 +95,7 @@ function PlanEditor(props: {
     saveTimer = setTimeout(async () => {
       saveTimer = null
       if (!cmView) return
-      const body = cmView.state.doc.toString()
-      const full = currentHeader ? currentHeader + '\n' + body : body
+      const full = cmView.state.doc.toString()
       await writeFile(props.path, full)
       vaultActions.reindexFile(props.path, full).catch(() => {})
     }, 500)
@@ -91,11 +111,8 @@ function PlanEditor(props: {
 
     if (text === null) return
 
-    const { header, body } = splitFrontmatter(text)
-    currentHeader = header
-
     const state = EditorState.create({
-      doc: body,
+      doc: text,
       extensions: [
         markdown({ codeLanguages: languages, extensions: [GFM] }),
         syntaxHighlighting(darkHighlightStyle),
@@ -103,6 +120,7 @@ function PlanEditor(props: {
         embedTheme,
         embedPreviewPlugin,
         livePreviewExtension,
+        hideFrontmatterExtension,
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) scheduleSave()
