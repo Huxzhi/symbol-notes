@@ -14,8 +14,8 @@ import {
   Show,
 } from 'solid-js'
 import { fileActions } from '../../stores/runtimeStore'
+import { showConflict } from '../../stores/conflictStore'
 import { vaultActions, vaultStore, setVaultStore } from '../../stores/vaultStore'
-import { showModal, closeModal } from '../../stores/modalStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
 import { frontmatterField } from '../../lib/cm6/frontmatterField'
@@ -202,14 +202,15 @@ export function EditorViewer(props: ViewComponentProps) {
       const currentMtime = await getFileMtime(p)
       if (currentMtime > knownMtime) {
         const filename = p.split('/').pop() ?? p
-        showModal({
-          title: '文件已被外部修改',
-          message: `"${filename}" 在磁盘上已被其他程序修改，如何处理？`,
-          buttons: [
-            { label: '覆盖保存', variant: 'danger',  onClick: () => { closeModal(); void doSave(p) } },
-            { label: '重新加载', variant: 'primary', onClick: () => { closeModal(); void doReload(p) } },
-            { label: '取消',     variant: 'ghost',   onClick: closeModal },
-          ],
+        const diskContent = await readFile(p)
+        showConflict({
+          filename,
+          editorContent: view.state.doc.toString(),
+          diskContent,
+          onChoice: (choice) => {
+            if (choice === 'overwrite') void doSave(p)
+            else if (choice === 'reload') void doReload(p)
+          },
         })
         return
       }

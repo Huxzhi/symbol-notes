@@ -1,6 +1,7 @@
 import { SettingsIcon } from 'lucide-solid'
 import { createEffect, onMount, Show } from 'solid-js'
 import { ConfirmModal } from './components/ConfirmModal'
+import { ConflictModal } from './components/ConflictModal'
 import { ContextMenu } from './components/ContextMenu'
 import { Ribbon } from './components/Ribbon'
 import { Settings } from './components/Settings'
@@ -98,6 +99,7 @@ export default function App() {
       <ContextMenu />
       <ToastContainer />
       <ConfirmModal />
+      <ConflictModal />
     </div>
   )
 }
