@@ -37,11 +37,11 @@ describe('getFileViewForPath', () => {
     expect(getFileViewForPath('notes/file.md')).toBe(def)
     expect(getFileViewForPath('notes/file.png')).toBeUndefined()
   })
-  it('compound extension takes priority when registered first', () => {
-    const excalidrawDef = makeFileDef('excalidraw', '.excalidraw.md')
+  it('compound extension takes priority when registered last', () => {
     const mdDef = makeFileDef('markdown', '.md')
-    registerView(excalidrawDef)
+    const excalidrawDef = makeFileDef('excalidraw', '.excalidraw.md')
     registerView(mdDef)
+    registerView(excalidrawDef)
     expect(getFileViewForPath('drawing.excalidraw.md')).toBe(excalidrawDef)
     expect(getFileViewForPath('notes/file.md')).toBe(mdDef)
   })

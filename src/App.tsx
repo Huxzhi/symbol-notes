@@ -47,9 +47,9 @@ const AppPlugin = definePlugin({
   },
 })
 
-registerPlugin(FilesPlugin)
-registerPlugin(ExcalidrawPlugin)
+// Core plugins first; specific plugins registered later take priority (last-wins in getFileViewForPath)
 registerPlugin(EditorPlugin)
+registerPlugin(FilesPlugin)
 registerPlugin(LinksPlugin)
 registerPlugin(OutlinePlugin)
 registerPlugin(TagsPlugin)
@@ -58,6 +58,7 @@ registerPlugin(AppPlugin)
 registerPlugin(CalendarPlugin)
 registerPlugin(DailyNotePlugin)
 registerPlugin(DashboardPlugin)
+registerPlugin(ExcalidrawPlugin)
 startPlugins()
 
 export default function App() {

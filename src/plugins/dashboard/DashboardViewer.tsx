@@ -17,9 +17,9 @@ import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
 import { hideFrontmatterExtension } from '../../lib/cm6/hideFrontmatterExtension'
 import { loadFromStorage } from '../../lib/localStorage'
-import { readFile, writeFile } from '../../services/fileIO'
+import { readFile, writeFile, getFileMtime } from '../../services/fileIO'
 import { fileActions } from '../../stores/runtimeStore'
-import { vaultStore, vaultActions } from '../../stores/vaultStore'
+import { vaultStore, vaultActions, setVaultStore } from '../../stores/vaultStore'
 import { workspaceActions } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import { buildWeekTaskData } from './dashboardUtils'
@@ -58,14 +58,20 @@ function PlanEditor(props: {
     },
   )
 
+  async function doSave() {
+    if (!cmView) return
+    const full = cmView.state.doc.toString()
+    await writeFile(props.path, full)
+    const newMtime = await getFileMtime(props.path)
+    setVaultStore('files', props.path, 'mtime', newMtime)
+    vaultActions.reindexFile(props.path, full).catch(() => {})
+  }
+
   function scheduleSave() {
     if (saveTimer !== null) clearTimeout(saveTimer)
     saveTimer = setTimeout(async () => {
       saveTimer = null
-      if (!cmView) return
-      const full = cmView.state.doc.toString()
-      await writeFile(props.path, full)
-      vaultActions.reindexFile(props.path, full).catch(() => {})
+      await doSave()
     }, 500)
   }
 
@@ -92,6 +98,15 @@ function PlanEditor(props: {
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) scheduleSave()
+        }),
+        EditorView.domEventHandlers({
+          keydown(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+              e.preventDefault()
+              if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
+              doSave().catch(() => {})
+            }
+          },
         }),
       ],
     })
@@ -128,12 +143,14 @@ function PlanEditor(props: {
           </button>
         </Show>
       </div>
-      <div class="flex-1 overflow-y-auto min-h-0 relative">
+      <div class="flex-1 min-h-0 relative">
         <Show when={content.loading}>
-          <div class="px-3 py-3 text-[11px] text-(--text-4) italic">加载中…</div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-[11px] text-(--text-4) italic">加载中…</span>
+          </div>
         </Show>
         <Show when={!content.loading && !fileExists()}>
-          <div class="flex flex-col items-center justify-center py-8 gap-2 text-(--text-4)">
+          <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-(--text-4)">
             <span class="text-[11px] italic">文件不存在</span>
             <Show when={props.onCreate}>
               <button
@@ -145,7 +162,7 @@ function PlanEditor(props: {
             </Show>
           </div>
         </Show>
-        <div ref={editorHost} />
+        <div ref={editorHost} class="h-full overflow-auto" />
       </div>
     </div>
   )

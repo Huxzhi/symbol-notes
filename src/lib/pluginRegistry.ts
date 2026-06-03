@@ -53,7 +53,9 @@ export function getView(type: string): ViewDef | undefined {
 }
 
 export function getFileViewForPath(path: string): FileViewDef | undefined {
-  for (const def of _viewRegistry().values()) {
+  const defs = [..._viewRegistry().values()]
+  for (let i = defs.length - 1; i >= 0; i--) {
+    const def = defs[i]
     if (def.kind === 'file' && def.canAcceptFile(path)) return def as FileViewDef
   }
   return undefined

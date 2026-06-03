@@ -16,7 +16,7 @@ export const EditorPlugin = definePlugin({
       kind: 'file',
       type: 'markdown',
       getDisplayText: (p) => p.split('/').pop()!,
-      canAcceptFile: (p) => p.endsWith('.md') && !p.endsWith('.excalidraw.md'),
+      canAcceptFile: (p) => p.endsWith('.md'),
       component: EditorViewer,
     })
 
@@ -24,7 +24,7 @@ export const EditorPlugin = definePlugin({
       kind: 'file',
       type: 'image',
       getDisplayText: (p) => p.split('/').pop()!,
-      canAcceptFile: (ext) => IMAGE_EXTS.has(ext),
+      canAcceptFile: (path) => IMAGE_EXTS.has(path.slice(path.lastIndexOf('.'))),
       component: ImageViewer,
     })
 

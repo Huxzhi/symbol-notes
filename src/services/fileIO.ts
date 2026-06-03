@@ -3,7 +3,10 @@ import { deleteFileStatEntry } from './indexStorage'
 
 const fileContentCache = new Map<string, string>()
 
-async function resolveFileHandle(path: string, create = false): Promise<FileSystemFileHandle> {
+async function resolveFileHandle(
+  path: string,
+  create = false,
+): Promise<FileSystemFileHandle> {
   const { rootHandle } = runtimeStore
   if (!rootHandle) throw new Error('No root directory')
   const parts = path.split('/')
@@ -11,7 +14,10 @@ async function resolveFileHandle(path: string, create = false): Promise<FileSyst
   for (let i = 0; i < parts.length - 1; i++) {
     dir = await dir.getDirectoryHandle(parts[i])
   }
-  return dir.getFileHandle(parts[parts.length - 1], create ? { create: true } : undefined)
+  return dir.getFileHandle(
+    parts[parts.length - 1],
+    create ? { create: true } : undefined,
+  )
 }
 
 export async function readFile(path: string): Promise<string> {
@@ -23,7 +29,11 @@ export async function readFile(path: string): Promise<string> {
   return content
 }
 
-export async function writeFile(path: string, content: string, create = false): Promise<void> {
+export async function writeFile(
+  path: string,
+  content: string,
+  create = false,
+): Promise<void> {
   const handle = await resolveFileHandle(path, create)
   const writable = await handle.createWritable()
   await writable.write(content)

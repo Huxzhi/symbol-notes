@@ -4,6 +4,7 @@ import { workspaceActions } from '../../stores/workspaceStore'
 import { getView } from '../../lib/pluginRegistry'
 import { dragState, setDragState, isDraggingMainTab } from '../../lib/tabDragState'
 import type { WorkspaceLeaf, WorkspaceTabs } from '../../stores/types'
+import { runtimeStore } from '../../stores/runtimeStore'
 import { WorkspaceLeafView } from './WorkspaceLeafView'
 
 function getTabLabel(leaf: WorkspaceLeaf): string {
@@ -130,6 +131,7 @@ export function WorkspaceTabsView(props: {
               const isDraggable = () => !isPanelLeaf() || props.area !== 'main'
               const isBeingDragged = () => dragState()?.leafId === leaf.id
               const showCursorBefore = () => tabBarOver() && insertBeforeId() === leaf.id
+              const isDirty = () => runtimeStore.leafInstances[leaf.id]?.isDirty ?? false
 
               return (
                 <>
@@ -182,13 +184,18 @@ export function WorkspaceTabsView(props: {
                     </span>
                     {!isPanelLeaf() && (
                       <button
-                        class="text-(--text-4) hover:text-(--text-2) text-[13px] leading-none ml-0.5"
+                        class="group/close ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-sm shrink-0"
                         onClick={(e) => {
                           e.stopPropagation()
                           workspaceActions.closeLeaf(leaf.id)
                         }}
                       >
-                        ×
+                        <Show when={isDirty()} fallback={
+                          <span class="text-(--text-4) group-hover/close:text-(--text-2) text-[13px] leading-none">×</span>
+                        }>
+                          <span class="block group-hover/close:hidden w-1.5 h-1.5 rounded-full bg-(--accent)" />
+                          <span class="hidden group-hover/close:block text-(--text-4) group-hover/close:text-(--text-2) text-[13px] leading-none">×</span>
+                        </Show>
                       </button>
                     )}
                   </div>
