@@ -11,9 +11,7 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { GFM } from '@lezer/markdown'
-import { vaultStore } from '../../stores/vaultStore'
-import { vaultFs } from '../../stores/vaultStore'
-import { getFile as fsGetFile } from '../../services/fileIO'
+import { vaultStore, vaultFs, getFile as fsGetFile } from '../../vault'
 import { darkHighlightStyle, darkTheme } from './cmTheme'
 import { livePreviewExtension } from './livePreviewExtension'
 import { parseFrontmatter } from '../parseFrontmatter'

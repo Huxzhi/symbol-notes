@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { workspaceActions, workspaceStore, activeLayout, layoutList } from '../stores/workspaceStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { leafInstances } from '../stores/workspaceStore'
-import { isIndexing } from '../services/vaultIndexer'
+import { isIndexing } from '../vault'
 
 export function StatusBar() {
   const [showSwitcher, setShowSwitcher] = createSignal(false)
