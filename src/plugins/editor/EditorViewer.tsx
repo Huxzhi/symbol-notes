@@ -13,7 +13,7 @@ import {
   onCleanup,
   Show,
 } from 'solid-js'
-import { fileActions, vaultActions, vaultStore, getStemIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
+import { fileActions, reindexFile, vaultStore, getStemIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
 import { showConflict } from '../../stores/conflictStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
@@ -127,7 +127,7 @@ export function EditorViewer(props: ViewComponentProps) {
           .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
         const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
         const tasks = view.state.field(tasksField)
-        void vaultActions.reindexFile(p, view.state.doc.toString(), {
+        void reindexFile(p, view.state.doc.toString(), {
           outLinks,
           inlineTags,
           tasks,
