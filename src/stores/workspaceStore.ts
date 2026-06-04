@@ -318,18 +318,12 @@ export const workspaceActions = {
     workspaceActions.createLeaf(ROOT_TABS_ID, { type, state: {} })
   },
 
-  openFile(
-    path: string,
+  openLeaf(
+    viewState: ViewState,
     options?: { area?: 'left' | 'main' | 'right'; newTab?: boolean; pin?: boolean },
   ): void {
-    const def = getFileViewForPath(path)
-    if (!def) return
-    const viewState: ViewState = { type: def.type, state: { file: path } }
     const area = options?.area ?? 'main'
-
     if (area === 'main') {
-      const existing = findLeafWithFile(activeRoot().main, path)
-      if (existing && !options?.newTab) { workspaceActions.activateLeaf(existing.id); return }
       if (!options?.newTab) {
         const layout = activeLayout()
         const activeLeafId = layout.activeLeafId
@@ -343,12 +337,9 @@ export const workspaceActions = {
       if (options?.pin) workspaceActions.setLeafPinned(leafId, true)
       return
     }
-
     const sideChildren = activeRoot()[area].children
     const firstTabs = sideChildren.find(n => n.type === 'tabs') as WorkspaceTabs | undefined
     if (!firstTabs) return
-    const existing = firstTabs.children.find(l => l.viewState.state.file === path)
-    if (existing && !options?.newTab) { workspaceActions.activateSidebarLeaf(area, existing.id); return }
     const leafId = crypto.randomUUID()
     const leaf: WorkspaceLeaf = { type: 'leaf', id: leafId, viewState, pinned: options?.pin ?? false }
     setRoot(
@@ -359,6 +350,29 @@ export const workspaceActions = {
           : node,
       ),
     )
+  },
+
+  openFile(
+    path: string,
+    options?: { area?: 'left' | 'main' | 'right'; newTab?: boolean; pin?: boolean },
+  ): void {
+    const def = getFileViewForPath(path)
+    if (!def) return
+    const viewState: ViewState = { type: def.type, state: { file: path } }
+    const area = options?.area ?? 'main'
+
+    if (area === 'main') {
+      const existing = findLeafWithFile(activeRoot().main, path)
+      if (existing && !options?.newTab) { workspaceActions.activateLeaf(existing.id); return }
+    } else {
+      const sideChildren = activeRoot()[area].children
+      const firstTabs = sideChildren.find(n => n.type === 'tabs') as WorkspaceTabs | undefined
+      if (!firstTabs) return
+      const existing = firstTabs.children.find(l => l.viewState.state.file === path)
+      if (existing && !options?.newTab) { workspaceActions.activateSidebarLeaf(area, existing.id); return }
+    }
+
+    workspaceActions.openLeaf(viewState, options)
   },
 
   clearAllLeaves(): void {

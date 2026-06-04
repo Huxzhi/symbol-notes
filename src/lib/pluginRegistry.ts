@@ -193,6 +193,8 @@ export interface PluginContext {
   contextMenu(type: string, factory: ContextMenuFactory): void
   vault: VaultService
   workspace: {
+    /** 直接按 type+state 申请或切换一个 leaf，不经过文件路径解析 */
+    openLeaf(viewState: { type: string; state: Record<string, unknown> }, opts?: { area?: 'left' | 'main' | 'right'; newTab?: boolean; pin?: boolean }): void
     openFile(path: string, opts?: { area?: 'left' | 'main' | 'right'; newTab?: boolean }): void
     openPage(type: string): void
     openPanel(area: 'left' | 'right', type: string, state?: Record<string, unknown>): void
@@ -285,6 +287,7 @@ function loadPlugin(def: PluginDef): () => void {
         moveEntry:    (src, dest)  => fileActions.moveEntry(src, dest),
       },
       workspace: {
+        openLeaf:           (viewState, opts) => workspaceActions.openLeaf(viewState, opts),
         openFile:           (path, opts) => workspaceActions.openFile(path, opts),
         openPage:           (type)       => workspaceActions.openPage(type),
         openPanel:          (area, type, state) => workspaceActions.openSidebarPanel(area, type, state),
