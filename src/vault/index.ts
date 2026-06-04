@@ -4,17 +4,16 @@ import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import type { ParseResult } from '../lib/parseMarkdown'
 import { parseMarkdown } from '../lib/parseMarkdown'
-import { LocalAdapter } from '../services/fs/LocalAdapter'
-import type { FileSystemAdapter } from '../services/fs/types'
 import type { FileMeta, TaskItem, VaultState } from '../stores/types'
 import {
   applyFileBacklinks,
   buildBacklinks,
+  buildStemIndex,
   removeFileBacklinks,
   resolveNewFile,
-  buildStemIndex,
-  resolveLink,
 } from './backlinks'
+import { LocalAdapter } from './fs/LocalAdapter'
+import type { FileSystemAdapter } from './fs/types'
 import {
   deleteFileStatEntry,
   getCachedMeta,
@@ -35,7 +34,14 @@ import {
   readFile,
   writeFile,
 } from './io'
-import { buildScan, runPhase1, extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName } from './scan'
+import {
+  buildScan,
+  extractAliases,
+  extractDateString,
+  extractTags,
+  mergeTagsWithBody,
+  runPhase1,
+} from './scan'
 import { applyFileTags, buildTags, removeFileTags } from './tags'
 import { applyFileTasks, buildTasks, removeFileTasks } from './tasks'
 
@@ -590,5 +596,5 @@ export {
 } from './io'
 
 // For non-vault consumers (pluginRegistry, EditorViewer, tests)
-export { resolveLink, buildStemIndex, buildLinkMaps } from './backlinks'
+export { buildLinkMaps, buildStemIndex, resolveLink } from './backlinks'
 export { extractDateFromName } from './scan'
