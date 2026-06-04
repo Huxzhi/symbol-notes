@@ -5,8 +5,7 @@ import {
   onCleanup,
   Switch,
 } from 'solid-js'
-import { vaultFs } from '../../stores/vaultStore'
-import { getFile } from '../../services/fileIO'
+import { vaultFs, getFile } from '../../vault'
 import type { ViewComponentProps } from '../../stores/types'
 
 export function ImageViewer(props: ViewComponentProps) {

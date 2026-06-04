@@ -17,9 +17,7 @@ import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
 import { hideFrontmatterExtension } from '../../lib/cm6/hideFrontmatterExtension'
 import { loadFromStorage } from '../../lib/localStorage'
-import { readFile, writeFile, getFileMtime } from '../../services/fileIO'
-import { fileActions } from '../../stores/runtimeStore'
-import { vaultStore, vaultActions, setVaultStore } from '../../stores/vaultStore'
+import { readFile, fileActions, vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import { buildWeekTaskData } from './dashboardUtils'
@@ -61,10 +59,7 @@ function PlanEditor(props: {
   async function doSave() {
     if (!cmView) return
     const full = cmView.state.doc.toString()
-    await writeFile(props.path, full)
-    const newMtime = await getFileMtime(props.path)
-    setVaultStore('files', props.path, 'mtime', newMtime)
-    vaultActions.reindexFile(props.path, full).catch(() => {})
+    await fileActions.saveFile(props.path, full)
   }
 
   function scheduleSave() {

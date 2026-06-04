@@ -1,5 +1,5 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { vaultStore } from '../../stores/vaultStore'
+import { vaultStore } from '../../vault'
 import type { ViewComponentProps } from '../../stores/types'
 import { workspaceActions } from '../../stores/workspaceStore'
 import {

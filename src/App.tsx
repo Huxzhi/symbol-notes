@@ -27,7 +27,7 @@ import { LinksPlugin } from './plugins/links'
 import { OutlinePlugin } from './plugins/outline'
 import { SearchPlugin } from './plugins/search'
 import { TagsPlugin } from './plugins/tags'
-import { appActions } from './stores/runtimeStore'
+import { restoreVault } from './vault'
 import { settingsStore } from './stores/settingsStore'
 import { activeRoot } from './stores/workspaceStore'
 
@@ -73,7 +73,7 @@ export default function App() {
   })
 
   onMount(() => {
-    void appActions.restoreVault()
+    void restoreVault()
   })
 
   return (

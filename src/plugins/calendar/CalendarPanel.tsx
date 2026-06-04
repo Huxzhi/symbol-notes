@@ -1,5 +1,5 @@
 import { batch, createMemo, createSignal, For, Show } from 'solid-js'
-import { vaultStore } from '../../stores/vaultStore'
+import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
 import {
   buildCalendarGrid,

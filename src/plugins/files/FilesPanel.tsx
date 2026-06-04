@@ -2,12 +2,10 @@ import { FolderOpen } from 'lucide-solid'
 import { createEffect, createMemo, createSignal, For, JSX, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 
-import { appActions, fileActions } from '../../stores/runtimeStore'
-import { vaultFs } from '../../stores/vaultStore'
+import { openVault, fileActions, vaultFs, vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { fileOp, beginCreate, cancelOp } from './fileOpStore'
 import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
-import { vaultStore } from '../../stores/vaultStore'
 import { settingsStore } from '../../stores/settingsStore'
 import { showError, showToast } from '../../stores/toastStore'
 import { getFileViewForPath } from '../../lib/pluginRegistry'
@@ -312,7 +310,7 @@ export function FilesPanel(props: ViewComponentProps) {
       <div class="border-b border-(--border) shrink-0 flex items-center gap-0.5 pr-1 min-w-0">
         <button
           class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-(--bg-hover) transition-colors min-w-0 group"
-          onClick={() => void appActions.openVault()}
+          onClick={() => void openVault()}
           title={vaultFs() ? '切换文件夹' : '打开文件夹'}
         >
           <FolderOpen size={12} class="shrink-0 text-(--accent) group-hover:text-(--accent-2)" />

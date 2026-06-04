@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from 'solid-js'
-import { vaultStore } from '../../stores/vaultStore'
+import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { definePlugin } from '../../lib/pluginRegistry'
 import type { ViewComponentProps } from '../../stores/types'

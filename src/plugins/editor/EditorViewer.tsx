@@ -13,9 +13,8 @@ import {
   onCleanup,
   Show,
 } from 'solid-js'
-import { fileActions } from '../../stores/runtimeStore'
+import { fileActions, vaultActions, vaultStore, getStemIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
 import { showConflict } from '../../stores/conflictStore'
-import { vaultActions, vaultStore } from '../../stores/vaultStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
 import { frontmatterField } from '../../lib/cm6/frontmatterField'
@@ -31,12 +30,9 @@ import {
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/cm6/wikiLinkParser'
 import { extractDateFromName, resolveLink } from '../../lib/knowledgeUtils'
-import { getStemIndex } from '../../stores/vaultStore'
 import { workspaceActions, setLeafInstances } from '../../stores/workspaceStore'
 import { syntaxTree } from '@codemirror/language'
-import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileIO'
 import { settingsStore } from '../../stores/settingsStore'
-import { vaultFs } from '../../stores/vaultStore'
 import type { ViewComponentProps } from '../../stores/types'
 
 async function loadFileContent(path: string): Promise<string> {
