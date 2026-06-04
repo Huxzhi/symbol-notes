@@ -137,7 +137,6 @@ export interface RuntimeState {
   fs: FileSystemAdapter | null
   leafInstances: Record<string, LeafRuntimeState>
   fileOp: FileOp
-  isIndexing: boolean
 }
 
 // ── View registry ─────────────────────────────────────────────────────────────

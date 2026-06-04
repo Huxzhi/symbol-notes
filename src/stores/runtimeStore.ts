@@ -16,7 +16,6 @@ const [runtimeStore, setRuntimeStore] = createStore<RuntimeState>({
   fs: null,
   leafInstances: {},
   fileOp: null,
-  isIndexing: false,
 })
 
 // ── App actions ───────────────────────────────────────────────────────────────

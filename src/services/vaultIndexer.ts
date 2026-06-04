@@ -1,8 +1,10 @@
+import { createSignal } from 'solid-js'
 import { vaultStore, setVaultStore } from '../stores/vaultStore'
-import { runtimeStore, setRuntimeStore } from '../stores/runtimeStore'
+
+export const [isIndexing, setIsIndexing] = createSignal(false)
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { createMarkdownParser } from '../lib/parseMarkdown'
-import { readFile } from './fileIO'
+import { readFile, listAll, isReady } from './fileIO'
 import {
   hashContent, getCachedMeta, setCachedMeta, getManyMeta, pruneCache,
   loadAllFileStats, setFileStatEntry, pruneFileStatCache,
@@ -41,32 +43,22 @@ const EMPTY_CONTENT: Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'alias
   tasks: [],
 }
 
-// Pure FS walk — collects stat fields only, no cache comparison.
-async function buildScan(
-  dirHandle: FileSystemDirectoryHandle,
-  parentPath: string | null = null,
-  result: ScanResult = { files: {}, activePaths: new Set() },
-): Promise<ScanResult> {
-  for await (const [name, handle] of dirHandle.entries()) {
-    if (name.startsWith('.')) continue
-    const path = parentPath ? `${parentPath}/${name}` : name
-
-    if (handle.kind === 'directory') {
-      const epoch = new Date(0).toISOString().slice(0, 10)
+async function buildScan(): Promise<ScanResult> {
+  const result: ScanResult = { files: {}, activePaths: new Set() }
+  const epoch = new Date(0).toISOString().slice(0, 10)
+  for await (const entry of listAll()) {
+    const { name, path, kind, parent, size, mtime } = entry
+    if (kind === 'directory') {
       result.files[path] = {
-        name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0, hash: '',
+        name, path, kind: 'directory', parent, size: 0, mtime: 0, hash: '',
         ...EMPTY_CONTENT,
         created: epoch,
         dated: extractDateFromName(name) ?? epoch,
       }
-      await buildScan(handle as FileSystemDirectoryHandle, path, result)
     } else {
-      const file = await (handle as FileSystemFileHandle).getFile()
-      const size = file.size
-      const mtime = file.lastModified
       const mtimeStr = new Date(mtime).toISOString().slice(0, 10)
       result.files[path] = {
-        name, path, kind: 'file', parent: parentPath, size, mtime, hash: '',
+        name, path, kind: 'file', parent, size, mtime, hash: '',
         ...EMPTY_CONTENT,
         created: mtimeStr,
         dated: extractDateFromName(name) ?? mtimeStr,
@@ -178,14 +170,12 @@ export async function scanAndIndex(): Promise<void> {
   const session: Session = { cancelled: false }
   currentSession = session
 
-  const { rootHandle } = runtimeStore
-  if (!rootHandle) return
+  if (!isReady()) return
 
-  setRuntimeStore('isIndexing', true)
+  setIsIndexing(true)
 
-  // FS walk and IDB stat read run in parallel
   const [{ files, activePaths }, idbStats] = await Promise.all([
-    buildScan(rootHandle),
+    buildScan(),
     loadAllFileStats(),
   ])
 
@@ -224,13 +214,12 @@ export async function scanAndIndex(): Promise<void> {
   }
 
   if (currentSession === session) {
-    setRuntimeStore('isIndexing', false)
+    setIsIndexing(false)
   }
 }
 
 export async function rescanTree(): Promise<void> {
-  const { rootHandle } = runtimeStore
-  if (!rootHandle) return
-  const { files } = await buildScan(rootHandle)
+  if (!isReady()) return
+  const { files } = await buildScan()
   setVaultStore('files', files)
 }

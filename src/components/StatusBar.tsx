@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { workspaceActions, workspaceStore, activeLayout, layoutList } from '../stores/workspaceStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { runtimeStore } from '../stores/runtimeStore'
+import { isIndexing } from '../services/vaultIndexer'
 
 export function StatusBar() {
   const [showSwitcher, setShowSwitcher] = createSignal(false)
@@ -110,7 +111,7 @@ export function StatusBar() {
         <span>{stats().words} 字</span>
         <span>{stats().lines} 行</span>
         <div class="flex-1" />
-        <Show when={runtimeStore.isIndexing}>
+        <Show when={isIndexing()}>
           <span class="flex items-center gap-1 text-(--text-3)">
             <span class="inline-block w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" />
             后台检测中
