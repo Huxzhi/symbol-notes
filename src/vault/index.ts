@@ -1,28 +1,43 @@
 import { createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
-import type { FileSystemAdapter } from '../services/fs/types'
-import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { parseMarkdown } from '../lib/parseMarkdown'
-import type { ParseResult } from '../lib/parseMarkdown'
-import {
-  hashContent, getCachedMeta, setCachedMeta, setFileStatEntry,
-  loadAllFileStats, pruneCache, pruneFileStatCache, deleteFileStatEntry,
-} from '../services/indexStorage'
-import {
-  extractTags, extractAliases, mergeTagsWithBody, extractDateString, buildStemIndex,
-} from '../lib/knowledgeUtils'
-import type { VaultState, FileMeta, TaskItem } from '../stores/types'
 import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
+import { parseFrontmatter } from '../lib/parseFrontmatter'
+import type { ParseResult } from '../lib/parseMarkdown'
+import { parseMarkdown } from '../lib/parseMarkdown'
 import { LocalAdapter } from '../services/fs/LocalAdapter'
-import { buildScan, runPhase1 } from './scan'
-import { buildBacklinks, applyFileBacklinks, removeFileBacklinks, resolveNewFile } from './backlinks'
-import { buildTags, applyFileTags, removeFileTags } from './tags'
-import { buildTasks, applyFileTasks, removeFileTasks } from './tasks'
+import type { FileSystemAdapter } from '../services/fs/types'
+import type { FileMeta, TaskItem, VaultState } from '../stores/types'
 import {
-  initFileIO, isReady,
-  readFile, writeFile, getFileMtime,
-  deleteEntry, invalidatePrefix, createDirectory, invalidateFile,
+  applyFileBacklinks,
+  buildBacklinks,
+  removeFileBacklinks,
+  resolveNewFile,
+  buildStemIndex,
+  resolveLink,
+} from './backlinks'
+import {
+  deleteFileStatEntry,
+  getCachedMeta,
+  hashContent,
+  loadAllFileStats,
+  pruneCache,
+  pruneFileStatCache,
+  setCachedMeta,
+  setFileStatEntry,
+} from './indexStorage'
+import {
+  createDirectory,
+  deleteEntry,
+  getFileMtime,
+  initFileIO,
+  invalidatePrefix,
+  isReady,
+  readFile,
+  writeFile,
 } from './io'
+import { buildScan, runPhase1, extractTags, extractAliases, mergeTagsWithBody, extractDateString, extractDateFromName } from './scan'
+import { applyFileTags, buildTags, removeFileTags } from './tags'
+import { applyFileTasks, buildTasks, removeFileTasks } from './tasks'
 
 // ── Vault connection signal ───────────────────────────────────────────────────
 
@@ -40,7 +55,7 @@ const [vaultStore, setVaultStore] = createStore<VaultState>({
   taskMap: {},
 })
 
-export { vaultStore, setVaultStore }
+export { setVaultStore, vaultStore }
 
 // ── Stem index (lazy cache) ───────────────────────────────────────────────────
 
@@ -81,7 +96,9 @@ export async function restoreVault(): Promise<void> {
 
 // ── Orchestration ─────────────────────────────────────────────────────────────
 
-interface Session { cancelled: boolean }
+interface Session {
+  cancelled: boolean
+}
 let currentSession: Session | null = null
 
 /** 打开 vault 后全量扫描：Phase1 填充 FileMeta → Phase2 重建三个索引 */
@@ -135,7 +152,17 @@ export async function scanAndIndex(): Promise<void> {
   if (currentSession === session) setIsIndexing(false)
 }
 
-type ContentFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'dated' | 'tasks'>
+type ContentFields = Pick<
+  FileMeta,
+  | 'frontmatter'
+  | 'outLinks'
+  | 'tags'
+  | 'aliases'
+  | 'created'
+  | 'updated'
+  | 'dated'
+  | 'tasks'
+>
 
 /** 单文件保存后：解析内容 → 更新 FileMeta → 增量更新三个索引 */
 export async function reindexFile(
@@ -151,13 +178,18 @@ export async function reindexFile(
     fields = cached
   } else {
     const { frontmatter } = parseFrontmatter(content)
-    const { outLinks, inlineTags, tasks: rawTasks } = cmParsed ?? parseMarkdown(content)
+    const {
+      outLinks,
+      inlineTags,
+      tasks: rawTasks,
+    } = cmParsed ?? parseMarkdown(content)
     const existingMtime = vaultStore.files[path]?.mtime ?? Date.now()
-    const created = extractDateString(frontmatter.created)
-                 ?? new Date(existingMtime).toISOString().slice(0, 10)
+    const created =
+      extractDateString(frontmatter.created) ??
+      new Date(existingMtime).toISOString().slice(0, 10)
     const updated = extractDateString(frontmatter.updated) ?? null
     const dated = extractDateString(frontmatter.dated) ?? created
-    const tasks: TaskItem[] = rawTasks.map(t => ({
+    const tasks: TaskItem[] = rawTasks.map((t) => ({
       ...t,
       dueDate: t.dueDate ?? dated,
       completedDate: t.checked ? (t.completedDate ?? dated) : null,
@@ -167,7 +199,10 @@ export async function reindexFile(
       outLinks,
       tags: mergeTagsWithBody(extractTags(frontmatter.tags), inlineTags),
       aliases: extractAliases(frontmatter.aliases),
-      created, updated, dated, tasks,
+      created,
+      updated,
+      dated,
+      tasks,
     }
     await setCachedMeta(hash, fields)
   }
@@ -181,7 +216,11 @@ export async function reindexFile(
   if (persistStat) {
     const entry = vaultStore.files[path]
     if (entry?.kind === 'file')
-      await setFileStatEntry(path, { size: entry.size, mtime: entry.mtime, hash })
+      await setFileStatEntry(path, {
+        size: entry.size,
+        mtime: entry.mtime,
+        hash,
+      })
   }
 }
 
@@ -197,11 +236,17 @@ export function removeVaultEntry(path: string): void {
 }
 
 /** 某个文件内的 wiki 链接指向从 oldTarget 重命名为 newTarget */
-export function remapFileLink(filePath: string, oldTarget: string, newTarget: string): void {
+export function remapFileLink(
+  filePath: string,
+  oldTarget: string,
+  newTarget: string,
+): void {
   const file = vaultStore.files[filePath]
   if (!file) return
   const prevOutLinks = file.outLinks
-  const nextOutLinks = prevOutLinks.map(l => l === oldTarget ? newTarget : l)
+  const nextOutLinks = prevOutLinks.map((l) =>
+    l === oldTarget ? newTarget : l,
+  )
   setVaultStore('files', filePath, 'outLinks', nextOutLinks)
   applyFileBacklinks(filePath, prevOutLinks, nextOutLinks)
 }
@@ -214,7 +259,11 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function replaceWikiLinks(content: string, oldPath: string, newPath: string): string {
+function replaceWikiLinks(
+  content: string,
+  oldPath: string,
+  newPath: string,
+): string {
   const oldBase = oldPath.replace(/\.md$/, '')
   const newBase = newPath.replace(/\.md$/, '')
   const oldStem = oldBase.split('/').pop()!
@@ -236,7 +285,10 @@ function replaceWikiLinks(content: string, oldPath: string, newPath: string): st
   return result
 }
 
-async function updateBacklinks(oldPath: string, newPath: string): Promise<void> {
+async function updateBacklinks(
+  oldPath: string,
+  newPath: string,
+): Promise<void> {
   const backlinks = vaultStore.backlinkMap[oldPath] ?? []
   for (const bPath of backlinks) {
     try {
@@ -246,7 +298,9 @@ async function updateBacklinks(oldPath: string, newPath: string): Promise<void> 
         await writeFile(bPath, updated)
         remapFileLink(bPath, oldPath, newPath)
       }
-    } catch { /* skip unreadable files */ }
+    } catch {
+      /* skip unreadable files */
+    }
   }
 }
 
@@ -257,7 +311,11 @@ export const fileActions = {
     return readFile(path)
   },
 
-  async saveFile(path: string, content: string, cmParsed?: ParseResult): Promise<void> {
+  async saveFile(
+    path: string,
+    content: string,
+    cmParsed?: ParseResult,
+  ): Promise<void> {
     await writeFile(path, content)
     const mtime = await getFileMtime(path)
     setVaultStore('files', path, 'mtime', mtime)
@@ -270,14 +328,26 @@ export const fileActions = {
     const fileName = parts.pop()!
     const finalName = fileName.endsWith('.md') ? fileName : `${fileName}.md`
     if (parts.length > 0) await createDirectory(parts.join('/'))
-    const path = parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
+    const path =
+      parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
     await writeFile(path, '')
     const parent = parts.length > 0 ? parts.join('/') : null
     const entry: FileMeta = {
-      name: finalName, path, kind: 'file', parent,
-      size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      name: finalName,
+      path,
+      kind: 'file',
+      parent,
+      size: 0,
+      mtime: 0,
+      hash: '',
+      frontmatter: {},
+      outLinks: [],
+      tags: [],
+      aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
-      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
+      updated: null,
+      dated: new Date(0).toISOString().slice(0, 10),
+      tasks: [],
     }
     setVaultStore('files', path, entry)
     invalidateStemIndex()
@@ -292,10 +362,21 @@ export const fileActions = {
     const dirName = parts[parts.length - 1]
     const parent = parts.length > 1 ? parts.slice(0, -1).join('/') : null
     const entry: FileMeta = {
-      name: dirName, path: name, kind: 'directory', parent,
-      size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      name: dirName,
+      path: name,
+      kind: 'directory',
+      parent,
+      size: 0,
+      mtime: 0,
+      hash: '',
+      frontmatter: {},
+      outLinks: [],
+      tags: [],
+      aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
-      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
+      updated: null,
+      dated: new Date(0).toISOString().slice(0, 10),
+      tasks: [],
     }
     setVaultStore('files', name, entry)
     invalidateStemIndex()
@@ -303,7 +384,9 @@ export const fileActions = {
 
   async renameFile(oldPath: string, newName: string): Promise<void> {
     if (!isReady()) return
-    const dir = oldPath.includes('/') ? oldPath.slice(0, oldPath.lastIndexOf('/')) : ''
+    const dir = oldPath.includes('/')
+      ? oldPath.slice(0, oldPath.lastIndexOf('/'))
+      : ''
     const finalName = newName.endsWith('.md') ? newName : `${newName}.md`
     const newPath = dir ? `${dir}/${finalName}` : finalName
     if (newPath !== oldPath && vaultStore.files[newPath])
@@ -313,13 +396,29 @@ export const fileActions = {
     await deleteEntry(oldPath)
     await deleteFileStatEntry(oldPath)
     removeVaultEntry(oldPath)
-    setVaultStore('files', produce((m: Record<string, FileMeta>) => { delete m[oldPath] }))
+    setVaultStore(
+      'files',
+      produce((m: Record<string, FileMeta>) => {
+        delete m[oldPath]
+      }),
+    )
     const parent = dir || null
     const entry: FileMeta = {
-      name: finalName, path: newPath, kind: 'file', parent,
-      size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      name: finalName,
+      path: newPath,
+      kind: 'file',
+      parent,
+      size: 0,
+      mtime: 0,
+      hash: '',
+      frontmatter: {},
+      outLinks: [],
+      tags: [],
+      aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
-      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
+      updated: null,
+      dated: new Date(0).toISOString().slice(0, 10),
+      tasks: [],
     }
     setVaultStore('files', newPath, entry)
     invalidateStemIndex()
@@ -334,14 +433,19 @@ export const fileActions = {
     await deleteEntry(path)
     await deleteFileStatEntry(path)
     removeVaultEntry(path)
-    setVaultStore('files', produce((m: Record<string, FileMeta>) => { delete m[path] }))
+    setVaultStore(
+      'files',
+      produce((m: Record<string, FileMeta>) => {
+        delete m[path]
+      }),
+    )
     invalidateStemIndex()
   },
 
   async deleteFolder(path: string): Promise<void> {
     if (!isReady()) return
     const toRemove = Object.values(vaultStore.files).filter(
-      e => e.path === path || e.path.startsWith(path + '/'),
+      (e) => e.path === path || e.path.startsWith(path + '/'),
     )
     await deleteEntry(path, { recursive: true })
     invalidatePrefix(path)
@@ -351,9 +455,12 @@ export const fileActions = {
         removeVaultEntry(entry.path)
       }
     }
-    setVaultStore('files', produce((m: Record<string, FileMeta>) => {
-      for (const entry of toRemove) delete m[entry.path]
-    }))
+    setVaultStore(
+      'files',
+      produce((m: Record<string, FileMeta>) => {
+        for (const entry of toRemove) delete m[entry.path]
+      }),
+    )
     invalidateStemIndex()
   },
 
@@ -362,18 +469,35 @@ export const fileActions = {
     const name = srcPath.split('/').pop()!
     const newPath = destDirPath ? `${destDirPath}/${name}` : name
     if (newPath === srcPath) return
-    if (vaultStore.files[newPath]) throw new Error(`目标位置已存在同名文件：${name}`)
+    if (vaultStore.files[newPath])
+      throw new Error(`目标位置已存在同名文件：${name}`)
     const oldContent = await readFile(srcPath)
     await writeFile(newPath, oldContent)
     await deleteEntry(srcPath)
     await deleteFileStatEntry(srcPath)
     removeVaultEntry(srcPath)
-    setVaultStore('files', produce((m: Record<string, FileMeta>) => { delete m[srcPath] }))
+    setVaultStore(
+      'files',
+      produce((m: Record<string, FileMeta>) => {
+        delete m[srcPath]
+      }),
+    )
     const entry: FileMeta = {
-      name, path: newPath, kind: 'file', parent: destDirPath ?? null,
-      size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], tags: [], aliases: [],
+      name,
+      path: newPath,
+      kind: 'file',
+      parent: destDirPath ?? null,
+      size: 0,
+      mtime: 0,
+      hash: '',
+      frontmatter: {},
+      outLinks: [],
+      tags: [],
+      aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
-      updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
+      updated: null,
+      dated: new Date(0).toISOString().slice(0, 10),
+      tasks: [],
     }
     setVaultStore('files', newPath, entry)
     invalidateStemIndex()
@@ -386,17 +510,22 @@ export const fileActions = {
   async moveFolder(srcPath: string, destDirPath: string | null): Promise<void> {
     if (!isReady()) return
     const folderName = srcPath.split('/').pop()!
-    const newFolderPath = destDirPath ? `${destDirPath}/${folderName}` : folderName
-    if (newFolderPath === srcPath || newFolderPath.startsWith(srcPath + '/')) return
-    if (vaultStore.files[newFolderPath]) throw new Error(`目标位置已存在同名文件夹：${folderName}`)
+    const newFolderPath = destDirPath
+      ? `${destDirPath}/${folderName}`
+      : folderName
+    if (newFolderPath === srcPath || newFolderPath.startsWith(srcPath + '/'))
+      return
+    if (vaultStore.files[newFolderPath])
+      throw new Error(`目标位置已存在同名文件夹：${folderName}`)
     const descendants = Object.values(vaultStore.files).filter(
-      e => e.path === srcPath || e.path.startsWith(srcPath + '/'),
+      (e) => e.path === srcPath || e.path.startsWith(srcPath + '/'),
     )
-    const fileEntries = descendants.filter(e => e.kind === 'file')
-    const dirEntries = descendants.filter(e => e.kind === 'directory')
-    const allNewDirs = [newFolderPath, ...dirEntries.map(
-      e => newFolderPath + e.path.slice(srcPath.length),
-    )].sort((a, b) => a.split('/').length - b.split('/').length)
+    const fileEntries = descendants.filter((e) => e.kind === 'file')
+    const dirEntries = descendants.filter((e) => e.kind === 'directory')
+    const allNewDirs = [
+      newFolderPath,
+      ...dirEntries.map((e) => newFolderPath + e.path.slice(srcPath.length)),
+    ].sort((a, b) => a.split('/').length - b.split('/').length)
     for (const dirPath of allNewDirs) await createDirectory(dirPath)
     const fileContents = new Map<string, string>()
     for (const entry of fileEntries) {
@@ -408,15 +537,23 @@ export const fileActions = {
     await deleteEntry(srcPath, { recursive: true })
     invalidatePrefix(srcPath)
     for (const entry of fileEntries) await deleteFileStatEntry(entry.path)
-    setVaultStore('files', produce((m: Record<string, FileMeta>) => {
-      for (const entry of descendants) delete m[entry.path]
-    }))
+    setVaultStore(
+      'files',
+      produce((m: Record<string, FileMeta>) => {
+        for (const entry of descendants) delete m[entry.path]
+      }),
+    )
     for (const entry of descendants) {
       const newEntryPath = newFolderPath + entry.path.slice(srcPath.length)
       const newParent = newEntryPath.includes('/')
         ? newEntryPath.slice(0, newEntryPath.lastIndexOf('/'))
         : null
-      setVaultStore('files', newEntryPath, { ...entry, path: newEntryPath, parent: newParent, hash: '' })
+      setVaultStore('files', newEntryPath, {
+        ...entry,
+        path: newEntryPath,
+        parent: newParent,
+        hash: '',
+      })
     }
     invalidateStemIndex()
     const { workspaceActions } = await import('../stores/workspaceStore')
@@ -440,6 +577,18 @@ export const fileActions = {
   },
 }
 
-// ── IO re-exports ─────────────────────────────────────────────────────────────
+// ── Re-exports ────────────────────────────────────────────────────────────────
 
-export { initFileIO, isReady, readFile, writeFile, getFileMtime, invalidateFile, getFile } from './io'
+export {
+  getFile,
+  getFileMtime,
+  initFileIO,
+  invalidateFile,
+  isReady,
+  readFile,
+  writeFile,
+} from './io'
+
+// For non-vault consumers (pluginRegistry, EditorViewer, tests)
+export { resolveLink, buildStemIndex, buildLinkMaps } from './backlinks'
+export { extractDateFromName } from './scan'

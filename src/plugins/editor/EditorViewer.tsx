@@ -29,7 +29,7 @@ import {
   setFrontmatterField,
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/cm6/wikiLinkParser'
-import { extractDateFromName, resolveLink } from '../../lib/knowledgeUtils'
+import { extractDateFromName, resolveLink } from '../../vault'
 import { workspaceActions, setLeafInstances } from '../../stores/workspaceStore'
 import { syntaxTree } from '@codemirror/language'
 import { settingsStore } from '../../stores/settingsStore'

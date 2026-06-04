@@ -1,6 +1,13 @@
-import { buildTaskMap } from '../lib/knowledgeUtils'
 import type { FileMeta, TaskItem } from '../stores/types'
 import { setVaultStore } from './index'
+
+export function buildTaskMap(files: Record<string, { tasks: TaskItem[] }>): Record<string, TaskItem[]> {
+  const result: Record<string, TaskItem[]> = {}
+  for (const [path, meta] of Object.entries(files)) {
+    if (meta.tasks.length > 0) result[path] = meta.tasks
+  }
+  return result
+}
 
 /** 全量重建 taskMap */
 export function buildTasks(mdFiles: Record<string, FileMeta>): void {

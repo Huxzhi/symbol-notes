@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { extractDateFromName, buildTaskMap, buildStemIndex, resolveLink, buildLinkMaps } from '../knowledgeUtils'
+import { extractDateFromName, buildStemIndex, resolveLink, buildLinkMaps } from '../../vault'
+import { buildTaskMap } from '../../vault/tasks'
 import type { TaskItem } from '../../stores/types'
 
 const task1: TaskItem = {

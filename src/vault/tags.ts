@@ -1,6 +1,16 @@
-import { buildTagMap } from '../lib/knowledgeUtils'
 import type { FileMeta } from '../stores/types'
 import { vaultStore, setVaultStore } from './index'
+
+function buildTagMap(files: Record<string, { tags: string[] }>): Record<string, string[]> {
+  const map: Record<string, string[]> = {}
+  for (const [path, meta] of Object.entries(files)) {
+    for (const tag of meta.tags) {
+      if (!map[tag]) map[tag] = []
+      map[tag].push(path)
+    }
+  }
+  return map
+}
 
 /** 全量重建 tagMap */
 export function buildTags(mdFiles: Record<string, FileMeta>): void {

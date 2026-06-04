@@ -1,6 +1,51 @@
-import { resolveLink, buildLinkMaps } from '../lib/knowledgeUtils'
 import type { FileMeta } from '../stores/types'
 import { vaultStore, setVaultStore, getStemIndex } from './index'
+
+// ── Link resolution ───────────────────────────────────────────────────────────
+
+export function buildStemIndex(files: Record<string, unknown>): Map<string, string[]> {
+  const index = new Map<string, string[]>()
+  for (const path of Object.keys(files)) {
+    if (!path.endsWith('.md')) continue
+    const stem = path.split('/').pop()!
+    const list = index.get(stem)
+    if (list) list.push(path)
+    else index.set(stem, [path])
+  }
+  return index
+}
+
+export function resolveLink(
+  target: string,
+  stemIndex: Map<string, string[]>,
+  files: Record<string, unknown>,
+): string | null {
+  if (target in files) return target
+  const stem = target.split('/').pop()!
+  const candidates = stemIndex.get(stem) ?? []
+  if (candidates.length === 1) return candidates[0]
+  const pathMatches = candidates.filter(c => c === target || c.endsWith('/' + target))
+  return pathMatches.length === 1 ? pathMatches[0] : null
+}
+
+export function buildLinkMaps(
+  files: Record<string, { outLinks: string[] }>,
+): { backlinkMap: Record<string, string[]>; unresolvedMap: Record<string, string[]> } {
+  const stemIndex = buildStemIndex(files)
+  const backlinkMap: Record<string, string[]> = {}
+  const unresolvedMap: Record<string, string[]> = {}
+  for (const [src, meta] of Object.entries(files)) {
+    for (const target of meta.outLinks) {
+      const resolved = resolveLink(target, stemIndex, files)
+      if (resolved) {
+        ;(backlinkMap[resolved] ??= []).push(src)
+      } else {
+        ;(unresolvedMap[target] ??= []).push(src)
+      }
+    }
+  }
+  return { backlinkMap, unresolvedMap }
+}
 
 /** 全量重建 backlinkMap + unresolvedMap（Phase2 全量扫描后调用） */
 export function buildBacklinks(mdFiles: Record<string, FileMeta>): void {

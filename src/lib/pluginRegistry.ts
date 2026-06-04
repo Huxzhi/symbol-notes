@@ -4,7 +4,7 @@ import type { Component, JSX } from 'solid-js'
 import { settingsStore } from '../stores/settingsStore'
 import { workspaceActions, getLeafsByType, activeLayout, activeFilePath, activeSidebarType, leafInstances } from '../stores/workspaceStore'
 import { fileActions, vaultFs, vaultStore, getStemIndex } from '../vault'
-import { resolveLink } from './knowledgeUtils'
+import { resolveLink } from '../vault'
 import { loadFromStorage, saveToStorage } from './localStorage'
 import type { ViewComponentProps, FileMeta } from '../stores/types'
 export type { ViewComponentProps }

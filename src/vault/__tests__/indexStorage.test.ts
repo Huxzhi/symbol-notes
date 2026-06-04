@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockStatStore = {}
 const mockKeys = vi.fn()
@@ -15,8 +15,12 @@ vi.mock('idb-keyval', () => ({
   getMany: mockGetMany,
 }))
 
-const { loadAllFileStats, setFileStatEntry, deleteFileStatEntry, pruneFileStatCache } =
-  await import('../indexStorage')
+const {
+  loadAllFileStats,
+  setFileStatEntry,
+  deleteFileStatEntry,
+  pruneFileStatCache,
+} = await import('../indexStorage')
 
 describe('file-stat-cache', () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
-import { deleteFileStatEntry } from '../services/indexStorage'
 import type { FileSystemAdapter } from '../services/fs/types'
+import { deleteFileStatEntry } from './indexStorage'
 export type { DirEntry } from '../services/fs/types'
 
 let _adapter: FileSystemAdapter | null = null
@@ -41,7 +41,10 @@ export async function getFile(path: string): Promise<File> {
   return adapter().getFile(path)
 }
 
-export async function deleteEntry(path: string, opts?: { recursive?: boolean }): Promise<void> {
+export async function deleteEntry(
+  path: string,
+  opts?: { recursive?: boolean },
+): Promise<void> {
   await adapter().deleteEntry(path, opts)
   contentCache.delete(path)
   deleteFileStatEntry(path).catch(() => {})
@@ -57,7 +60,9 @@ export async function createDirectory(path: string): Promise<void> {
   return adapter().createDirectory(path)
 }
 
-export async function* listAll(): AsyncGenerator<import('../services/fs/types').DirEntry> {
+export async function* listAll(): AsyncGenerator<
+  import('../services/fs/types').DirEntry
+> {
   if (!_adapter) return
   yield* _adapter.listAll()
 }
