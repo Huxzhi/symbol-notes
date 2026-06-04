@@ -1,4 +1,5 @@
 import type { EditorView } from '@codemirror/view'
+import type { FileSystemAdapter } from '../services/fs/types'
 import type { OutLink } from '../lib/cm6/outLinksField'
 import type { Heading } from '../lib/cm6/headingsField'
 
@@ -133,11 +134,10 @@ export type FileOp =
   | null
 
 export interface RuntimeState {
-  rootHandle: FileSystemDirectoryHandle | null
+  fs: FileSystemAdapter | null
   leafInstances: Record<string, LeafRuntimeState>
   fileOp: FileOp
   isIndexing: boolean
-  showSettings: boolean
 }
 
 // ── View registry ─────────────────────────────────────────────────────────────

@@ -1,26 +1,22 @@
-import { get, set } from 'idb-keyval'
 import { createStore, produce } from 'solid-js/store'
-import { vaultActions, vaultStore, setVaultStore } from './vaultStore'
-import { clearContentCache, invalidateFile, readFile, writeFile } from '../services/fileIO'
+import { vaultActions, vaultStore, setVaultStore, invalidateStemIndex } from './vaultStore'
+import {
+  initFileIO, isReady,
+  readFile, writeFile, getFileMtime,
+  deleteEntry, invalidatePrefix, createDirectory,
+  invalidateFile,
+} from '../services/fileIO'
 import { deleteFileStatEntry } from '../services/indexStorage'
 import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
+import { LocalAdapter } from '../services/fs/LocalAdapter'
 import type { FileMeta, RuntimeState } from './types'
-
-declare global {
-  interface Window {
-    showDirectoryPicker: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>
-  }
-  interface FileSystemDirectoryHandle {
-    requestPermission: (options?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>
-  }
-}
+import type { ParseResult } from '../lib/parseMarkdown'
 
 const [runtimeStore, setRuntimeStore] = createStore<RuntimeState>({
-  rootHandle: null,
+  fs: null,
   leafInstances: {},
   fileOp: null,
   isIndexing: false,
-  showSettings: false,
 })
 
 // ── App actions ───────────────────────────────────────────────────────────────
@@ -28,10 +24,9 @@ const [runtimeStore, setRuntimeStore] = createStore<RuntimeState>({
 export const appActions = {
   async openVault(): Promise<void> {
     clearEmbedUrlCache()
-    clearContentCache()
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
-    await set('rootHandle', handle)
-    setRuntimeStore('rootHandle', handle)
+    const adapter = await LocalAdapter.open()
+    initFileIO(adapter)
+    setRuntimeStore('fs', adapter)
     const { workspaceActions } = await import('./workspaceStore')
     workspaceActions.clearAllLeaves()
     const { scanAndIndex } = await import('../services/vaultIndexer')
@@ -39,28 +34,17 @@ export const appActions = {
   },
 
   async restoreVault(): Promise<void> {
-    const handle = await get<FileSystemDirectoryHandle>('rootHandle')
-    if (!handle) return
-    try {
-      const perm = await handle.requestPermission({ mode: 'readwrite' })
-      if (perm !== 'granted') return
-      clearContentCache()
-      setRuntimeStore('rootHandle', handle)
-      const { scanAndIndex } = await import('../services/vaultIndexer')
-      await scanAndIndex()
-    } catch { /* handle invalidated */ }
+    const adapter = await LocalAdapter.restore()
+    if (!adapter) return
+    initFileIO(adapter)
+    setRuntimeStore('fs', adapter)
+    const { scanAndIndex } = await import('../services/vaultIndexer')
+    await scanAndIndex()
   },
 
-  toggleSettings(): void {
-    setRuntimeStore('showSettings', v => !v)
-  },
-
-  isSettingsOpen(): boolean {
-    return runtimeStore.showSettings
-  },
 }
 
-// ── Internal helpers for fileActions ─────────────────────────────────────────
+// ── Internal helpers ──────────────────────────────────────────────────────────
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -116,16 +100,25 @@ async function updateBacklinks(oldPath: string, newPath: string): Promise<void> 
 // ── File actions ──────────────────────────────────────────────────────────────
 
 export const fileActions = {
+  readFile(path: string): Promise<string> {
+    return readFile(path)
+  },
+
+  async saveFile(path: string, content: string, cmParsed?: ParseResult): Promise<void> {
+    await writeFile(path, content)
+    const mtime = await getFileMtime(path)
+    setVaultStore('files', path, 'mtime', mtime)
+    await vaultActions.reindexFile(path, content, cmParsed, true)
+  },
+
   async createFile(name: string): Promise<string | null> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return null
+    if (!isReady()) return null
     const parts = name.includes('/') ? name.split('/') : [name]
     const fileName = parts.pop()!
     const finalName = fileName.endsWith('.md') ? fileName : `${fileName}.md`
-    let dir = rootHandle
-    for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
-    await dir.getFileHandle(finalName, { create: true })
+    if (parts.length > 0) await createDirectory(parts.join('/'))
     const path = parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
+    await writeFile(path, '')
     const parent = parts.length > 0 ? parts.join('/') : null
     const entry: FileMeta = {
       name: finalName, path, kind: 'file', parent,
@@ -134,16 +127,15 @@ export const fileActions = {
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setVaultStore('files', path, entry)
+    invalidateStemIndex()
     resolveUnresolved(path)
     return path
   },
 
   async createFolder(name: string): Promise<void> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return
+    if (!isReady()) return
+    await createDirectory(name)
     const parts = name.split('/')
-    let dir = rootHandle
-    for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
     const dirName = parts[parts.length - 1]
     const parent = parts.length > 1 ? parts.slice(0, -1).join('/') : null
     const entry: FileMeta = {
@@ -153,11 +145,11 @@ export const fileActions = {
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setVaultStore('files', name, entry)
+    invalidateStemIndex()
   },
 
   async renameFile(oldPath: string, newName: string): Promise<void> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return
+    if (!isReady()) return
     const dir = oldPath.includes('/') ? oldPath.slice(0, oldPath.lastIndexOf('/')) : ''
     const finalName = newName.endsWith('.md') ? newName : `${newName}.md`
     const newPath = dir ? `${dir}/${finalName}` : finalName
@@ -167,13 +159,8 @@ export const fileActions = {
     }
 
     const oldContent = await readFile(oldPath)
-    await writeFile(newPath, oldContent, true)
-    let dirHandle: FileSystemDirectoryHandle = rootHandle
-    if (dir) {
-      for (const part of dir.split('/')) dirHandle = await dirHandle.getDirectoryHandle(part)
-    }
-    await dirHandle.removeEntry(oldPath.split('/').pop()!)
-    invalidateFile(oldPath)
+    await writeFile(newPath, oldContent)
+    await deleteEntry(oldPath)
     await deleteFileStatEntry(oldPath)
 
     vaultActions.removeVaultEntry(oldPath)
@@ -187,6 +174,7 @@ export const fileActions = {
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setVaultStore('files', newPath, entry)
+    invalidateStemIndex()
 
     const { workspaceActions } = await import('./workspaceStore')
     workspaceActions.renameLeafPath(oldPath, newPath)
@@ -195,34 +183,23 @@ export const fileActions = {
   },
 
   async deleteFile(path: string): Promise<void> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return
-    const parts = path.split('/')
-    const name = parts.pop()!
-    let dir: FileSystemDirectoryHandle = rootHandle
-    for (const part of parts) dir = await dir.getDirectoryHandle(part)
-    await dir.removeEntry(name)
-    invalidateFile(path)
+    if (!isReady()) return
+    await deleteEntry(path)
     await deleteFileStatEntry(path)
     vaultActions.removeVaultEntry(path)
     setVaultStore('files', produce((m: Record<string, FileMeta>) => { delete m[path] }))
+    invalidateStemIndex()
   },
 
   async deleteFolder(path: string): Promise<void> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return
-    const parts = path.split('/')
-    const name = parts.pop()!
-    let parentDir: FileSystemDirectoryHandle = rootHandle
-    for (const part of parts) parentDir = await parentDir.getDirectoryHandle(part)
-    await parentDir.removeEntry(name, { recursive: true })
-
+    if (!isReady()) return
     const toRemove = Object.values(vaultStore.files).filter(
       e => e.path === path || e.path.startsWith(path + '/'),
     )
+    await deleteEntry(path, { recursive: true })
+    invalidatePrefix(path)
     for (const entry of toRemove) {
       if (entry.kind === 'file') {
-        invalidateFile(entry.path)
         await deleteFileStatEntry(entry.path)
         vaultActions.removeVaultEntry(entry.path)
       }
@@ -233,6 +210,7 @@ export const fileActions = {
         for (const entry of toRemove) delete m[entry.path]
       }),
     )
+    invalidateStemIndex()
   },
 
   beginCreate(mode: 'file' | 'folder', prefix = ''): void {
@@ -268,8 +246,7 @@ export const fileActions = {
   },
 
   async moveFile(srcPath: string, destDirPath: string | null): Promise<void> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return
+    if (!isReady()) return
     const name = srcPath.split('/').pop()!
     const newPath = destDirPath ? `${destDirPath}/${name}` : name
     if (newPath === srcPath) return
@@ -279,15 +256,8 @@ export const fileActions = {
     }
 
     const oldContent = await readFile(srcPath)
-    await writeFile(newPath, oldContent, true)
-
-    const oldParts = srcPath.split('/')
-    const oldFileName = oldParts.pop()!
-    let oldDir: FileSystemDirectoryHandle = rootHandle
-    for (const part of oldParts) oldDir = await oldDir.getDirectoryHandle(part)
-    await oldDir.removeEntry(oldFileName)
-
-    invalidateFile(srcPath)
+    await writeFile(newPath, oldContent)
+    await deleteEntry(srcPath)
     await deleteFileStatEntry(srcPath)
 
     vaultActions.removeVaultEntry(srcPath)
@@ -300,6 +270,7 @@ export const fileActions = {
       updated: null, dated: new Date(0).toISOString().slice(0, 10), tasks: [],
     }
     setVaultStore('files', newPath, entry)
+    invalidateStemIndex()
 
     const { workspaceActions } = await import('./workspaceStore')
     workspaceActions.renameLeafPath(srcPath, newPath)
@@ -308,8 +279,7 @@ export const fileActions = {
   },
 
   async moveFolder(srcPath: string, destDirPath: string | null): Promise<void> {
-    const { rootHandle } = runtimeStore
-    if (!rootHandle) return
+    if (!isReady()) return
     const folderName = srcPath.split('/').pop()!
     const newFolderPath = destDirPath ? `${destDirPath}/${folderName}` : folderName
     if (newFolderPath === srcPath) return
@@ -325,40 +295,24 @@ export const fileActions = {
     const fileEntries = descendants.filter(e => e.kind === 'file')
     const dirEntries = descendants.filter(e => e.kind === 'directory')
 
-    // Create new directory structure (sorted by depth so parents come first)
     const allNewDirs = [newFolderPath, ...dirEntries.map(
       e => newFolderPath + e.path.slice(srcPath.length),
     )].sort((a, b) => a.split('/').length - b.split('/').length)
 
-    for (const dirPath of allNewDirs) {
-      const parts = dirPath.split('/')
-      let dir: FileSystemDirectoryHandle = rootHandle
-      for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
-    }
+    for (const dirPath of allNewDirs) await createDirectory(dirPath)
 
-    // Copy each file to the new location
     const fileContents = new Map<string, string>()
     for (const entry of fileEntries) {
       const content = await readFile(entry.path)
       fileContents.set(entry.path, content)
       const newFilePath = newFolderPath + entry.path.slice(srcPath.length)
-      await writeFile(newFilePath, content, true)
+      await writeFile(newFilePath, content)
     }
 
-    // Delete old folder in one shot
-    const oldParts = srcPath.split('/')
-    const oldFolderName = oldParts.pop()!
-    let oldParentDir: FileSystemDirectoryHandle = rootHandle
-    for (const part of oldParts) oldParentDir = await oldParentDir.getDirectoryHandle(part)
-    await oldParentDir.removeEntry(oldFolderName, { recursive: true })
+    await deleteEntry(srcPath, { recursive: true })
+    invalidatePrefix(srcPath)
+    for (const entry of fileEntries) await deleteFileStatEntry(entry.path)
 
-    // Invalidate old file caches
-    for (const entry of fileEntries) {
-      invalidateFile(entry.path)
-      await deleteFileStatEntry(entry.path)
-    }
-
-    // Update vaultStore: remove old entries, insert new ones
     setVaultStore('files', produce((m: Record<string, FileMeta>) => {
       for (const entry of descendants) delete m[entry.path]
     }))
@@ -369,8 +323,8 @@ export const fileActions = {
         : null
       setVaultStore('files', newEntryPath, { ...entry, path: newEntryPath, parent: newParent, hash: '' })
     }
+    invalidateStemIndex()
 
-    // Reindex files and update workspace tabs + backlinks
     const { workspaceActions } = await import('./workspaceStore')
     for (const entry of fileEntries) {
       const newFilePath = newFolderPath + entry.path.slice(srcPath.length)

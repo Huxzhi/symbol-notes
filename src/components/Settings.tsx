@@ -1,7 +1,6 @@
 import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { settingsActions, settingsStore } from '../stores/settingsStore'
-import { setRuntimeStore } from '../stores/runtimeStore'
 import { getRegisteredPlugins } from '../lib/pluginRegistry'
 import { getSettingsTabs } from '../lib/pluginRegistry'
 import type { ThemeId } from '../stores/types'
@@ -36,14 +35,14 @@ function Toggle(props: { checked: boolean; onChange: (v: boolean) => void }) {
   )
 }
 
-export function Settings() {
+export function Settings(props: { onClose(): void }) {
   const [section, setSection] = createSignal('appearance')
   const [draftTheme,          setDraftTheme]          = createSignal<ThemeId>(settingsStore.theme)
   const [draftCSS,            setDraftCSS]            = createSignal(settingsStore.customCSS)
   const [draftAutoTs,         setDraftAutoTs]         = createSignal(settingsStore.autoTimestamps)
   const [draftShowOtherFiles, setDraftShowOtherFiles] = createSignal(settingsStore.showOtherFiles)
 
-  const close = () => setRuntimeStore('showSettings', false)
+  const close = props.onClose
 
   const apply = () => {
     settingsActions.setTheme(draftTheme())
