@@ -1,6 +1,6 @@
 import { FolderOpen } from 'lucide-solid'
 import { definePlugin } from '../../lib/pluginRegistry'
-import { fileActions } from '../../stores/runtimeStore'
+import { beginCreate, beginRename } from './fileOpStore'
 import { FilesPanel } from './FilesPanel'
 
 export const FilesPlugin = definePlugin({
@@ -27,19 +27,19 @@ export const FilesPlugin = definePlugin({
     ctx.contextMenu('file', (d) => {
       const path = d.path!
       return [
-        { label: '重命名', action: () => fileActions.beginRename(path) },
+        { label: '重命名', action: () => beginRename(path) },
         { separator: true as const },
-        { label: '删除', action: () => { if (confirm(`删除 ${path.split('/').pop()}？`)) void fileActions.deleteFile(path) } },
+        { label: '删除', action: () => { if (confirm(`删除 ${path.split('/').pop()}？`)) void ctx.vault.deleteFile(path) } },
       ]
     })
 
     ctx.contextMenu('directory', (d) => {
       const path = d.path!
       return [
-        { label: '新建文件', action: () => fileActions.beginCreate('file', path + '/') },
-        { label: '新建文件夹', action: () => fileActions.beginCreate('folder', path + '/') },
+        { label: '新建文件', action: () => beginCreate('file', path + '/') },
+        { label: '新建文件夹', action: () => beginCreate('folder', path + '/') },
         { separator: true as const },
-        { label: '删除文件夹', action: () => { if (confirm(`删除文件夹 ${path.split('/').pop()}？`)) void fileActions.deleteFolder(path) } },
+        { label: '删除文件夹', action: () => { if (confirm(`删除文件夹 ${path.split('/').pop()}？`)) void ctx.vault.deleteFolder(path) } },
       ]
     })
   },

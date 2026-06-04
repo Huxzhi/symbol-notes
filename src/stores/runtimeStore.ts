@@ -15,7 +15,6 @@ import type { ParseResult } from '../lib/parseMarkdown'
 const [runtimeStore, setRuntimeStore] = createStore<RuntimeState>({
   fs: null,
   leafInstances: {},
-  fileOp: null,
 })
 
 // ── App actions ───────────────────────────────────────────────────────────────
@@ -210,38 +209,6 @@ export const fileActions = {
       }),
     )
     invalidateStemIndex()
-  },
-
-  beginCreate(mode: 'file' | 'folder', prefix = ''): void {
-    setRuntimeStore('fileOp', { type: mode === 'file' ? 'create-file' : 'create-folder', prefix })
-  },
-
-  beginRename(path: string): void {
-    setRuntimeStore('fileOp', { type: 'rename', path })
-  },
-
-  cancelOp(): void {
-    setRuntimeStore('fileOp', null)
-  },
-
-  async commitCreate(name: string): Promise<void> {
-    const op = runtimeStore.fileOp
-    if (!op || (op.type !== 'create-file' && op.type !== 'create-folder')) return
-    setRuntimeStore('fileOp', null)
-    if (op.type === 'create-file') {
-      const path = await fileActions.createFile(name)
-      if (path) {
-        const { workspaceActions } = await import('./workspaceStore')
-        workspaceActions.openFile(path, { newTab: true, pin: true })
-      }
-    } else {
-      await fileActions.createFolder(name)
-    }
-  },
-
-  async commitRename(path: string, newName: string): Promise<void> {
-    setRuntimeStore('fileOp', null)
-    await fileActions.renameFile(path, newName)
   },
 
   async moveFile(srcPath: string, destDirPath: string | null): Promise<void> {

@@ -2,11 +2,11 @@ import { FolderOpen } from 'lucide-solid'
 import { createEffect, createMemo, createSignal, For, JSX, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 
-import { appActions, fileActions } from '../../stores/runtimeStore'
+import { appActions, fileActions, runtimeStore } from '../../stores/runtimeStore'
 import { workspaceActions } from '../../stores/workspaceStore'
+import { fileOp, beginCreate, cancelOp } from './fileOpStore'
 import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
 import { vaultStore } from '../../stores/vaultStore'
-import { runtimeStore } from '../../stores/runtimeStore'
 import { settingsStore } from '../../stores/settingsStore'
 import { showError, showToast } from '../../stores/toastStore'
 import { getFileViewForPath } from '../../lib/pluginRegistry'
@@ -48,8 +48,8 @@ function FileRow(props: {
   const isCollapsed = () =>
     entry().kind === 'directory' && props.collapsedFolders.includes(entry().path)
   const isRenaming = () =>
-    runtimeStore.fileOp?.type === 'rename' &&
-    (runtimeStore.fileOp as { path: string }).path === entry().path
+    fileOp()?.type === 'rename' &&
+    (fileOp() as { path: string }).path === entry().path
   const isDragTarget = () =>
     entry().kind === 'directory' && props.dragOver() === entry().path
 
@@ -57,12 +57,10 @@ function FileRow(props: {
 
   const confirmRename = async () => {
     const val = renameValue().trim()
-    if (!val) {
-      fileActions.cancelOp()
-      return
-    }
+    if (!val) { cancelOp(); return }
+    cancelOp()
     try {
-      await fileActions.commitRename(entry().path, val)
+      await fileActions.renameFile(entry().path, val)
     } catch (err) {
       showError(err instanceof Error ? err.message : '重命名失败')
     }
@@ -70,7 +68,7 @@ function FileRow(props: {
 
   const onRenameKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') void confirmRename()
-    else if (e.key === 'Escape') fileActions.cancelOp()
+    else if (e.key === 'Escape') cancelOp()
   }
 
   return (
@@ -178,7 +176,7 @@ export function FilesPanel(props: ViewComponentProps) {
   const [dragOver, setDragOver] = createSignal<string | null>(null)
 
   createEffect(() => {
-    const op = runtimeStore.fileOp
+    const op = fileOp()
     if (op?.type === 'rename') {
       const path = (op as { path: string }).path
       const idx = flatRows().findIndex(r => r.entry.path === path)
@@ -284,7 +282,6 @@ export function FilesPanel(props: ViewComponentProps) {
     }
   }
 
-  const fileOp = () => runtimeStore.fileOp
   const isCreating = () =>
     fileOp()?.type === 'create-file' || fileOp()?.type === 'create-folder'
 
@@ -292,16 +289,21 @@ export function FilesPanel(props: ViewComponentProps) {
 
   const confirmCreate = async () => {
     const val = createValue().trim()
-    if (!val) {
-      fileActions.cancelOp()
-      return
+    if (!val) { cancelOp(); return }
+    const op = fileOp()
+    if (!op || (op.type !== 'create-file' && op.type !== 'create-folder')) return
+    cancelOp()
+    if (op.type === 'create-file') {
+      const path = await fileActions.createFile(val)
+      if (path) workspaceActions.openFile(path, { newTab: true, pin: true })
+    } else {
+      await fileActions.createFolder(val)
     }
-    await fileActions.commitCreate(val)
   }
 
   const onCreateKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') void confirmCreate()
-    else if (e.key === 'Escape') fileActions.cancelOp()
+    else if (e.key === 'Escape') cancelOp()
   }
 
   return (
@@ -310,23 +312,23 @@ export function FilesPanel(props: ViewComponentProps) {
         <button
           class="flex items-center gap-1.5 flex-1 px-2.5 py-2 text-left hover:bg-(--bg-hover) transition-colors min-w-0 group"
           onClick={() => void appActions.openVault()}
-          title={runtimeStore.rootHandle ? '切换文件夹' : '打开文件夹'}
+          title={runtimeStore.fs ? '切换文件夹' : '打开文件夹'}
         >
           <FolderOpen size={12} class="shrink-0 text-(--accent) group-hover:text-(--accent-2)" />
           <span class="truncate text-[10px] text-(--accent) font-bold tracking-widest uppercase group-hover:text-(--accent-2)">
-            {runtimeStore.rootHandle?.name ?? '打开文件夹'}
+            {runtimeStore.fs?.name ?? '打开文件夹'}
           </span>
         </button>
-        <Show when={runtimeStore.rootHandle}>
+        <Show when={runtimeStore.fs}>
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors text-[13px]"
             title="新建文件夹"
-            onClick={() => { setCreateValue(''); fileActions.beginCreate('folder') }}
+            onClick={() => { setCreateValue(''); beginCreate('folder') }}
           >⊞</button>
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors"
             title="新建文件"
-            onClick={() => { setCreateValue(''); fileActions.beginCreate('file') }}
+            onClick={() => { setCreateValue(''); beginCreate('file') }}
           >+</button>
         </Show>
       </div>
