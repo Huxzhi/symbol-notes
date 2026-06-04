@@ -2,10 +2,6 @@ import { PenLine } from 'lucide-solid'
 import { definePlugin } from '../../lib/pluginRegistry'
 import type { SettingsTabProps } from '../../lib/pluginRegistry'
 import { loadFromStorage, saveToStorage } from '../../lib/localStorage'
-import { fileActions } from '../../stores/runtimeStore'
-import { vaultStore } from '../../stores/vaultStore'
-import { workspaceActions } from '../../stores/workspaceStore'
-import { writeFile } from '../../services/fileIO'
 import { EMPTY_EXCALIDRAW_MD } from './excalidrawFormat'
 import { ExcalidrawViewer } from './ExcalidrawViewer'
 
@@ -104,27 +100,6 @@ export function updateExcalidrawPluginConfig(patch: Partial<ExcalidrawPluginConf
   saveToStorage('sn-plugin-excalidraw', { ...current, ...patch })
 }
 
-// ── File creation helpers ─────────────────────────────────────────────────────
-
-function getUniqueName(dirPath: string | null): string {
-  const prefix = dirPath ? `${dirPath}/` : ''
-  if (!vaultStore.files[`${prefix}Untitled.excalidraw.md`]) return 'Untitled.excalidraw.md'
-  for (let i = 1; i <= 99; i++) {
-    const name = `Untitled ${i}.excalidraw.md`
-    if (!vaultStore.files[`${prefix}${name}`]) return name
-  }
-  return `Untitled ${Date.now()}.excalidraw.md`
-}
-
-async function createExcalidrawFile(dirPath: string | null): Promise<void> {
-  const name = getUniqueName(dirPath)
-  const fullName = dirPath ? `${dirPath}/${name}` : name
-  const path = await fileActions.createFile(fullName)
-  if (!path) return
-  await writeFile(path, EMPTY_EXCALIDRAW_MD)
-  workspaceActions.openFile(path)
-}
-
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 export const ExcalidrawPlugin = definePlugin({
@@ -133,6 +108,26 @@ export const ExcalidrawPlugin = definePlugin({
   description: 'Excalidraw 绘图编辑器',
   defaultEnabled: true,
   setup(ctx) {
+    function getUniqueName(dirPath: string | null): string {
+      const files = ctx.vault.files()
+      const prefix = dirPath ? `${dirPath}/` : ''
+      if (!files[`${prefix}Untitled.excalidraw.md`]) return 'Untitled.excalidraw.md'
+      for (let i = 1; i <= 99; i++) {
+        const name = `Untitled ${i}.excalidraw.md`
+        if (!files[`${prefix}${name}`]) return name
+      }
+      return `Untitled ${Date.now()}.excalidraw.md`
+    }
+
+    async function createExcalidrawFile(dirPath: string | null): Promise<void> {
+      const name = getUniqueName(dirPath)
+      const fullName = dirPath ? `${dirPath}/${name}` : name
+      const path = await ctx.vault.createFile(fullName)
+      if (!path) return
+      await ctx.vault.saveFile(path, EMPTY_EXCALIDRAW_MD)
+      ctx.workspace.openFile(path)
+    }
+
     ctx.view({
       kind: 'file',
       type: 'excalidraw',

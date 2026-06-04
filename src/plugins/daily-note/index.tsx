@@ -1,7 +1,5 @@
 import { BookOpen } from 'lucide-solid'
 import { definePlugin } from '../../lib/pluginRegistry'
-import { fileActions } from '../../stores/runtimeStore'
-import { vaultStore } from '../../stores/vaultStore'
 import { showModal, closeModal } from '../../stores/modalStore'
 import { todayPath } from './formatDate'
 import type { SettingsTabProps } from '../../lib/pluginRegistry'
@@ -94,13 +92,13 @@ export const DailyNotePlugin = definePlugin({
       const { folder, dateFormat, autoCreate } = ctx.settings.getConfig(DEFAULTS)
       const path = todayPath(folder as string, dateFormat as string)
 
-      if (vaultStore.files[path]) {
+      if (ctx.vault.files()[path]) {
         ctx.workspace.openFile(path)
         return
       }
 
       if (autoCreate) {
-        const created = await fileActions.createFile(path)
+        const created = await ctx.vault.createFile(path)
         if (created) ctx.workspace.openFile(created)
         return
       }
@@ -115,7 +113,7 @@ export const DailyNotePlugin = definePlugin({
             variant: 'primary',
             onClick: () => {
               closeModal()
-              void fileActions.createFile(path).then((created) => {
+              void ctx.vault.createFile(path).then((created) => {
                 if (created) ctx.workspace.openFile(created)
               })
             },
