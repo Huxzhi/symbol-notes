@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { workspaceActions, workspaceStore, activeLayout, layoutList } from '../stores/workspaceStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { runtimeStore } from '../stores/runtimeStore'
+import { leafInstances } from '../stores/workspaceStore'
 import { isIndexing } from '../services/vaultIndexer'
 
 export function StatusBar() {
@@ -10,7 +10,7 @@ export function StatusBar() {
 
   const activeRuntime = () => {
     const { activeLeafId } = activeLayout()
-    return activeLeafId ? runtimeStore.leafInstances[activeLeafId] : null
+    return activeLeafId ? leafInstances[activeLeafId] : null
   }
 
   const stats = createMemo(() => {

@@ -2,7 +2,6 @@ import { createRoot, createEffect } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { loadFromStorage, saveToStorage } from '../lib/localStorage'
 import { getFileViewForPath, getView } from '../lib/pluginRegistry'
-import { setRuntimeStore } from './runtimeStore'
 import {
   mapNode,
   patchLeafViewState,
@@ -21,7 +20,11 @@ import type {
   WorkspaceRoot,
   WorkspaceState,
   WorkspaceTabs,
+  LeafRuntimeState,
 } from './types'
+
+const [leafInstances, setLeafInstances] = createStore<Record<string, LeafRuntimeState>>({})
+export { leafInstances, setLeafInstances }
 
 export const ROOT_TABS_ID = 'root-tabs'
 export const DEFAULT_LAYOUT_ID = 'default'
@@ -214,7 +217,7 @@ export const workspaceActions = {
       })),
     )
     if (activeLayout().activeLeafId === leafId) setLayout('activeLeafId', nextActiveId)
-    setRuntimeStore('leafInstances', produce((s) => { delete s[leafId] }))
+    setLeafInstances(produce((s) => { delete s[leafId] }))
   },
 
   closeOtherLeaves(tabsId: string, keepLeafId: string): void {
@@ -231,7 +234,7 @@ export const workspaceActions = {
       })),
     )
     setLayout('activeLeafId', keepLeafId)
-    setRuntimeStore('leafInstances', produce((s) => { for (const l of toRemove) delete s[l.id] }))
+    setLeafInstances(produce((s) => { for (const l of toRemove) delete s[l.id] }))
   },
 
   closeRightLeaves(tabsId: string, leafId: string): void {
@@ -252,7 +255,7 @@ export const workspaceActions = {
       })),
     )
     if (removedIds.has(currentActiveId)) setLayout('activeLeafId', leafId)
-    setRuntimeStore('leafInstances', produce((s) => { for (const l of toRemove) delete s[l.id] }))
+    setLeafInstances(produce((s) => { for (const l of toRemove) delete s[l.id] }))
   },
 
   activateLeaf(leafId: string): void {
@@ -361,7 +364,7 @@ export const workspaceActions = {
   clearAllLeaves(): void {
     setRoot('main', { type: 'tabs', id: ROOT_TABS_ID, activeLeafId: null, children: [] })
     setLayout('activeLeafId', null)
-    setRuntimeStore('leafInstances', {})
+    setLeafInstances({})
   },
 
   renameLeafPath(oldPath: string, newPath: string): void {

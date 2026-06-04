@@ -1,7 +1,7 @@
 import { createEffect, on, onCleanup, onMount, createMemo } from 'solid-js'
-import { readFile, writeFile } from '../../services/fileIO'
 import { loadFromStorage } from '../../lib/localStorage'
-import { setRuntimeStore, runtimeStore } from '../../stores/runtimeStore'
+import { runtimeStore, fileActions } from '../../stores/runtimeStore'
+import { setLeafInstances } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {
   parseExcalidrawMd,
@@ -50,7 +50,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
   function setDirty(dirty: boolean) {
     localDirty = dirty
     if (props.isActive) {
-      setRuntimeStore('leafInstances', props.leafId, (prev) => ({
+      setLeafInstances(props.leafId, (prev) => ({
         cmView: prev?.cmView ?? null,
         outLinks: prev?.outLinks ?? [],
         headings: prev?.headings ?? [],
@@ -87,7 +87,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
         gridSize: s.gridSize ?? 0,
       })
     }
-    await writeFile(p, serializeExcalidrawMd(data, currentMode), true)
+    await fileActions.saveFile(p, serializeExcalidrawMd(data, currentMode))
     setDirty(false)
   }
 
@@ -113,7 +113,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     let data: ExcalidrawData
     let mode: ExcalidrawMode
     try {
-      const content = await readFile(p)
+      const content = await fileActions.readFile(p)
       const parsed = parseExcalidrawMd(content)
       data = parsed.data
       mode = parsed.mode
@@ -161,11 +161,11 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
     }
   }
 
-  // Wait for rootHandle before first load
+  // Wait for fs adapter before first load
   createEffect(on(
-    () => runtimeStore.rootHandle,
-    async (rootHandle) => {
-      if (!rootHandle || reactRoot) return
+    () => runtimeStore.fs,
+    async (fs) => {
+      if (!fs || reactRoot) return
       const p = filePath()
       if (!p) return
       await loadFile(p)

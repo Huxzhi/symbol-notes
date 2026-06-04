@@ -130,7 +130,6 @@ export interface LeafRuntimeState {
 
 export interface RuntimeState {
   fs: FileSystemAdapter | null
-  leafInstances: Record<string, LeafRuntimeState>
 }
 
 // ── View registry ─────────────────────────────────────────────────────────────

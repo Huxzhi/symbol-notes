@@ -2,9 +2,18 @@ import { createRoot, createEffect, createSignal, onCleanup } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import type { Component, JSX } from 'solid-js'
 import { settingsStore } from '../stores/settingsStore'
-import { workspaceActions, getLeafsByType, activeLayout, activeFilePath, activeSidebarType } from '../stores/workspaceStore'
+import { workspaceActions, getLeafsByType, activeLayout, activeFilePath, activeSidebarType, leafInstances } from '../stores/workspaceStore'
+import { fileActions, runtimeStore } from '../stores/runtimeStore'
+import { vaultStore } from '../stores/vaultStore'
+import { getStemIndex } from '../stores/vaultStore'
+import { resolveLink } from './knowledgeUtils'
 import { loadFromStorage, saveToStorage } from './localStorage'
-import type { ViewComponentProps } from '../stores/types'
+import type { ViewComponentProps, FileMeta } from '../stores/types'
+export type { ViewComponentProps }
+import type { OutLink } from './cm6/outLinksField'
+import type { Heading } from './cm6/headingsField'
+
+export type { OutLink, Heading }
 
 // ── View Registry ─────────────────────────────────────────────────────────────
 
@@ -156,12 +165,35 @@ export function _resetContextMenuForTest(): void {
   _contextMenuRegistry.clear()
 }
 
+// ── Vault Service ─────────────────────────────────────────────────────────────
+
+export interface VaultService {
+  /** Whether a vault is open and ready. Reactive — use in createMemo/createEffect. */
+  ready(): boolean
+  /** All vault files and directories. Reactive. */
+  files(): Record<string, FileMeta>
+  /** Files that link to the given path. Reactive. */
+  backlinks(path: string): string[]
+  /** Resolve a wiki link target to an absolute vault path, or null if unresolved. */
+  resolveLink(target: string): string | null
+
+  readFile(path: string): Promise<string>
+  saveFile(path: string, content: string): Promise<void>
+  createFile(name: string): Promise<string | null>
+  createFolder(name: string): Promise<void>
+  deleteFile(path: string): Promise<void>
+  deleteFolder(path: string): Promise<void>
+  renameFile(path: string, newName: string): Promise<void>
+  moveEntry(src: string, dest: string | null): Promise<void>
+}
+
 // ── Plugin Lifecycle ──────────────────────────────────────────────────────────
 
 export interface PluginContext {
   view(def: ViewDef): void
   ribbon(def: RibbonItemDef): void
   contextMenu(type: string, factory: ContextMenuFactory): void
+  vault: VaultService
   workspace: {
     openFile(path: string, opts?: { area?: 'left' | 'main' | 'right'; newTab?: boolean }): void
     openPage(type: string): void
@@ -171,6 +203,10 @@ export interface PluginContext {
     activeFilePath(): string | null
     activeSidebarType(side: 'left' | 'right'): string | null
     switchSidebarPanel(side: 'left' | 'right', type: string): void
+    /** Out-links parsed from the active editor. Reactive. Empty when no editor is open. */
+    activeOutLinks(): OutLink[]
+    /** Headings parsed from the active editor. Reactive. Empty when no editor is open. */
+    activeHeadings(): Heading[]
   }
   settings: {
     tab(def: SettingsTabInput): void
@@ -223,6 +259,33 @@ function loadPlugin(def: PluginDef): () => void {
         registerContextMenu(type, factory)
         onCleanup(() => unregisterContextMenu(type))
       },
+      vault: {
+        ready:        ()           => runtimeStore.fs !== null,
+        files:        ()           => vaultStore.files,
+        backlinks:    (path)       => {
+          const f = vaultStore.files[path]
+          const aliases = f?.aliases ?? []
+          const keys = [path, ...aliases.map(a => `${a}.md`)]
+          const seen = new Set<string>()
+          const result: string[] = []
+          for (const key of keys)
+            for (const bl of vaultStore.backlinkMap[key] ?? [])
+              if (!seen.has(bl)) { seen.add(bl); result.push(bl) }
+          return result
+        },
+        resolveLink:  (target)     => {
+          const withExt = target.endsWith('.md') ? target : `${target}.md`
+          return resolveLink(withExt, getStemIndex(), vaultStore.files)
+        },
+        readFile:     (path)       => fileActions.readFile(path),
+        saveFile:     (path, c)    => fileActions.saveFile(path, c),
+        createFile:   (name)       => fileActions.createFile(name),
+        createFolder: (name)       => fileActions.createFolder(name),
+        deleteFile:   (path)       => fileActions.deleteFile(path),
+        deleteFolder: (path)       => fileActions.deleteFolder(path),
+        renameFile:   (path, name) => fileActions.renameFile(path, name),
+        moveEntry:    (src, dest)  => fileActions.moveEntry(src, dest),
+      },
       workspace: {
         openFile:           (path, opts) => workspaceActions.openFile(path, opts),
         openPage:           (type)       => workspaceActions.openPage(type),
@@ -232,6 +295,14 @@ function loadPlugin(def: PluginDef): () => void {
         activeFilePath:     () => activeFilePath(),
         activeSidebarType:  (side) => activeSidebarType(side),
         switchSidebarPanel: (side, type) => workspaceActions.switchSidebarPanel(side, type),
+        activeOutLinks: () => {
+          const id = activeLayout().activeLeafId
+          return id ? (leafInstances[id]?.outLinks ?? []) : []
+        },
+        activeHeadings: () => {
+          const id = activeLayout().activeLeafId
+          return id ? (leafInstances[id]?.headings ?? []) : []
+        },
       },
       settings: {
         tab(tabDef) {

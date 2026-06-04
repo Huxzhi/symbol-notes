@@ -15,7 +15,7 @@ import {
 } from 'solid-js'
 import { fileActions } from '../../stores/runtimeStore'
 import { showConflict } from '../../stores/conflictStore'
-import { vaultActions, vaultStore, setVaultStore } from '../../stores/vaultStore'
+import { vaultActions, vaultStore } from '../../stores/vaultStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
 import { frontmatterField } from '../../lib/cm6/frontmatterField'
@@ -30,12 +30,13 @@ import {
   setFrontmatterField,
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/cm6/wikiLinkParser'
-import { extractDateFromName, buildStemIndex, resolveLink } from '../../lib/knowledgeUtils'
-import { workspaceActions } from '../../stores/workspaceStore'
+import { extractDateFromName, resolveLink } from '../../lib/knowledgeUtils'
+import { getStemIndex } from '../../stores/vaultStore'
+import { workspaceActions, setLeafInstances } from '../../stores/workspaceStore'
 import { syntaxTree } from '@codemirror/language'
 import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileIO'
 import { settingsStore } from '../../stores/settingsStore'
-import { runtimeStore, setRuntimeStore } from '../../stores/runtimeStore'
+import { runtimeStore } from '../../stores/runtimeStore'
 import type { ViewComponentProps } from '../../stores/types'
 
 async function loadFileContent(path: string): Promise<string> {
@@ -104,7 +105,7 @@ export function EditorViewer(props: ViewComponentProps) {
       headings: any[]
     }>,
   ) {
-    setRuntimeStore('leafInstances', props.leafId, (prev) => ({
+    setLeafInstances(props.leafId, (prev) => ({
       ...(prev ?? { cmView: null, isDirty: false, outLinks: [], headings: [] }),
       ...patch,
     }))
@@ -184,7 +185,7 @@ export function EditorViewer(props: ViewComponentProps) {
 
     const clean = (targetText as string).split('#')[0].trim()
     const withExt = clean.endsWith('.md') ? clean : `${clean}.md`
-    const stemIndex = buildStemIndex(vaultStore.files)
+    const stemIndex = getStemIndex()
     const resolved = resolveLink(withExt, stemIndex, vaultStore.files)
     if (!resolved) return false
 
@@ -254,18 +255,15 @@ export function EditorViewer(props: ViewComponentProps) {
         content = newContent
       }
     }
-    await writeFile(p, content)
-    const newMtime = await getFileMtime(p)
-    setVaultStore('files', p, 'mtime', newMtime)
-    localDirty = false
-    if (props.isActive) setLeafRuntime({ isDirty: false })
     const outLinks = view.state
       .field(outLinksField)
       .filter((l) => l.type === 'wiki')
       .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
     const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
     const tasks = view.state.field(tasksField)
-    await vaultActions.reindexFile(p, content, { outLinks, inlineTags, tasks }, true)
+    await fileActions.saveFile(p, content, { outLinks, inlineTags, tasks })
+    localDirty = false
+    if (props.isActive) setLeafRuntime({ isDirty: false })
   }
 
   async function doReload(p: string): Promise<void> {
@@ -286,9 +284,9 @@ export function EditorViewer(props: ViewComponentProps) {
   }
 
   createEffect(on(
-    () => runtimeStore.rootHandle,
-    async (rootHandle) => {
-      if (!rootHandle || view) return
+    () => runtimeStore.fs,
+    async (fs) => {
+      if (!fs || view) return
       const p = filePath()
       if (!p) return
       const doc = await loadFileContent(p)

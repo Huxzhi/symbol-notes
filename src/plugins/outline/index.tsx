@@ -1,13 +1,12 @@
 import { EditorView } from '@codemirror/view'
 import { createMemo, For, Show } from 'solid-js'
-import { activeLayout } from '../../stores/workspaceStore'
-import { runtimeStore } from '../../stores/runtimeStore'
+import { activeLayout, leafInstances } from '../../stores/workspaceStore'
 import { definePlugin } from '../../lib/pluginRegistry'
 
 function OutlinePanel() {
   const activeLeafRuntime = () => {
     const { activeLeafId } = activeLayout()
-    return activeLeafId ? runtimeStore.leafInstances[activeLeafId] : null
+    return activeLeafId ? leafInstances[activeLeafId] : null
   }
 
   const outline = createMemo(() => activeLeafRuntime()?.headings ?? [])

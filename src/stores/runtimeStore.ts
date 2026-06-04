@@ -14,7 +14,6 @@ import type { ParseResult } from '../lib/parseMarkdown'
 
 const [runtimeStore, setRuntimeStore] = createStore<RuntimeState>({
   fs: null,
-  leafInstances: {},
 })
 
 // ── App actions ───────────────────────────────────────────────────────────────

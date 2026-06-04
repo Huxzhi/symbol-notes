@@ -4,7 +4,7 @@ import { workspaceActions } from '../../stores/workspaceStore'
 import { getView } from '../../lib/pluginRegistry'
 import { dragState, setDragState, isDraggingMainTab } from '../../lib/tabDragState'
 import type { WorkspaceLeaf, WorkspaceTabs } from '../../stores/types'
-import { runtimeStore } from '../../stores/runtimeStore'
+import { leafInstances } from '../../stores/workspaceStore'
 import { WorkspaceLeafView } from './WorkspaceLeafView'
 
 function getTabLabel(leaf: WorkspaceLeaf): string {
@@ -131,7 +131,7 @@ export function WorkspaceTabsView(props: {
               const isDraggable = () => !isPanelLeaf() || props.area !== 'main'
               const isBeingDragged = () => dragState()?.leafId === leaf.id
               const showCursorBefore = () => tabBarOver() && insertBeforeId() === leaf.id
-              const isDirty = () => runtimeStore.leafInstances[leaf.id]?.isDirty ?? false
+              const isDirty = () => leafInstances[leaf.id]?.isDirty ?? false
 
               return (
                 <>
