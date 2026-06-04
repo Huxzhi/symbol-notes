@@ -1,5 +1,4 @@
 import type { EditorView } from '@codemirror/view'
-import type { FileSystemAdapter } from '../services/fs/types'
 import type { OutLink } from '../lib/cm6/outLinksField'
 import type { Heading } from '../lib/cm6/headingsField'
 
@@ -128,9 +127,6 @@ export interface LeafRuntimeState {
   headings: Heading[]
 }
 
-export interface RuntimeState {
-  fs: FileSystemAdapter | null
-}
 
 // ── View registry ─────────────────────────────────────────────────────────────
 

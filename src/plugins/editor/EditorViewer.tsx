@@ -36,7 +36,7 @@ import { workspaceActions, setLeafInstances } from '../../stores/workspaceStore'
 import { syntaxTree } from '@codemirror/language'
 import { readFile, writeFile, getFileMtime, invalidateFile } from '../../services/fileIO'
 import { settingsStore } from '../../stores/settingsStore'
-import { runtimeStore } from '../../stores/runtimeStore'
+import { vaultFs } from '../../stores/vaultStore'
 import type { ViewComponentProps } from '../../stores/types'
 
 async function loadFileContent(path: string): Promise<string> {
@@ -284,7 +284,7 @@ export function EditorViewer(props: ViewComponentProps) {
   }
 
   createEffect(on(
-    () => runtimeStore.fs,
+    () => vaultFs(),
     async (fs) => {
       if (!fs || view) return
       const p = filePath()

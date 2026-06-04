@@ -1,4 +1,10 @@
+import { createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
+import type { FileSystemAdapter } from '../services/fs/types'
+
+const [_vaultFs, setVaultFs] = createSignal<FileSystemAdapter | null>(null)
+export const vaultFs = _vaultFs
+export { setVaultFs }
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { parseMarkdown } from '../lib/parseMarkdown'
 import type { ParseResult } from '../lib/parseMarkdown'
@@ -18,11 +24,22 @@ const [vaultStore, setVaultStore] = createStore<VaultState>({
 
 type ContentFields = Pick<FileMeta, 'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'dated' | 'tasks'>
 
+let _stemIndex: Map<string, string[]> | null = null
+
+export function invalidateStemIndex(): void {
+  _stemIndex = null
+}
+
+export function getStemIndex(): Map<string, string[]> {
+  if (!_stemIndex) _stemIndex = buildStemIndex(vaultStore.files)
+  return _stemIndex
+}
+
 function applyContent(path: string, hash: string, content: ContentFields): void {
   const prev = vaultStore.files[path]
   setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...content }))
 
-  const stemIndex = buildStemIndex(vaultStore.files)
+  const stemIndex = getStemIndex()
 
   const prevLinks = new Set(prev?.outLinks ?? [])
   const nextLinks = new Set(content.outLinks)
@@ -122,7 +139,7 @@ export const vaultActions = {
     }
 
     // Remove this file's own outLinks from backlinkMap/unresolvedMap
-    const stemIndex = buildStemIndex(vaultStore.files)
+    const stemIndex = getStemIndex()
     for (const t of file.outLinks) {
       const resolved = resolveLink(t, stemIndex, vaultStore.files)
       if (resolved)
@@ -135,6 +152,7 @@ export const vaultActions = {
       setVaultStore('tagMap', t, (list: string[]) => list?.filter(p => p !== path) ?? [])
     setVaultStore('taskMap', path, undefined as unknown as TaskItem[])
     setVaultStore('files', path, undefined as unknown as FileMeta)
+    invalidateStemIndex()
   },
 }
 

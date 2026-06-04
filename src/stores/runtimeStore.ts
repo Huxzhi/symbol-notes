@@ -1,5 +1,5 @@
-import { createStore, produce } from 'solid-js/store'
-import { vaultActions, vaultStore, setVaultStore, invalidateStemIndex } from './vaultStore'
+import { produce } from 'solid-js/store'
+import { vaultActions, vaultStore, setVaultStore, invalidateStemIndex, setVaultFs } from './vaultStore'
 import {
   initFileIO, isReady,
   readFile, writeFile, getFileMtime,
@@ -9,12 +9,8 @@ import {
 import { deleteFileStatEntry } from '../services/indexStorage'
 import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
 import { LocalAdapter } from '../services/fs/LocalAdapter'
-import type { FileMeta, RuntimeState } from './types'
+import type { FileMeta } from './types'
 import type { ParseResult } from '../lib/parseMarkdown'
-
-const [runtimeStore, setRuntimeStore] = createStore<RuntimeState>({
-  fs: null,
-})
 
 // ── App actions ───────────────────────────────────────────────────────────────
 
@@ -23,7 +19,7 @@ export const appActions = {
     clearEmbedUrlCache()
     const adapter = await LocalAdapter.open()
     initFileIO(adapter)
-    setRuntimeStore('fs', adapter)
+    setVaultFs(adapter)
     const { workspaceActions } = await import('./workspaceStore')
     workspaceActions.clearAllLeaves()
     const { scanAndIndex } = await import('../services/vaultIndexer')
@@ -34,7 +30,7 @@ export const appActions = {
     const adapter = await LocalAdapter.restore()
     if (!adapter) return
     initFileIO(adapter)
-    setRuntimeStore('fs', adapter)
+    setVaultFs(adapter)
     const { scanAndIndex } = await import('../services/vaultIndexer')
     await scanAndIndex()
   },
@@ -311,4 +307,3 @@ export const fileActions = {
   },
 }
 
-export { runtimeStore, setRuntimeStore }

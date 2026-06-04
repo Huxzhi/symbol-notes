@@ -12,7 +12,8 @@ import {
 } from '@codemirror/view'
 import { GFM } from '@lezer/markdown'
 import { vaultStore } from '../../stores/vaultStore'
-import { runtimeStore } from '../../stores/runtimeStore'
+import { vaultFs } from '../../stores/vaultStore'
+import { getFile as fsGetFile } from '../../services/fileIO'
 import { darkHighlightStyle, darkTheme } from './cmTheme'
 import { livePreviewExtension } from './livePreviewExtension'
 import { parseFrontmatter } from '../parseFrontmatter'
@@ -51,25 +52,10 @@ export function clearEmbedUrlCache() {
 
 // ── File loading ──────────────────────────────────────────────────────────────
 
-async function getFile(
-  path: string,
-  root: FileSystemDirectoryHandle,
-): Promise<File> {
-  const parts = path.split('/')
-  let dir: FileSystemDirectoryHandle = root
-  for (let i = 0; i < parts.length - 1; i++) {
-    dir = await dir.getDirectoryHandle(parts[i])
-  }
-  return (await dir.getFileHandle(parts[parts.length - 1])).getFile()
-}
-
-async function getImageDataUrl(
-  path: string,
-  root: FileSystemDirectoryHandle,
-): Promise<string> {
+async function getImageDataUrl(path: string): Promise<string> {
   const cached = imageUrlCache.get(path)
   if (cached) return cached
-  const file = await getFile(path, root)
+  const file = await fsGetFile(path)
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as string)
@@ -112,7 +98,6 @@ class EmbedWidget extends WidgetType {
   }
 
   toDOM() {
-    const root = runtimeStore.rootHandle!
     const el = document.createElement('div')
     el.className = 'cm-embed'
 
@@ -125,7 +110,7 @@ class EmbedWidget extends WidgetType {
       img.className = 'cm-embed-img'
       img.alt = this.target
       el.appendChild(img)
-      getImageDataUrl(this.resolved, root)
+      getImageDataUrl(this.resolved)
         .then((url) => { img.src = url })
         .catch(() => { el.textContent = `[图片加载失败: ${this.target}]` })
     } else {
@@ -139,7 +124,7 @@ class EmbedWidget extends WidgetType {
       editorHost.className = 'cm-embed-md-body'
       el.appendChild(editorHost)
 
-      getFile(this.resolved, root)
+      fsGetFile(this.resolved)
         .then(async (f) => {
           const { body } = parseFrontmatter(await f.text())
           const state = EditorState.create({
@@ -181,8 +166,6 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { state } = view
   const sel = state.selection.main
-  const root = runtimeStore.rootHandle
-
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(state).iterate({
       from,
@@ -201,8 +184,7 @@ function buildEmbedDecos(view: EditorView): DecorationSet {
         }
         if (!target) return false
 
-        // Skip decoration if tree not ready or file not found — raw text shows instead
-        if (!root) return false
+        if (!vaultFs()) return false
         const resolved = resolveEmbedTarget(target)
         if (!resolved) return false
 

@@ -5,22 +5,9 @@ import {
   onCleanup,
   Switch,
 } from 'solid-js'
-import { runtimeStore } from '../../stores/runtimeStore'
+import { vaultFs } from '../../stores/vaultStore'
+import { getFile } from '../../services/fileIO'
 import type { ViewComponentProps } from '../../stores/types'
-
-async function getObjectUrl(
-  path: string,
-  root: FileSystemDirectoryHandle,
-): Promise<string> {
-  const parts = path.split('/')
-  let dir: FileSystemDirectoryHandle = root
-  for (let i = 0; i < parts.length - 1; i++) {
-    dir = await dir.getDirectoryHandle(parts[i])
-  }
-  const handle = await dir.getFileHandle(parts[parts.length - 1])
-  const file = await handle.getFile()
-  return URL.createObjectURL(file)
-}
 
 export function ImageViewer(props: ViewComponentProps) {
   const path = () => props.viewState.file as string | undefined
@@ -28,10 +15,12 @@ export function ImageViewer(props: ViewComponentProps) {
   const [objectUrl] = createResource(
     () => {
       const p = path()
-      const root = runtimeStore.rootHandle
-      return p && root ? { path: p, root } : null
+      return p && vaultFs() ? p : null
     },
-    ({ path, root }) => getObjectUrl(path, root),
+    async (p) => {
+      const file = await getFile(p)
+      return URL.createObjectURL(file)
+    },
   )
 
   createEffect(() => {

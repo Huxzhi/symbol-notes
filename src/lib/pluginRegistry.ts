@@ -3,7 +3,8 @@ import { createStore } from 'solid-js/store'
 import type { Component, JSX } from 'solid-js'
 import { settingsStore } from '../stores/settingsStore'
 import { workspaceActions, getLeafsByType, activeLayout, activeFilePath, activeSidebarType, leafInstances } from '../stores/workspaceStore'
-import { fileActions, runtimeStore } from '../stores/runtimeStore'
+import { fileActions } from '../stores/runtimeStore'
+import { vaultFs } from '../stores/vaultStore'
 import { vaultStore } from '../stores/vaultStore'
 import { getStemIndex } from '../stores/vaultStore'
 import { resolveLink } from './knowledgeUtils'
@@ -260,7 +261,7 @@ function loadPlugin(def: PluginDef): () => void {
         onCleanup(() => unregisterContextMenu(type))
       },
       vault: {
-        ready:        ()           => runtimeStore.fs !== null,
+        ready:        ()           => vaultFs() !== null,
         files:        ()           => vaultStore.files,
         backlinks:    (path)       => {
           const f = vaultStore.files[path]

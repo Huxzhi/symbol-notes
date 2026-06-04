@@ -1,6 +1,7 @@
 import { createEffect, on, onCleanup, onMount, createMemo } from 'solid-js'
 import { loadFromStorage } from '../../lib/localStorage'
-import { runtimeStore, fileActions } from '../../stores/runtimeStore'
+import { fileActions } from '../../stores/runtimeStore'
+import { vaultFs } from '../../stores/vaultStore'
 import { setLeafInstances } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {
@@ -163,7 +164,7 @@ export function ExcalidrawViewer(props: ViewComponentProps) {
 
   // Wait for fs adapter before first load
   createEffect(on(
-    () => runtimeStore.fs,
+    () => vaultFs(),
     async (fs) => {
       if (!fs || reactRoot) return
       const p = filePath()
