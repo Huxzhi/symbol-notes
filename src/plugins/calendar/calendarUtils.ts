@@ -13,6 +13,28 @@ export const WEEKDAYS_LONG = [
   '周日',
 ]
 
+// ── Multi-month row model ─────────────────────────────────────────────────────
+
+export interface DayRef {
+  year: number
+  month: number
+  day: number
+  dayStr: string
+}
+
+export interface MonthHeaderRow {
+  type: 'month-header'
+  year: number
+  month: number
+}
+
+export interface WeekRow {
+  type: 'week'
+  cells: (DayRef | null)[]
+}
+
+export type CalRow = MonthHeaderRow | WeekRow
+
 export function toIsoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
@@ -41,6 +63,30 @@ function stemDate(path: string): string | null {
   m = RE_DATE_COMPACT.exec(stem)
   if (m) return `${m[1]}-${m[2]}-${m[3]}`
   return null
+}
+
+export function buildMonthRows(year: number, month: number): CalRow[] {
+  const grid = buildCalendarGrid(year, month)
+  const header: MonthHeaderRow = { type: 'month-header', year, month }
+  const weeks: WeekRow[] = []
+  for (let i = 0; i < grid.length; i += 7) {
+    const cells: (DayRef | null)[] = []
+    for (let j = 0; j < 7; j++) {
+      const d = grid[i + j]
+      cells.push(d === null ? null : { year, month, day: d, dayStr: toIsoDate(year, month, d) })
+    }
+    weeks.push({ type: 'week', cells })
+  }
+  return [header, ...weeks]
+}
+
+export function buildRangeRows(startYear: number, startMonth: number, count: number): CalRow[] {
+  const rows: CalRow[] = []
+  for (let i = 0; i < count; i++) {
+    const total = startYear * 12 + startMonth + i
+    rows.push(...buildMonthRows(Math.floor(total / 12), total % 12))
+  }
+  return rows
 }
 
 export function buildTaskDayData(taskMap: Record<string, TaskItem[]>): Record<string, Task[]> {
