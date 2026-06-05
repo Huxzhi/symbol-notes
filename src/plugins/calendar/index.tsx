@@ -75,7 +75,13 @@ export const CalendarPlugin = definePlugin({
       type: 'calendar',
       getDisplayText: () => '日历',
       getIcon: () => <CalendarRange size={11} />,
-      component: CalendarViewer,
+      component: (viewProps) => (
+        <CalendarViewer
+          {...viewProps}
+          getConfig={(d) => ctx.settings.getConfig(d)}
+          setConfig={(p) => ctx.settings.setConfig(p)}
+        />
+      ),
     })
 
     ctx.ribbon({
