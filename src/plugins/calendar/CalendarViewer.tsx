@@ -1,109 +1,327 @@
-import { batch, createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, onMount } from 'solid-js'
+import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
-import type { ViewComponentProps } from '../../stores/types'
 import { workspaceActions } from '../../stores/workspaceStore'
+import type { ViewComponentProps } from '../../stores/types'
 import {
-  buildCalendarGrid,
   buildDayData,
   buildTaskDayData,
-  toIsoDate,
+  buildRangeRows,
   WEEKDAYS_LONG,
+  type CalRow,
+  type MonthHeaderRow,
+  type WeekRow,
+  type Task,
 } from './calendarUtils'
 
-export function CalendarViewer(_props: ViewComponentProps) {
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface CalendarViewerProps extends ViewComponentProps {
+  getConfig: <T extends Record<string, unknown>>(defaults: T) => T
+  setConfig: (patch: Record<string, unknown>) => void
+}
+
+const FILTER_DEFAULTS = {
+  dated: true,
+  created: true,
+  updated: true,
+  pending: true,
+  done: true,
+}
+type FilterKey = keyof typeof FILTER_DEFAULTS
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function normalizeYM(year: number, month: number) {
+  const total = year * 12 + month
+  return { year: Math.floor(total / 12), month: ((total % 12) + 12) % 12 }
+}
+
+function estimateRowsHeight(rows: CalRow[]): number {
+  return rows.reduce((acc, r) => acc + (r.type === 'month-header' ? 32 : 80), 0)
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function FilterChip(props: {
+  label: string
+  colorClass: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      class="flex items-center gap-1.5 text-[10px] select-none cursor-pointer transition-opacity"
+      style={{ opacity: props.active ? '1' : '0.35' }}
+      onClick={props.onClick}
+      title={`${props.active ? '隐藏' : '显示'}${props.label}`}
+    >
+      <span class={`w-2 h-2 rounded-sm shrink-0 ${props.colorClass}`} />
+      <span class="text-[var(--text-3)]">{props.label}</span>
+    </button>
+  )
+}
+
+function MonthHeader(props: { year: number; month: number }) {
+  return (
+    <div class="px-4 py-1.5 text-[13px] font-semibold text-[var(--text)] bg-[var(--bg-surface)] border-b border-(--border)">
+      {props.year}年{props.month + 1}月
+    </div>
+  )
+}
+
+function WeekRowComp(props: {
+  row: WeekRow
+  dayData: () => ReturnType<typeof buildDayData>
+  taskDayData: () => Record<string, Task[]>
+  filter: () => typeof FILTER_DEFAULTS
+  todayStr: string
+  onOpenFile: (path: string) => void
+}) {
+  return (
+    <div class="grid grid-cols-7 border-b border-(--border)">
+      <For each={props.row.cells}>
+        {(cell, i) => {
+          if (cell === null) {
+            return (
+              <div
+                class={`min-h-[80px] bg-[var(--bg-surface)]${i() < 6 ? ' border-r border-(--border)' : ''}`}
+              />
+            )
+          }
+          const { dayStr, day } = cell
+          const isToday = dayStr === props.todayStr
+          const dated = () =>
+            props.filter().dated ? (props.dayData().dated[dayStr] ?? []) : []
+          const created = () =>
+            props.filter().created ? (props.dayData().created[dayStr] ?? []) : []
+          const updated = () =>
+            props.filter().updated ? (props.dayData().updated[dayStr] ?? []) : []
+          const allTasks = () => props.taskDayData()[dayStr] ?? []
+          const pending = () =>
+            props.filter().pending ? allTasks().filter((t) => !t.checked) : []
+          const done = () =>
+            props.filter().done ? allTasks().filter((t) => t.checked) : []
+
+          return (
+            <div
+              class={`p-1.5 flex flex-col min-h-[80px]${i() < 6 ? ' border-r border-(--border)' : ''}${isToday ? ' bg-(--accent-bg)' : ' bg-[var(--bg-base)]'}`}
+            >
+              <div
+                class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none${isToday ? ' bg-(--accent) text-white' : ' text-[var(--text-3)]'}`}
+              >
+                {day}
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <For each={dated()}>
+                  {(path) => (
+                    <button
+                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
+                      onClick={() => props.onOpenFile(path)}
+                      title={path}
+                    >
+                      {path.split('/').pop()?.replace(/\.md$/, '')}
+                    </button>
+                  )}
+                </For>
+                <For each={created()}>
+                  {(path) => (
+                    <button
+                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
+                      onClick={() => props.onOpenFile(path)}
+                      title={path}
+                    >
+                      {path.split('/').pop()?.replace(/\.md$/, '')}
+                    </button>
+                  )}
+                </For>
+                <For each={updated()}>
+                  {(path) => (
+                    <button
+                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
+                      onClick={() => props.onOpenFile(path)}
+                      title={path}
+                    >
+                      {path.split('/').pop()?.replace(/\.md$/, '')}
+                    </button>
+                  )}
+                </For>
+                <For each={pending()}>
+                  {(task) => (
+                    <button
+                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate text-[var(--tag)] hover:opacity-80"
+                      style={{
+                        'background-color':
+                          'color-mix(in srgb, var(--tag) 18%, transparent)',
+                      }}
+                      onClick={() => props.onOpenFile(task.path)}
+                      title={task.path}
+                    >
+                      ☐ {task.cleanText}
+                    </button>
+                  )}
+                </For>
+                <For each={done()}>
+                  {(task) => (
+                    <button
+                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through w-full cursor-pointer transition-colors truncate"
+                      onClick={() => props.onOpenFile(task.path)}
+                      title={task.path}
+                    >
+                      ☑ {task.cleanText}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          )
+        }}
+      </For>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function CalendarViewer(props: CalendarViewerProps) {
   const now = new Date()
-  const todayStr = toIsoDate(now.getFullYear(), now.getMonth(), now.getDate())
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
-  const [viewYear, setViewYear] = createSignal(now.getFullYear())
-  const [viewMonth, setViewMonth] = createSignal(now.getMonth())
+  // Filter state — persisted via plugin config
+  const filter = () => {
+    const cfg = props.getConfig({ filter: FILTER_DEFAULTS })
+    return { ...FILTER_DEFAULTS, ...(cfg.filter as Partial<typeof FILTER_DEFAULTS>) }
+  }
+  const toggleFilter = (key: FilterKey) =>
+    props.setConfig({ filter: { ...filter(), [key]: !filter()[key] } })
 
+  // Vault data
   const dayData = createMemo(() => buildDayData(vaultStore.files))
   const taskDayData = createMemo(() => buildTaskDayData(vaultStore.taskMap))
-  const calendarGrid = createMemo(() =>
-    buildCalendarGrid(viewYear(), viewMonth()),
+
+  // Row list — mutable head/tail month tracking (not reactive, just boundary markers)
+  let head = normalizeYM(now.getFullYear(), now.getMonth() - 3)
+  let tail = normalizeYM(now.getFullYear(), now.getMonth() + 3)
+
+  const [rows, setRows] = createSignal<CalRow[]>(
+    buildRangeRows(head.year, head.month, 7),
   )
 
-  const prevMonth = () =>
-    batch(() => {
-      if (viewMonth() === 0) {
-        setViewYear((y) => y - 1)
-        setViewMonth(11)
-      } else setViewMonth((m) => m - 1)
+  // Virtual list
+  let scrollEl!: HTMLDivElement
+  let pendingLoad = false
+
+  const virtualizer = createVirtualizer({
+    get count() {
+      return rows().length
+    },
+    getScrollElement: () => scrollEl,
+    estimateSize: (i) => (rows()[i]?.type === 'month-header' ? 32 : 80),
+    overscan: 3,
+  })
+
+  // Infinite scroll actions
+  const appendMonths = (n: number) => {
+    const start = normalizeYM(tail.year, tail.month + 1)
+    const newRows = buildRangeRows(start.year, start.month, n)
+    tail = normalizeYM(tail.year, tail.month + n)
+    setRows((prev) => [...prev, ...newRows])
+  }
+
+  const prependMonths = (n: number) => {
+    const start = normalizeYM(head.year, head.month - n)
+    const newRows = buildRangeRows(start.year, start.month, n)
+    head = normalizeYM(head.year, head.month - n)
+    const estimatedHeight = estimateRowsHeight(newRows)
+    setRows((prev) => [...newRows, ...prev])
+    // Compensate scroll after reactive updates flush to prevent viewport jump
+    queueMicrotask(() => {
+      scrollEl.scrollTop += estimatedHeight
     })
-  const nextMonth = () =>
-    batch(() => {
-      if (viewMonth() === 11) {
-        setViewYear((y) => y + 1)
-        setViewMonth(0)
-      } else setViewMonth((m) => m + 1)
-    })
-  const goToday = () =>
-    batch(() => {
-      setViewYear(now.getFullYear())
-      setViewMonth(now.getMonth())
-    })
+  }
+
+  const handleScroll = () => {
+    if (pendingLoad) return
+    const items = virtualizer.getVirtualItems()
+    if (items.length === 0) return
+    if (items[0].index < 5) {
+      pendingLoad = true
+      prependMonths(3)
+      requestAnimationFrame(() => {
+        pendingLoad = false
+      })
+    } else if (items[items.length - 1].index > rows().length - 5) {
+      pendingLoad = true
+      appendMonths(3)
+      requestAnimationFrame(() => {
+        pendingLoad = false
+      })
+    }
+  }
+
+  // Scroll to today's month on mount and on button click
+  const scrollToToday = () => {
+    const idx = rows().findIndex(
+      (r) =>
+        r.type === 'month-header' &&
+        r.year === now.getFullYear() &&
+        r.month === now.getMonth(),
+    )
+    if (idx >= 0) virtualizer.scrollToIndex(idx, { align: 'start' })
+  }
+
+  onMount(() => scrollToToday())
 
   return (
     <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]">
       {/* Toolbar */}
-      <div class="flex items-center gap-2 px-4 py-2 border-b border-(--border)] shrink-0">
+      <div class="flex items-center gap-3 px-4 py-2 border-b border-(--border) shrink-0 flex-wrap">
         <button
-          class="px-2.5 py-1 text-[11px] text-[var(--text-3)] hover:text-[var(--text)] hover:bg-(--bg-hover) rounded transition-colors border border-(--border)]"
-          onClick={goToday}
+          class="px-2.5 py-1 text-[11px] text-[var(--text-3)] hover:text-[var(--text)] hover:bg-(--bg-hover) rounded transition-colors border border-(--border)"
+          onClick={scrollToToday}
         >
           今天
         </button>
-        <button
-          class="w-7 h-7 flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text)] hover:bg-(--bg-hover) rounded transition-colors text-[12px]"
-          onClick={prevMonth}
-        >
-          ◀
-        </button>
-        <button
-          class="w-7 h-7 flex items-center justify-center text-[var(--text-3)] hover:text-[var(--text)] hover:bg-(--bg-hover) rounded transition-colors text-[12px]"
-          onClick={nextMonth}
-        >
-          ▶
-        </button>
-        <h2 class="text-[15px] font-semibold text-[var(--text)] ml-1 select-none">
-          {viewYear()}年{viewMonth() + 1}月
-        </h2>
-        <div class="flex-1" />
-        <div class="flex items-center gap-4 text-[10px] text-[var(--text-4)]">
-          <span class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-sm bg-(--bg-hover)" />
-            日记
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-sm bg-(--accent)" />
-            创建
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-sm bg-[var(--link-2)]" />
-            修改
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span
-              class="w-2 h-2 rounded-sm bg-[var(--tag)]"
-              style="opacity:0.25"
-            />
-            待办
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-sm bg-[var(--text-4)]" />
-            已完成
-          </span>
+        <div class="flex items-center gap-3 flex-wrap">
+          <FilterChip
+            label="日记"
+            colorClass="bg-(--bg-active)"
+            active={filter().dated}
+            onClick={() => toggleFilter('dated')}
+          />
+          <FilterChip
+            label="新建"
+            colorClass="bg-(--accent)"
+            active={filter().created}
+            onClick={() => toggleFilter('created')}
+          />
+          <FilterChip
+            label="修改"
+            colorClass="bg-[var(--link-2)]"
+            active={filter().updated}
+            onClick={() => toggleFilter('updated')}
+          />
+          <FilterChip
+            label="待办"
+            colorClass="bg-[var(--tag)]"
+            active={filter().pending}
+            onClick={() => toggleFilter('pending')}
+          />
+          <FilterChip
+            label="已完成"
+            colorClass="bg-[var(--text-4)]"
+            active={filter().done}
+            onClick={() => toggleFilter('done')}
+          />
         </div>
       </div>
 
-      {/* Weekday header row */}
-      <div class="grid grid-cols-7 border-b border-(--border)] bg-[var(--bg-surface)] shrink-0">
+      {/* Weekday header — fixed above scroll area */}
+      <div class="grid grid-cols-7 border-b border-(--border) bg-[var(--bg-surface)] shrink-0">
         <For each={WEEKDAYS_LONG}>
           {(d, i) => (
             <div
-              class={`py-2 text-center text-[11px] select-none
-              ${i() < 6 ? 'border-r border-(--border)]' : ''}
-              ${i() >= 5 ? 'text-(--accent)' : 'text-[var(--text-3)]'}`}
+              class={`py-2 text-center text-[11px] select-none${i() < 6 ? ' border-r border-(--border)' : ''}${i() >= 5 ? ' text-(--accent)' : ' text-[var(--text-3)]'}`}
             >
               {d}
             </div>
@@ -111,121 +329,52 @@ export function CalendarViewer(_props: ViewComponentProps) {
         </For>
       </div>
 
-      {/* Calendar grid */}
+      {/* Virtual scroll container */}
       <div
-        class="flex-1 min-h-0 grid grid-cols-7 border-l border-t border-(--border)] overflow-hidden"
-        style={{ 'grid-auto-rows': '1fr' }}
+        ref={scrollEl}
+        class="flex-1 min-h-0 overflow-y-auto"
+        onScroll={handleScroll}
       >
-        <For each={calendarGrid()}>
-          {(day, idx) => {
-            const isLastCol = () => (idx() + 1) % 7 === 0
-
-            if (day === null) {
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            position: 'relative',
+          }}
+        >
+          <For each={virtualizer.getVirtualItems()}>
+            {(vItem) => {
+              const row = () => rows()[vItem.index]
               return (
                 <div
-                  class={`border-r border-b border-(--border)] bg-[var(--bg-surface)]
-                  ${isLastCol() ? 'border-r-0' : ''}`}
-                />
-              )
-            }
-
-            const dayStr = () => toIsoDate(viewYear(), viewMonth(), day)
-            const isToday = () => dayStr() === todayStr
-            const dated = () => dayData().dated[dayStr()] ?? []
-            const created = () => dayData().created[dayStr()] ?? []
-            const updated = () => dayData().updated[dayStr()] ?? []
-            const tasks = () => taskDayData()[dayStr()] ?? []
-
-            return (
-              <div
-                class={`border-b border-(--border)] p-1.5 flex flex-col min-h-0 overflow-hidden group
-                  ${isLastCol() ? '' : 'border-r border-(--border)]'}
-                  ${isToday() ? 'bg-(--accent-bg)' : 'bg-[var(--bg-base)]'}`}
-              >
-                <div
-                  class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none
-                  ${
-                    isToday()
-                      ? 'bg-(--accent) text-white'
-                      : 'text-[var(--text-3)] group-hover:text-[var(--text-2)]'
-                  }`}
+                  style={{
+                    position: 'absolute',
+                    top: '0',
+                    transform: `translateY(${vItem.start}px)`,
+                    width: '100%',
+                  }}
+                  ref={(el) => virtualizer.measureElement(el)}
+                  data-index={vItem.index}
                 >
-                  {day}
+                  {row().type === 'month-header' ? (
+                    <MonthHeader
+                      year={(row() as MonthHeaderRow).year}
+                      month={(row() as MonthHeaderRow).month}
+                    />
+                  ) : (
+                    <WeekRowComp
+                      row={row() as WeekRow}
+                      dayData={dayData}
+                      taskDayData={taskDayData}
+                      filter={filter}
+                      todayStr={todayStr}
+                      onOpenFile={workspaceActions.openFile}
+                    />
+                  )}
                 </div>
-                <div class="flex-1 overflow-y-auto min-h-0 flex flex-col gap-0.5">
-                  <For each={dated()}>
-                    {(path) => (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
-                        onClick={() => workspaceActions.openFile(path)}
-                        title={path}
-                      >
-                        {path.split('/').pop()?.replace(/\.md$/, '')}
-                      </button>
-                    )}
-                  </For>
-                  <For each={created()}>
-                    {(path) => (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
-                        onClick={() => workspaceActions.openFile(path)}
-                        title={path}
-                      >
-                        {path.split('/').pop()?.replace(/\.md$/, '')}
-                      </button>
-                    )}
-                  </For>
-                  <For each={updated()}>
-                    {(path) => (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
-                        onClick={() => workspaceActions.openFile(path)}
-                        title={path}
-                      >
-                        {path.split('/').pop()?.replace(/\.md$/, '')}
-                      </button>
-                    )}
-                  </For>
-                  <For each={tasks()}>
-                    {(task) => (
-                      <button
-                        class={`shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate
-                          ${
-                            task.checked
-                              ? 'bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through'
-                              : 'bg-[var(--tag)] text-[var(--tag)] hover:opacity-80'
-                          }`}
-                        style={
-                          task.checked
-                            ? {}
-                            : {
-                                'background-color':
-                                  'color-mix(in srgb, var(--tag) 18%, transparent)',
-                              }
-                        }
-                        onClick={() => workspaceActions.openFile(task.path)}
-                        title={`${task.path}`}
-                      >
-                        {task.checked ? '☑ ' : '☐ '}
-                        {task.cleanText}
-                      </button>
-                    )}
-                  </For>
-                  <Show
-                    when={
-                      dated().length === 0 &&
-                      created().length === 0 &&
-                      updated().length === 0 &&
-                      tasks().length === 0
-                    }
-                  >
-                    <div class="flex-1" />
-                  </Show>
-                </div>
-              </div>
-            )
-          }}
-        </For>
+              )
+            }}
+          </For>
+        </div>
       </div>
     </div>
   )
