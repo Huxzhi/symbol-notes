@@ -84,6 +84,7 @@ export interface FileMeta {
   hash: string           // content hash (two-variant djb2, 64-bit); '' until indexed
   frontmatter: Record<string, unknown>
   outLinks: string[]
+  etags: string[]
   tags: string[]
   aliases: string[]
   created: string        // YYYY-MM-DD: frontmatter.created → mtime (never null)

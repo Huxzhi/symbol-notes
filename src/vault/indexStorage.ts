@@ -2,7 +2,7 @@ import { get, set, del, keys, getMany, createStore } from 'idb-keyval'
 import type { FileMeta } from '../stores/types'
 
 export type CachedFields = Pick<FileMeta,
-  'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'created' | 'updated' | 'dated' | 'tasks'
+  'frontmatter' | 'outLinks' | 'etags' | 'tags' | 'aliases' | 'created' | 'updated' | 'dated' | 'tasks'
 >
 
 // ── Stat cache: path → { size, mtime, hash } ─────────────────────────────────

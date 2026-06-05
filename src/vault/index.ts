@@ -162,6 +162,7 @@ type ContentFields = Pick<
   FileMeta,
   | 'frontmatter'
   | 'outLinks'
+  | 'etags'
   | 'tags'
   | 'aliases'
   | 'created'
@@ -200,10 +201,12 @@ export async function reindexFile(
       dueDate: t.dueDate ?? dated,
       completedDate: t.checked ? (t.completedDate ?? dated) : null,
     }))
+    const fmTags = extractTags(frontmatter.tags)
     fields = {
       frontmatter,
       outLinks,
-      tags: mergeTagsWithBody(extractTags(frontmatter.tags), inlineTags),
+      etags: [...new Set([...fmTags, ...inlineTags])],
+      tags: mergeTagsWithBody(fmTags, inlineTags),
       aliases: extractAliases(frontmatter.aliases),
       created,
       updated,
@@ -348,6 +351,7 @@ export const fileActions = {
       hash: '',
       frontmatter: {},
       outLinks: [],
+      etags: [],
       tags: [],
       aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
@@ -377,6 +381,7 @@ export const fileActions = {
       hash: '',
       frontmatter: {},
       outLinks: [],
+      etags: [],
       tags: [],
       aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
@@ -419,6 +424,7 @@ export const fileActions = {
       hash: '',
       frontmatter: {},
       outLinks: [],
+      etags: [],
       tags: [],
       aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
@@ -498,6 +504,7 @@ export const fileActions = {
       hash: '',
       frontmatter: {},
       outLinks: [],
+      etags: [],
       tags: [],
       aliases: [],
       created: new Date(0).toISOString().slice(0, 10),
