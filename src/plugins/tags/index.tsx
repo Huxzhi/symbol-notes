@@ -44,30 +44,51 @@ function subtreeCount(node: TagNode): number {
   return node.count + node.children.reduce((s, c) => s + subtreeCount(c), 0)
 }
 
+function getFilesForTag(tagMap: Record<string, string[]>, tag: string): string[] {
+  const paths = new Set<string>()
+  for (const [k, files] of Object.entries(tagMap)) {
+    if (k === tag || k.startsWith(tag + '/')) {
+      for (const f of files) paths.add(f)
+    }
+  }
+  return [...paths].sort()
+}
+
+function displayName(path: string): string {
+  const name = path.split('/').pop() ?? path
+  return name.endsWith('.md') ? name.slice(0, -3) : name
+}
+
 function TagTreeNode(props: {
   node: TagNode
   depth: number
   collapsed: Set<string>
-  onToggle: (tag: string) => void
-  onSelect: (tag: string) => void
+  expandedFiles: Set<string>
+  onToggleCollapse: (tag: string) => void
+  onToggleFiles: (tag: string) => void
+  tagMap: Record<string, string[]>
 }) {
   const hasChildren = () => props.node.children.length > 0
   const isCollapsed = () => props.collapsed.has(props.node.fullTag)
+  const isFilesExpanded = () => props.expandedFiles.has(props.node.fullTag)
   const total = () => subtreeCount(props.node)
+  const files = () => isFilesExpanded()
+    ? getFilesForTag(props.tagMap, props.node.fullTag)
+    : []
 
   return (
     <div>
       <div
         class="flex items-center gap-1 py-0.5 rounded cursor-pointer hover:bg-(--bg-hover) text-[11px] select-none"
         style={{ 'padding-left': `${8 + props.depth * 12}px`, 'padding-right': '8px' }}
-        onClick={() => props.onSelect(props.node.fullTag)}
+        onClick={() => props.onToggleFiles(props.node.fullTag)}
       >
         <span
           class="w-3 shrink-0 text-center text-(--text-4) text-[9px]"
           onClick={(e) => {
             if (!hasChildren()) return
             e.stopPropagation()
-            props.onToggle(props.node.fullTag)
+            props.onToggleCollapse(props.node.fullTag)
           }}
         >
           {hasChildren() ? (isCollapsed() ? '▶' : '▼') : ''}
@@ -76,6 +97,23 @@ function TagTreeNode(props: {
         <span class="flex-1 text-(--text-2)">{props.node.segment}</span>
         <span class="text-(--text-4) text-[10px]">{total()}</span>
       </div>
+      <Show when={isFilesExpanded()}>
+        <For each={files()}>
+          {(path) => (
+            <div
+              class="truncate text-[11px] cursor-pointer hover:bg-(--bg-hover) text-(--text-2) py-0.5"
+              style={{
+                'padding-left': `${8 + (props.depth + 1) * 12 + 4}px`,
+                'padding-right': '8px',
+              }}
+              title={path}
+              onClick={() => workspaceActions.openFile(path)}
+            >
+              {displayName(path)}
+            </div>
+          )}
+        </For>
+      </Show>
       <Show when={hasChildren() && !isCollapsed()}>
         <For each={props.node.children}>
           {(child) => (
@@ -83,8 +121,10 @@ function TagTreeNode(props: {
               node={child}
               depth={props.depth + 1}
               collapsed={props.collapsed}
-              onToggle={props.onToggle}
-              onSelect={props.onSelect}
+              expandedFiles={props.expandedFiles}
+              onToggleCollapse={props.onToggleCollapse}
+              onToggleFiles={props.onToggleFiles}
+              tagMap={props.tagMap}
             />
           )}
         </For>
@@ -95,9 +135,10 @@ function TagTreeNode(props: {
 
 function TagsPanel() {
   const [collapsed, setCollapsed] = createSignal(new Set<string>())
+  const [expandedFiles, setExpandedFiles] = createSignal(new Set<string>())
   const roots = createMemo(() => buildTagTree(vaultStore.tagMap))
 
-  function toggle(tag: string) {
+  function toggleCollapse(tag: string) {
     setCollapsed(prev => {
       const next = new Set(prev)
       next.has(tag) ? next.delete(tag) : next.add(tag)
@@ -105,8 +146,12 @@ function TagsPanel() {
     })
   }
 
-  function select(tag: string) {
-    workspaceActions.openSidebarPanel('right', 'search', { tag })
+  function toggleFiles(tag: string) {
+    setExpandedFiles(prev => {
+      const next = new Set(prev)
+      next.has(tag) ? next.delete(tag) : next.add(tag)
+      return next
+    })
   }
 
   return (
@@ -121,8 +166,10 @@ function TagsPanel() {
               node={node}
               depth={0}
               collapsed={collapsed()}
-              onToggle={toggle}
-              onSelect={select}
+              expandedFiles={expandedFiles()}
+              onToggleCollapse={toggleCollapse}
+              onToggleFiles={toggleFiles}
+              tagMap={vaultStore.tagMap}
             />
           )}
         </For>
