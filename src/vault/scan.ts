@@ -74,10 +74,11 @@ export interface ScanResult {
 
 const EMPTY_CONTENT: Pick<
   FileMeta,
-  'frontmatter' | 'outLinks' | 'tags' | 'aliases' | 'updated' | 'tasks'
+  'frontmatter' | 'outLinks' | 'etags' | 'tags' | 'aliases' | 'updated' | 'tasks'
 > = {
   frontmatter: {},
   outLinks: [],
+  etags: [],
   tags: [],
   aliases: [],
   updated: null,
@@ -190,10 +191,12 @@ export async function runPhase1(
         dueDate: t.dueDate ?? dated,
         completedDate: t.checked ? (t.completedDate ?? dated) : null,
       }))
+      const fmTags = extractTags(frontmatter.tags)
       const parsed = {
         frontmatter,
         outLinks,
-        tags: mergeTagsWithBody(extractTags(frontmatter.tags), inlineTags),
+        etags: [...new Set([...fmTags, ...inlineTags])],
+        tags: mergeTagsWithBody(fmTags, inlineTags),
         aliases: extractAliases(frontmatter.aliases),
         created,
         updated,
