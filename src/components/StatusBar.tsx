@@ -1,7 +1,12 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { workspaceActions, workspaceStore, activeLayout, layoutList } from '../stores/workspaceStore'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
-import { leafInstances } from '../stores/workspaceStore'
+import {
+  activeLayout,
+  layoutList,
+  leafInstances,
+  workspaceActions,
+  workspaceStore,
+} from '../stores/workspaceStore'
 import { isIndexing } from '../vault'
 
 export function StatusBar() {

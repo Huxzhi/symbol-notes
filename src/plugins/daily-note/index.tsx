@@ -1,10 +1,14 @@
 import { BookOpen } from 'lucide-solid'
-import { definePlugin } from '../../lib/pluginRegistry'
-import { showModal, closeModal } from '../../stores/modalStore'
-import { todayPath } from './formatDate'
 import type { SettingsTabProps } from '../../lib/pluginRegistry'
+import { definePlugin } from '../../lib/pluginRegistry'
+import { closeModal, showModal } from '../../stores/modalStore'
+import { todayPath } from './formatDate'
 
-const DEFAULTS = { folder: 'journal', dateFormat: 'YYYY-MM-DD', autoCreate: false }
+const DEFAULTS = {
+  folder: 'journal',
+  dateFormat: 'YYYY-MM-DD',
+  autoCreate: false,
+}
 
 function TextRow(props: {
   label: string
@@ -43,13 +47,19 @@ function ToggleRow(props: {
           checked={props.checked}
           onChange={(e) => props.onChange(e.currentTarget.checked)}
         />
-        <div class={`w-9 h-5 rounded-full transition-colors ${props.checked ? 'bg-(--accent)' : 'bg-(--bg-active)'}`} />
-        <div class={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${props.checked ? 'translate-x-4' : ''}`} />
+        <div
+          class={`w-9 h-5 rounded-full transition-colors ${props.checked ? 'bg-(--accent)' : 'bg-(--bg-active)'}`}
+        />
+        <div
+          class={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${props.checked ? 'translate-x-4' : ''}`}
+        />
       </div>
       <div>
         <div class="text-[13px] t-base font-medium">{props.label}</div>
         {props.description && (
-          <div class="text-[11px] t-3 mt-0.5 leading-relaxed">{props.description}</div>
+          <div class="text-[11px] t-3 mt-0.5 leading-relaxed">
+            {props.description}
+          </div>
         )}
       </div>
     </label>
@@ -85,11 +95,13 @@ function DailyNoteSettings(props: SettingsTabProps) {
 export const DailyNotePlugin = definePlugin({
   id: 'daily-note',
   name: '今日日记',
+  core: true,
   description: '快速打开或新建今天的日记文件',
   defaultEnabled: true,
   setup(ctx) {
     async function openToday() {
-      const { folder, dateFormat, autoCreate } = ctx.settings.getConfig(DEFAULTS)
+      const { folder, dateFormat, autoCreate } =
+        ctx.settings.getConfig(DEFAULTS)
       const path = todayPath(folder as string, dateFormat as string)
 
       if (ctx.vault.files()[path]) {

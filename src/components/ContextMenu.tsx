@@ -1,4 +1,4 @@
-import { For, Show, onMount, onCleanup } from 'solid-js'
+import { For, Show, onCleanup, onMount } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Portal } from 'solid-js/web'
 import { getMenuItems, type MenuItem } from '../lib/pluginRegistry'
@@ -24,8 +24,14 @@ export function ContextMenu() {
             const approxH = items.length * 28
             const approxW = 160
             setState('menu', {
-              x: e.clientX + approxW > window.innerWidth ? e.clientX - approxW : e.clientX,
-              y: e.clientY + approxH > window.innerHeight ? e.clientY - approxH : e.clientY,
+              x:
+                e.clientX + approxW > window.innerWidth
+                  ? e.clientX - approxW
+                  : e.clientX,
+              y:
+                e.clientY + approxH > window.innerHeight
+                  ? e.clientY - approxH
+                  : e.clientY,
               items,
             })
           }

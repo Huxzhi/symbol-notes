@@ -1,7 +1,7 @@
 import { EditorView } from '@codemirror/view'
 import { createMemo, For, Show } from 'solid-js'
-import { activeLayout, leafInstances } from '../../stores/workspaceStore'
 import { definePlugin } from '../../lib/pluginRegistry'
+import { activeLayout, leafInstances } from '../../stores/workspaceStore'
 
 function OutlinePanel() {
   const activeLeafRuntime = () => {

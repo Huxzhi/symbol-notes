@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { conflictStore, closeConflict } from '../stores/conflictStore'
+import { closeConflict, conflictStore } from '../stores/conflictStore'
 
 // ── Line diff (LCS-based, capped at 500 lines each side) ─────────────────────
 
@@ -10,35 +10,53 @@ function computeDiff(editorText: string, diskText: string): DiffLine[] | null {
   const b = diskText.split('\n')
   if (a.length > 500 || b.length > 500) return null
 
-  const m = a.length, n = b.length
+  const m = a.length,
+    n = b.length
   // Uint16Array: 2 bytes/entry vs 8, fine for LCS ≤ 500
-  const dp: Uint16Array[] = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1))
+  const dp: Uint16Array[] = Array.from(
+    { length: m + 1 },
+    () => new Uint16Array(n + 1),
+  )
   for (let i = 1; i <= m; i++)
     for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1])
 
   const result: DiffLine[] = []
-  let i = m, j = n
+  let i = m,
+    j = n
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
-      result.unshift({ type: 'same', text: a[i - 1] }); i--; j--
+      result.unshift({ type: 'same', text: a[i - 1] })
+      i--
+      j--
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift({ type: 'add', text: b[j - 1] }); j--   // add = in disk, not editor
+      result.unshift({ type: 'add', text: b[j - 1] })
+      j-- // add = in disk, not editor
     } else {
-      result.unshift({ type: 'del', text: a[i - 1] }); i--   // del = in editor, not disk
+      result.unshift({ type: 'del', text: a[i - 1] })
+      i-- // del = in editor, not disk
     }
   }
   return result
 }
 
 // Collapse long unchanged runs; keep `ctx` lines of context around changes.
-type ViewChunk = { type: 'lines'; lines: DiffLine[] } | { type: 'skip'; count: number }
+type ViewChunk =
+  | { type: 'lines'; lines: DiffLine[] }
+  | { type: 'skip'; count: number }
 
 function collapseContext(diff: DiffLine[], ctx = 3): ViewChunk[] {
   const shown = new Set<number>()
   diff.forEach((l, i) => {
     if (l.type !== 'same')
-      for (let k = Math.max(0, i - ctx); k <= Math.min(diff.length - 1, i + ctx); k++)
+      for (
+        let k = Math.max(0, i - ctx);
+        k <= Math.min(diff.length - 1, i + ctx);
+        k++
+      )
         shown.add(k)
   })
   if (shown.size === 0) return [{ type: 'skip', count: diff.length }]
@@ -52,7 +70,10 @@ function collapseContext(diff: DiffLine[], ctx = 3): ViewChunk[] {
       chunks.push({ type: 'lines', lines })
     } else {
       let count = 0
-      while (i < diff.length && !shown.has(i)) { count++; i++ }
+      while (i < diff.length && !shown.has(i)) {
+        count++
+        i++
+      }
       chunks.push({ type: 'skip', count })
     }
   }
@@ -62,11 +83,15 @@ function collapseContext(diff: DiffLine[], ctx = 3): ViewChunk[] {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const LINE_STYLE: Record<DiffLine['type'], string> = {
-  add:  'bg-[#1a3a1a] text-[#7ec87e] select-text',
-  del:  'bg-[#3a1a1a] text-[#e07a7a] select-text',
+  add: 'bg-[#1a3a1a] text-[#7ec87e] select-text',
+  del: 'bg-[#3a1a1a] text-[#e07a7a] select-text',
   same: 'text-(--text-4) select-text',
 }
-const LINE_PREFIX: Record<DiffLine['type'], string> = { add: '+', del: '-', same: ' ' }
+const LINE_PREFIX: Record<DiffLine['type'], string> = {
+  add: '+',
+  del: '-',
+  same: ' ',
+}
 
 export function ConflictModal() {
   const [tab, setTab] = createSignal<'diff' | 'disk'>('diff')
@@ -74,7 +99,7 @@ export function ConflictModal() {
   const diff = createMemo(() =>
     conflictStore.open
       ? computeDiff(conflictStore.editorContent, conflictStore.diskContent)
-      : null
+      : null,
   )
   const chunks = createMemo(() => {
     const d = diff()
@@ -91,7 +116,9 @@ export function ConflictModal() {
       <div
         class="fixed inset-0 z-[10000] flex items-center justify-center"
         style={{ background: 'rgba(0,0,0,0.6)' }}
-        onClick={(e) => { if (e.target === e.currentTarget) choose('cancel') }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) choose('cancel')
+        }}
       >
         <div
           class="bg-(--bg-elevated) border border-(--border-2) rounded-lg shadow-xl flex flex-col"
@@ -99,10 +126,14 @@ export function ConflictModal() {
         >
           {/* Header */}
           <div class="px-5 pt-4 pb-3 border-b border-(--border) shrink-0">
-            <h2 class="text-[15px] font-semibold text-(--text) mb-0.5">文件冲突</h2>
+            <h2 class="text-[15px] font-semibold text-(--text) mb-0.5">
+              文件冲突
+            </h2>
             <p class="text-[12px] text-(--text-3)">
-              <span class="font-medium text-(--text-2)">{conflictStore.filename}</span>
-              {' '}已被外部程序修改，与编辑器中的版本不一致。
+              <span class="font-medium text-(--text-2)">
+                {conflictStore.filename}
+              </span>{' '}
+              已被外部程序修改，与编辑器中的版本不一致。
             </p>
           </div>
 
@@ -128,7 +159,8 @@ export function ConflictModal() {
             <Show when={tab() === 'diff'}>
               <Show when={diff() === null}>
                 <div class="px-5 py-4 text-(--text-3) text-[12px]">
-                  文件过长（超过 500 行），差异视图不可用。请切换到"磁盘原版"查看。
+                  文件过长（超过 500
+                  行），差异视图不可用。请切换到"磁盘原版"查看。
                 </div>
               </Show>
               <Show when={diff() !== null}>
@@ -143,17 +175,28 @@ export function ConflictModal() {
                       <>
                         <Show when={chunk.type === 'skip'}>
                           <div class="px-3 py-0.5 text-(--text-4) text-[10px] select-none italic">
-                            … 跳过 {(chunk as { type: 'skip'; count: number }).count} 行 …
+                            … 跳过{' '}
+                            {(chunk as { type: 'skip'; count: number }).count}{' '}
+                            行 …
                           </div>
                         </Show>
                         <Show when={chunk.type === 'lines'}>
-                          <For each={(chunk as { type: 'lines'; lines: DiffLine[] }).lines}>
+                          <For
+                            each={
+                              (chunk as { type: 'lines'; lines: DiffLine[] })
+                                .lines
+                            }
+                          >
                             {(line) => (
-                              <div class={`flex px-2 py-px ${LINE_STYLE[line.type]}`}>
+                              <div
+                                class={`flex px-2 py-px ${LINE_STYLE[line.type]}`}
+                              >
                                 <span class="w-4 shrink-0 select-none opacity-60">
                                   {LINE_PREFIX[line.type]}
                                 </span>
-                                <span class="whitespace-pre-wrap break-all">{line.text || ' '}</span>
+                                <span class="whitespace-pre-wrap break-all">
+                                  {line.text || ' '}
+                                </span>
                               </div>
                             )}
                           </For>

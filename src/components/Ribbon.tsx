@@ -1,7 +1,7 @@
-import { For } from 'solid-js'
 import { PanelLeft } from 'lucide-solid'
-import { workspaceActions } from '../stores/workspaceStore'
+import { For } from 'solid-js'
 import { getRibbonItems } from '../lib/pluginRegistry'
+import { workspaceActions } from '../stores/workspaceStore'
 
 export function Ribbon() {
   return (

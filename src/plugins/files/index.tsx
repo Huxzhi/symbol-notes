@@ -29,7 +29,13 @@ export const FilesPlugin = definePlugin({
       return [
         { label: '重命名', action: () => beginRename(path) },
         { separator: true as const },
-        { label: '删除', action: () => { if (confirm(`删除 ${path.split('/').pop()}？`)) void ctx.vault.deleteFile(path) } },
+        {
+          label: '删除',
+          action: () => {
+            if (confirm(`删除 ${path.split('/').pop()}？`))
+              void ctx.vault.deleteFile(path)
+          },
+        },
       ]
     })
 
@@ -37,9 +43,18 @@ export const FilesPlugin = definePlugin({
       const path = d.path!
       return [
         { label: '新建文件', action: () => beginCreate('file', path + '/') },
-        { label: '新建文件夹', action: () => beginCreate('folder', path + '/') },
+        {
+          label: '新建文件夹',
+          action: () => beginCreate('folder', path + '/'),
+        },
         { separator: true as const },
-        { label: '删除文件夹', action: () => { if (confirm(`删除文件夹 ${path.split('/').pop()}？`)) void ctx.vault.deleteFolder(path) } },
+        {
+          label: '删除文件夹',
+          action: () => {
+            if (confirm(`删除文件夹 ${path.split('/').pop()}？`))
+              void ctx.vault.deleteFolder(path)
+          },
+        },
       ]
     })
   },

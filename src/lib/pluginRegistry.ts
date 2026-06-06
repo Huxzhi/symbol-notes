@@ -1,17 +1,29 @@
-import { createRoot, createEffect, createSignal, onCleanup } from 'solid-js'
-import { createStore } from 'solid-js/store'
 import type { Component, JSX } from 'solid-js'
+import { createEffect, createRoot, createSignal, onCleanup } from 'solid-js'
+import { createStore } from 'solid-js/store'
 import { settingsStore } from '../stores/settingsStore'
-import { workspaceActions, getLeafsByType, activeLayout, activeFilePath, activeSidebarType, leafInstances } from '../stores/workspaceStore'
-import { fileActions, vaultFs, vaultStore, getStemIndex } from '../vault'
-import { resolveLink } from '../vault'
-import { loadFromStorage, saveToStorage } from './localStorage'
-import type { ViewComponentProps, FileMeta } from '../stores/types'
-export type { ViewComponentProps }
-import type { OutLink } from './cm6/outLinksField'
+import type { FileMeta, ViewComponentProps } from '../stores/types'
+import {
+  activeFilePath,
+  activeLayout,
+  activeSidebarType,
+  getLeafsByType,
+  leafInstances,
+  workspaceActions,
+} from '../stores/workspaceStore'
+import {
+  fileActions,
+  getStemIndex,
+  resolveLink,
+  vaultFs,
+  vaultStore,
+} from '../vault'
 import type { Heading } from './cm6/headingsField'
+import type { OutLink } from './cm6/outLinksField'
+import { loadFromStorage, saveToStorage } from './localStorage'
+export type { ViewComponentProps }
 
-export type { OutLink, Heading }
+export type { Heading, OutLink }
 
 // ── View Registry ─────────────────────────────────────────────────────────────
 
@@ -45,14 +57,20 @@ export interface PanelViewDef {
 
 export type ViewDef = FileViewDef | PageViewDef | PanelViewDef
 
-const [_viewRegistry, setViewRegistry] = createSignal(new Map<string, ViewDef>())
+const [_viewRegistry, setViewRegistry] = createSignal(
+  new Map<string, ViewDef>(),
+)
 
 export function registerView(def: ViewDef): void {
-  setViewRegistry(m => new Map(m).set(def.type, def))
+  setViewRegistry((m) => new Map(m).set(def.type, def))
 }
 
 export function unregisterView(type: string): void {
-  setViewRegistry(m => { const n = new Map(m); n.delete(type); return n })
+  setViewRegistry((m) => {
+    const n = new Map(m)
+    n.delete(type)
+    return n
+  })
 }
 
 export function getView(type: string): ViewDef | undefined {
@@ -63,17 +81,22 @@ export function getFileViewForPath(path: string): FileViewDef | undefined {
   const defs = [..._viewRegistry().values()]
   for (let i = defs.length - 1; i >= 0; i--) {
     const def = defs[i]
-    if (def.kind === 'file' && def.canAcceptFile(path)) return def as FileViewDef
+    if (def.kind === 'file' && def.canAcceptFile(path))
+      return def as FileViewDef
   }
   return undefined
 }
 
 export function getLeftPanelViews(): PanelViewDef[] {
-  return [..._viewRegistry().values()].filter((d): d is PanelViewDef => d.kind === 'panel' && d.position === 'left')
+  return [..._viewRegistry().values()].filter(
+    (d): d is PanelViewDef => d.kind === 'panel' && d.position === 'left',
+  )
 }
 
 export function getRightPanelViews(): PanelViewDef[] {
-  return [..._viewRegistry().values()].filter((d): d is PanelViewDef => d.kind === 'panel' && d.position === 'right')
+  return [..._viewRegistry().values()].filter(
+    (d): d is PanelViewDef => d.kind === 'panel' && d.position === 'right',
+  )
 }
 
 export function _clearViewRegistryForTest(): void {
@@ -94,15 +117,17 @@ export interface RibbonItemDef {
 const [_ribbonItems, setRibbonItems] = createSignal<RibbonItemDef[]>([])
 
 export function registerRibbonItem(def: RibbonItemDef): void {
-  setRibbonItems(prev => [...prev, def])
+  setRibbonItems((prev) => [...prev, def])
 }
 
 export function unregisterRibbonItem(id: string): void {
-  setRibbonItems(prev => prev.filter(d => d.id !== id))
+  setRibbonItems((prev) => prev.filter((d) => d.id !== id))
 }
 
-export function getRibbonItems(position: 'top' | 'bottom' = 'top'): RibbonItemDef[] {
-  return _ribbonItems().filter(d => (d.position ?? 'top') === position)
+export function getRibbonItems(
+  position: 'top' | 'bottom' = 'top',
+): RibbonItemDef[] {
+  return _ribbonItems().filter((d) => (d.position ?? 'top') === position)
 }
 
 // ── Settings Tab Registry ─────────────────────────────────────────────────────
@@ -126,11 +151,11 @@ export interface SettingsTabDef extends SettingsTabInput {
 const [_settingsTabs, setSettingsTabs] = createSignal<SettingsTabDef[]>([])
 
 export function registerSettingsTab(def: SettingsTabDef): void {
-  setSettingsTabs(prev => [...prev, def])
+  setSettingsTabs((prev) => [...prev, def])
 }
 
 export function unregisterSettingsTab(pluginId: string): void {
-  setSettingsTabs(prev => prev.filter(t => t.pluginId !== pluginId))
+  setSettingsTabs((prev) => prev.filter((t) => t.pluginId !== pluginId))
 }
 
 export function getSettingsTabs(): SettingsTabDef[] {
@@ -147,7 +172,10 @@ type ContextMenuFactory = (dataset: DOMStringMap) => MenuItem[]
 
 const _contextMenuRegistry = new Map<string, ContextMenuFactory>()
 
-export function registerContextMenu(type: string, factory: ContextMenuFactory): void {
+export function registerContextMenu(
+  type: string,
+  factory: ContextMenuFactory,
+): void {
   _contextMenuRegistry.set(type, factory)
 }
 
@@ -194,10 +222,24 @@ export interface PluginContext {
   vault: VaultService
   workspace: {
     /** 直接按 type+state 申请或切换一个 leaf，不经过文件路径解析 */
-    openLeaf(viewState: { type: string; state: Record<string, unknown> }, opts?: { area?: 'left' | 'main' | 'right'; newTab?: boolean; pin?: boolean }): void
-    openFile(path: string, opts?: { area?: 'left' | 'main' | 'right'; newTab?: boolean }): void
+    openLeaf(
+      viewState: { type: string; state: Record<string, unknown> },
+      opts?: {
+        area?: 'left' | 'main' | 'right'
+        newTab?: boolean
+        pin?: boolean
+      },
+    ): void
+    openFile(
+      path: string,
+      opts?: { area?: 'left' | 'main' | 'right'; newTab?: boolean },
+    ): void
     openPage(type: string): void
-    openPanel(area: 'left' | 'right', type: string, state?: Record<string, unknown>): void
+    openPanel(
+      area: 'left' | 'right',
+      type: string,
+      state?: Record<string, unknown>,
+    ): void
     getLeafsByType(type: string): string[]
     activeLeafId(): string | null
     activeFilePath(): string | null
@@ -231,7 +273,7 @@ export function definePlugin(def: PluginDef): PluginDef {
 const [_registered, setRegistered] = createSignal<PluginDef[]>([])
 
 export function registerPlugin(def: PluginDef): void {
-  setRegistered(prev => [...prev, def])
+  setRegistered((prev) => [...prev, def])
 }
 
 export function getRegisteredPlugins(): PluginDef[] {
@@ -241,9 +283,13 @@ export function getRegisteredPlugins(): PluginDef[] {
 function loadPlugin(def: PluginDef): () => void {
   return createRoot((dispose) => {
     const saved = loadFromStorage<Record<string, unknown>>(
-      `sn-plugin-${def.id}`, {}, (v) => typeof v === 'object' && v !== null,
+      `sn-plugin-${def.id}`,
+      {},
+      (v) => typeof v === 'object' && v !== null,
     )
-    const [config, setConfig] = createStore<Record<string, unknown>>(saved ?? {})
+    const [config, setConfig] = createStore<Record<string, unknown>>(
+      saved ?? {},
+    )
     createEffect(() => saveToStorage(`sn-plugin-${def.id}`, { ...config }))
 
     const ctx: PluginContext = {
@@ -260,42 +306,48 @@ function loadPlugin(def: PluginDef): () => void {
         onCleanup(() => unregisterContextMenu(type))
       },
       vault: {
-        ready:        ()           => vaultFs() !== null,
-        files:        ()           => vaultStore.files,
-        backlinks:    (path)       => {
+        ready: () => vaultFs() !== null,
+        files: () => vaultStore.files,
+        backlinks: (path) => {
           const f = vaultStore.files[path]
           const aliases = f?.aliases ?? []
-          const keys = [path, ...aliases.map(a => `${a}.md`)]
+          const keys = [path, ...aliases.map((a) => `${a}.md`)]
           const seen = new Set<string>()
           const result: string[] = []
           for (const key of keys)
             for (const bl of vaultStore.backlinkMap[key] ?? [])
-              if (!seen.has(bl)) { seen.add(bl); result.push(bl) }
+              if (!seen.has(bl)) {
+                seen.add(bl)
+                result.push(bl)
+              }
           return result
         },
-        resolveLink:  (target)     => {
+        resolveLink: (target) => {
           const withExt = target.endsWith('.md') ? target : `${target}.md`
           return resolveLink(withExt, getStemIndex(), vaultStore.files)
         },
-        readFile:     (path)       => fileActions.readFile(path),
-        saveFile:     (path, c)    => fileActions.saveFile(path, c),
-        createFile:   (name)       => fileActions.createFile(name),
-        createFolder: (name)       => fileActions.createFolder(name),
-        deleteFile:   (path)       => fileActions.deleteFile(path),
-        deleteFolder: (path)       => fileActions.deleteFolder(path),
-        renameFile:   (path, name) => fileActions.renameFile(path, name),
-        moveEntry:    (src, dest)  => fileActions.moveEntry(src, dest),
+        readFile: (path) => fileActions.readFile(path),
+        saveFile: (path, c) => fileActions.saveFile(path, c),
+        createFile: (name) => fileActions.createFile(name),
+        createFolder: (name) => fileActions.createFolder(name),
+        deleteFile: (path) => fileActions.deleteFile(path),
+        deleteFolder: (path) => fileActions.deleteFolder(path),
+        renameFile: (path, name) => fileActions.renameFile(path, name),
+        moveEntry: (src, dest) => fileActions.moveEntry(src, dest),
       },
       workspace: {
-        openLeaf:           (viewState, opts) => workspaceActions.openLeaf(viewState, opts),
-        openFile:           (path, opts) => workspaceActions.openFile(path, opts),
-        openPage:           (type)       => workspaceActions.openPage(type),
-        openPanel:          (area, type, state) => workspaceActions.openSidebarPanel(area, type, state),
+        openLeaf: (viewState, opts) =>
+          workspaceActions.openLeaf(viewState, opts),
+        openFile: (path, opts) => workspaceActions.openFile(path, opts),
+        openPage: (type) => workspaceActions.openPage(type),
+        openPanel: (area, type, state) =>
+          workspaceActions.openSidebarPanel(area, type, state),
         getLeafsByType,
-        activeLeafId:       () => activeLayout().activeLeafId,
-        activeFilePath:     () => activeFilePath(),
-        activeSidebarType:  (side) => activeSidebarType(side),
-        switchSidebarPanel: (side, type) => workspaceActions.switchSidebarPanel(side, type),
+        activeLeafId: () => activeLayout().activeLeafId,
+        activeFilePath: () => activeFilePath(),
+        activeSidebarType: (side) => activeSidebarType(side),
+        switchSidebarPanel: (side, type) =>
+          workspaceActions.switchSidebarPanel(side, type),
         activeOutLinks: () => {
           const id = activeLayout().activeLeafId
           return id ? (leafInstances[id]?.outLinks ?? []) : []
@@ -319,7 +371,7 @@ function loadPlugin(def: PluginDef): () => void {
           return { ...defaults, ...config } as T
         },
         setConfig(patch) {
-          setConfig(prev => ({ ...prev, ...patch }))
+          setConfig((prev) => ({ ...prev, ...patch }))
         },
       },
     }
@@ -329,15 +381,13 @@ function loadPlugin(def: PluginDef): () => void {
   })
 }
 
-
-
-
-
 export function startPlugins(): void {
   createRoot(() => {
     for (const def of _registered()) {
       createEffect(() => {
-        const enabled = def.core || (settingsStore.pluginStates[def.id] ?? def.defaultEnabled ?? true)
+        const enabled =
+          def.core ||
+          (settingsStore.pluginStates[def.id] ?? def.defaultEnabled ?? true)
         if (enabled) {
           const dispose = loadPlugin(def)
           onCleanup(dispose)

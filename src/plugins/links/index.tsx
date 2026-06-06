@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from 'solid-js'
+import type { OutLink, ViewComponentProps } from '../../lib/pluginRegistry'
 import { definePlugin } from '../../lib/pluginRegistry'
-import type { ViewComponentProps, OutLink } from '../../lib/pluginRegistry'
 
 export const LinksPlugin = definePlugin({
   id: 'links',
@@ -31,9 +31,14 @@ export const LinksPlugin = definePlugin({
               return (
                 <div
                   class={`py-0.5 min-w-0 ${resolved() ? 'cursor-pointer hover:bg-(--bg-2) rounded px-1 -mx-1' : 'opacity-50'}`}
-                  onClick={() => { const p = resolved(); if (p) ctx.workspace.openFile(p) }}
+                  onClick={() => {
+                    const p = resolved()
+                    if (p) ctx.workspace.openFile(p)
+                  }}
                 >
-                  <div class={`flex items-center gap-1 ${link.type === 'wiki' ? 'text-(--link)' : 'text-(--link-2)'}`}>
+                  <div
+                    class={`flex items-center gap-1 ${link.type === 'wiki' ? 'text-(--link)' : 'text-(--link-2)'}`}
+                  >
                     <span class="text-(--accent) text-[10px] shrink-0">↗</span>
                     <span class="truncate">{link.label}</span>
                   </div>
@@ -57,7 +62,9 @@ export const LinksPlugin = definePlugin({
                 onClick={() => ctx.workspace.openFile(path)}
               >
                 <span class="text-(--accent) text-[10px]">↙</span>
-                <span class="truncate">{path.split('/').pop()?.replace(/\.md$/, '') ?? path}</span>
+                <span class="truncate">
+                  {path.split('/').pop()?.replace(/\.md$/, '') ?? path}
+                </span>
               </div>
             )}
           </For>
