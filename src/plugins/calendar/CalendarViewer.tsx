@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onMount, Show } from 'solid-js'
+import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -210,9 +210,16 @@ export function CalendarViewer(props: CalendarViewerProps) {
   let head = normalizeYM(now.getFullYear(), now.getMonth() - 3)
   let tail = normalizeYM(now.getFullYear(), now.getMonth() + 3)
 
-  const [rows, setRows] = createSignal<CalRow[]>(
-    buildRangeRows(head.year, head.month, 7),
+  const initialRows = buildRangeRows(head.year, head.month, 7)
+  const [rows, setRows] = createSignal<CalRow[]>(initialRows)
+
+  // Pre-compute scroll offset to today's month header using known fixed row heights
+  const todayMonthIdx = initialRows.findIndex(
+    (r) => r.type === 'month-header' && r.year === now.getFullYear() && r.month === now.getMonth(),
   )
+  const initialScrollOffset = initialRows
+    .slice(0, Math.max(0, todayMonthIdx))
+    .reduce((acc, r) => acc + (r.type === 'month-header' ? 32 : 140), 0)
 
   // Virtual list
   let scrollEl!: HTMLDivElement
@@ -225,6 +232,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
     getScrollElement: () => scrollEl,
     estimateSize: (i) => (rows()[i]?.type === 'month-header' ? 32 : 140),
     overscan: 3,
+    initialOffset: initialScrollOffset,
   })
 
   // Infinite scroll actions
@@ -276,8 +284,6 @@ export function CalendarViewer(props: CalendarViewerProps) {
     )
     if (idx >= 0) virtualizer.scrollToIndex(idx, { align: 'start' })
   }
-
-  onMount(() => scrollToToday())
 
   return (
     <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)]">
