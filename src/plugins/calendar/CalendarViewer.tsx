@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onMount } from 'solid-js'
+import { createMemo, createSignal, For, onMount, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -30,6 +30,12 @@ const FILTER_DEFAULTS = {
 }
 type FilterKey = keyof typeof FILTER_DEFAULTS
 
+type CellItem =
+  | { kind: 'dated' | 'created' | 'updated'; path: string }
+  | { kind: 'pending' | 'done'; task: Task }
+
+const MAX_CELL_ITEMS = 5
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function normalizeYM(year: number, month: number) {
@@ -38,7 +44,7 @@ function normalizeYM(year: number, month: number) {
 }
 
 function estimateRowsHeight(rows: CalRow[]): number {
-  return rows.reduce((acc, r) => acc + (r.type === 'month-header' ? 32 : 80), 0)
+  return rows.reduce((acc, r) => acc + (r.type === 'month-header' ? 32 : 140), 0)
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -85,93 +91,94 @@ function WeekRowComp(props: {
           if (cell === null) {
             return (
               <div
-                class={`min-h-[80px] bg-[var(--bg-surface)]${i() < 6 ? ' border-r border-(--border)' : ''}`}
+                class={`h-[140px] bg-[var(--bg-surface)]${i() < 6 ? ' border-r border-(--border)' : ''}`}
               />
             )
           }
           const { dayStr, day } = cell
           const isToday = dayStr === props.todayStr
-          const dated = () =>
-            props.filter().dated ? (props.dayData().dated[dayStr] ?? []) : []
-          const created = () =>
-            props.filter().created ? (props.dayData().created[dayStr] ?? []) : []
-          const updated = () =>
-            props.filter().updated ? (props.dayData().updated[dayStr] ?? []) : []
-          const allTasks = () => props.taskDayData()[dayStr] ?? []
-          const pending = () =>
-            props.filter().pending ? allTasks().filter((t) => !t.checked) : []
-          const done = () =>
-            props.filter().done ? allTasks().filter((t) => t.checked) : []
+
+          const cellData = () => {
+            const f = props.filter()
+            const d = props.dayData()
+            const td = props.taskDayData()
+            const all: CellItem[] = [
+              ...(f.dated ? (d.dated[dayStr] ?? []).map((path): CellItem => ({ kind: 'dated', path })) : []),
+              ...(f.created ? (d.created[dayStr] ?? []).map((path): CellItem => ({ kind: 'created', path })) : []),
+              ...(f.updated ? (d.updated[dayStr] ?? []).map((path): CellItem => ({ kind: 'updated', path })) : []),
+              ...(f.pending ? (td[dayStr] ?? []).filter(t => !t.checked).map((task): CellItem => ({ kind: 'pending', task })) : []),
+              ...(f.done ? (td[dayStr] ?? []).filter(t => t.checked).map((task): CellItem => ({ kind: 'done', task })) : []),
+            ]
+            if (all.length <= MAX_CELL_ITEMS) return { items: all, more: 0 }
+            return { items: all.slice(0, MAX_CELL_ITEMS - 1), more: all.length - (MAX_CELL_ITEMS - 1) }
+          }
 
           return (
             <div
-              class={`p-1.5 flex flex-col min-h-[80px]${i() < 6 ? ' border-r border-(--border)' : ''}${isToday ? ' bg-(--accent-bg)' : ' bg-[var(--bg-base)]'}`}
+              class={`p-1.5 flex flex-col h-[140px] overflow-hidden${i() < 6 ? ' border-r border-(--border)' : ''}${isToday ? ' bg-(--accent-bg)' : ' bg-[var(--bg-base)]'}`}
             >
               <div
                 class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none${isToday ? ' bg-(--accent) text-white' : ' text-[var(--text-3)]'}`}
               >
                 {day}
               </div>
-              <div class="flex flex-col gap-0.5">
-                <For each={dated()}>
-                  {(path) => (
-                    <button
-                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
-                      onClick={() => props.onOpenFile(path)}
-                      title={path}
-                    >
-                      {path.split('/').pop()?.replace(/\.md$/, '')}
-                    </button>
-                  )}
+              <div class="flex flex-col gap-0.5 overflow-hidden">
+                <For each={cellData().items}>
+                  {(item) => {
+                    if (item.kind === 'dated') return (
+                      <button
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
+                        onClick={() => props.onOpenFile(item.path)}
+                        title={item.path}
+                      >
+                        {item.path.split('/').pop()?.replace(/\.md$/, '')}
+                      </button>
+                    )
+                    if (item.kind === 'created') return (
+                      <button
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
+                        onClick={() => props.onOpenFile(item.path)}
+                        title={item.path}
+                      >
+                        {item.path.split('/').pop()?.replace(/\.md$/, '')}
+                      </button>
+                    )
+                    if (item.kind === 'updated') return (
+                      <button
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
+                        onClick={() => props.onOpenFile(item.path)}
+                        title={item.path}
+                      >
+                        {item.path.split('/').pop()?.replace(/\.md$/, '')}
+                      </button>
+                    )
+                    if (item.kind === 'pending') return (
+                      <button
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate text-[var(--tag)] hover:opacity-80"
+                        style={{ 'background-color': 'color-mix(in srgb, var(--tag) 18%, transparent)' }}
+                        onClick={() => props.onOpenFile(item.task.path)}
+                        title={item.task.path}
+                      >
+                        ☐ {item.task.cleanText}
+                      </button>
+                    )
+                    if (item.kind === 'done') return (
+                      <button
+                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through w-full cursor-pointer transition-colors truncate"
+                        onClick={() => props.onOpenFile(item.task.path)}
+                        title={item.task.path}
+                      >
+                        ☑ {item.task.cleanText}
+                      </button>
+                    )
+                    return null
+                  }}
                 </For>
-                <For each={created()}>
-                  {(path) => (
-                    <button
-                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
-                      onClick={() => props.onOpenFile(path)}
-                      title={path}
-                    >
-                      {path.split('/').pop()?.replace(/\.md$/, '')}
-                    </button>
-                  )}
-                </For>
-                <For each={updated()}>
-                  {(path) => (
-                    <button
-                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
-                      onClick={() => props.onOpenFile(path)}
-                      title={path}
-                    >
-                      {path.split('/').pop()?.replace(/\.md$/, '')}
-                    </button>
-                  )}
-                </For>
-                <For each={pending()}>
-                  {(task) => (
-                    <button
-                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate text-[var(--tag)] hover:opacity-80"
-                      style={{
-                        'background-color':
-                          'color-mix(in srgb, var(--tag) 18%, transparent)',
-                      }}
-                      onClick={() => props.onOpenFile(task.path)}
-                      title={task.path}
-                    >
-                      ☐ {task.cleanText}
-                    </button>
-                  )}
-                </For>
-                <For each={done()}>
-                  {(task) => (
-                    <button
-                      class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through w-full cursor-pointer transition-colors truncate"
-                      onClick={() => props.onOpenFile(task.path)}
-                      title={task.path}
-                    >
-                      ☑ {task.cleanText}
-                    </button>
-                  )}
-                </For>
+                <Show when={cellData().more > 0}>
+                  <div class="shrink-0 text-[10px] text-[var(--text-4)] px-1.5 py-0.5 select-none">
+                    +{cellData().more} more
+                  </div>
+                </Show>
               </div>
             </div>
           )
@@ -216,7 +223,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
       return rows().length
     },
     getScrollElement: () => scrollEl,
-    estimateSize: (i) => (rows()[i]?.type === 'month-header' ? 32 : 80),
+    estimateSize: (i) => (rows()[i]?.type === 'month-header' ? 32 : 140),
     overscan: 3,
   })
 
