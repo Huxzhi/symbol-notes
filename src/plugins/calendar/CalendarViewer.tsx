@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createDeferred, createMemo, createSignal, For, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -202,9 +202,9 @@ export function CalendarViewer(props: CalendarViewerProps) {
   const toggleFilter = (key: FilterKey) =>
     props.setConfig({ filter: { ...filter(), [key]: !filter()[key] } })
 
-  // Vault data
-  const dayData = createMemo(() => buildDayData(vaultStore.files))
-  const taskDayData = createMemo(() => buildTaskDayData(vaultStore.taskMap))
+  // Vault data — deferred so rapid per-file vault updates don't cause frame drops
+  const dayData = createDeferred(() => buildDayData(vaultStore.files))
+  const taskDayData = createDeferred(() => buildTaskDayData(vaultStore.taskMap))
 
   // Row list — mutable head/tail month tracking (not reactive, just boundary markers)
   let head = normalizeYM(now.getFullYear(), now.getMonth() - 3)

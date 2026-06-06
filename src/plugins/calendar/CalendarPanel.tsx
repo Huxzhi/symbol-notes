@@ -1,4 +1,4 @@
-import { batch, createMemo, createSignal, For, Show } from 'solid-js'
+import { batch, createDeferred, createMemo, createSignal, For, Show } from 'solid-js'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
 import {
@@ -16,7 +16,7 @@ export function CalendarPanel() {
   const [viewMonth, setViewMonth] = createSignal(now.getMonth())
   const [selectedDay, setSelectedDay] = createSignal<string | null>(todayStr)
 
-  const dayData = createMemo(() => buildDayData(vaultStore.files))
+  const dayData = createDeferred(() => buildDayData(vaultStore.files))
   const calendarGrid = createMemo(() =>
     buildCalendarGrid(viewYear(), viewMonth()),
   )

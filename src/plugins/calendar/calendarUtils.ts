@@ -1,4 +1,4 @@
-import type { TaskItem } from '../../stores/types'
+import type { TaskItem, FileMeta } from '../../stores/types'
 
 export type Task = TaskItem & { path: string }
 
@@ -100,27 +100,17 @@ export function buildTaskDayData(taskMap: Record<string, TaskItem[]>): Record<st
   return map
 }
 
-export function buildDayData(
-  index: Record<string, { frontmatter: Record<string, unknown> }>,
-) {
+export function buildDayData(index: Record<string, FileMeta>) {
   const created: Record<string, string[]> = {}
   const updated: Record<string, string[]> = {}
   const dated: Record<string, string[]> = {}
   for (const [path, meta] of Object.entries(index)) {
-    const fm = meta.frontmatter
-    const c =
-      typeof fm.created === 'string' && fm.created.length >= 10
-        ? fm.created.slice(0, 10)
-        : null
-    const u =
-      typeof fm.updated === 'string' && fm.updated.length >= 10
-        ? fm.updated.slice(0, 10)
-        : null
+    if (meta.kind !== 'file') continue
 
     // frontmatter.dated takes precedence over stem date
     const fmDated =
-      typeof fm.dated === 'string' && fm.dated.length >= 10
-        ? fm.dated.slice(0, 10)
+      typeof meta.frontmatter.dated === 'string' && meta.frontmatter.dated.length >= 10
+        ? meta.frontmatter.dated.slice(0, 10)
         : null
     const d = fmDated ?? stemDate(path)
 
@@ -128,6 +118,9 @@ export function buildDayData(
       // Dated file: only appears on its dated date, not in created/updated
       ;(dated[d] ??= []).push(path)
     } else {
+      // Use pre-computed FileMeta fields (already validated YYYY-MM-DD strings)
+      const c = meta.created
+      const u = meta.updated
       if (c) (created[c] ??= []).push(path)
       if (u && u !== c) (updated[u] ??= []).push(path)
     }
