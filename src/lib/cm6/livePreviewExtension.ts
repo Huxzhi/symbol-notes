@@ -1,5 +1,10 @@
 import { syntaxTree } from '@codemirror/language'
 import {
+  type EditorState,
+  RangeSetBuilder,
+  StateField,
+} from '@codemirror/state'
+import {
   Decoration,
   type DecorationSet,
   EditorView,
@@ -7,7 +12,6 @@ import {
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
-import { RangeSetBuilder, StateField, type EditorState } from '@codemirror/state'
 import { detectFrontmatter } from './frontmatterField'
 
 // ── Shared decorations ──────────────────────────────────────────────────────
@@ -19,11 +23,16 @@ const mdLinkMark = Decoration.mark({ class: 'cm-mdlink' })
 // ── Widgets ──────────────────────────────────────────────────────────────────
 
 class CheckboxWidget extends WidgetType {
-  constructor(readonly checked: boolean, readonly markerFrom: number) {
+  constructor(
+    readonly checked: boolean,
+    readonly markerFrom: number,
+  ) {
     super()
   }
 
-  eq(other: CheckboxWidget) { return other.checked === this.checked }
+  eq(other: CheckboxWidget) {
+    return other.checked === this.checked
+  }
 
   toDOM(view: EditorView) {
     const el = document.createElement('input')
@@ -45,8 +54,12 @@ class CheckboxWidget extends WidgetType {
 }
 
 class FencedTopWidget extends WidgetType {
-  constructor(readonly lang: string) { super() }
-  eq(other: FencedTopWidget) { return other.lang === this.lang }
+  constructor(readonly lang: string) {
+    super()
+  }
+  eq(other: FencedTopWidget) {
+    return other.lang === this.lang
+  }
   toDOM() {
     const el = document.createElement('div')
     el.className = 'cm-fenced-top'
@@ -61,10 +74,23 @@ class FencedTopWidget extends WidgetType {
 }
 
 class FencedBottomWidget extends WidgetType {
-  eq() { return true }
+  eq() {
+    return true
+  }
   toDOM() {
     const el = document.createElement('div')
     el.className = 'cm-fenced-bottom'
+    return el
+  }
+}
+
+class BulletWidget extends WidgetType {
+  eq() {
+    return true
+  }
+  toDOM() {
+    const el = document.createElement('span')
+    el.className = 'cm-list-bullet'
     return el
   }
 }
@@ -75,18 +101,27 @@ class HRWidget extends WidgetType {
     el.className = 'cm-hr-widget'
     return el
   }
-  eq() { return true }
+  eq() {
+    return true
+  }
 }
 
 class TableWidget extends WidgetType {
-  constructor(readonly text: string) { super() }
+  constructor(readonly text: string) {
+    super()
+  }
 
-  eq(other: TableWidget) { return other.text === this.text }
+  eq(other: TableWidget) {
+    return other.text === this.text
+  }
 
   toDOM() {
-    const lines = this.text.split('\n').filter(l => l.trim())
+    const lines = this.text.split('\n').filter((l) => l.trim())
     const parseRow = (line: string) =>
-      line.split('|').slice(1, -1).map(c => c.trim())
+      line
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim())
 
     const headers = parseRow(lines[0] ?? '')
     const dataRows = lines.slice(2).map(parseRow)
@@ -96,16 +131,16 @@ class TableWidget extends WidgetType {
 
     const thead = table.createTHead()
     const headerRow = thead.insertRow()
-    headers.forEach(h => {
+    headers.forEach((h) => {
       const th = document.createElement('th')
       th.textContent = h
       headerRow.appendChild(th)
     })
 
     const tbody = table.createTBody()
-    dataRows.forEach(cells => {
+    dataRows.forEach((cells) => {
       const tr = tbody.insertRow()
-      cells.forEach(cell => {
+      cells.forEach((cell) => {
         const td = tr.insertCell()
         td.textContent = cell
       })
@@ -156,21 +191,30 @@ function buildBlockDecos(state: EditorState): DecorationSet {
         let closeMarkFrom = node.to
         if (c.firstChild()) {
           do {
-            if (c.name === 'CodeInfo') lang = state.doc.sliceString(c.from, c.to).trim()
-            else if (c.name === 'CodeMark' && c.from > openLine.to) closeMarkFrom = c.from
+            if (c.name === 'CodeInfo')
+              lang = state.doc.sliceString(c.from, c.to).trim()
+            else if (c.name === 'CodeMark' && c.from > openLine.to)
+              closeMarkFrom = c.from
           } while (c.nextSibling())
         }
         const closeLine = state.doc.lineAt(closeMarkFrom)
 
-        const cursorOnOpen  = sel.from <= openLine.to  && sel.to >= openLine.from
-        const cursorOnClose = sel.from <= closeLine.to && sel.to >= closeLine.from
+        const cursorOnOpen = sel.from <= openLine.to && sel.to >= openLine.from
+        const cursorOnClose =
+          sel.from <= closeLine.to && sel.to >= closeLine.from
 
         // Opening ``` line → top border widget (hide only if cursor is on that line)
+        // 这里没有添加 openLine.to + 1 ，因为第一行被top widget完全覆盖了
         if (!cursorOnOpen) {
-          const openTo = Math.min(openLine.to + 1, state.doc.length)
-          builder.add(openLine.from, openTo, Decoration.replace({
-            widget: new FencedTopWidget(lang), block: true,
-          }))
+          const openTo = Math.min(openLine.to, state.doc.length)
+          builder.add(
+            openLine.from,
+            openTo,
+            Decoration.replace({
+              widget: new FencedTopWidget(lang),
+              block: true,
+            }),
+          )
         }
 
         // Code content lines → side-border line class (always, no height change on cursor move)
@@ -184,9 +228,14 @@ function buildBlockDecos(state: EditorState): DecorationSet {
         if (!cursorOnClose && closeLine.from > openLine.to) {
           const closeFrom = closeLine.from
           const closeTo = Math.min(closeLine.to + 1, state.doc.length)
-          builder.add(closeFrom, closeTo, Decoration.replace({
-            widget: new FencedBottomWidget(), block: true,
-          }))
+          builder.add(
+            closeFrom,
+            closeTo,
+            Decoration.replace({
+              widget: new FencedBottomWidget(),
+              block: true,
+            }),
+          )
         }
 
         return false
@@ -194,19 +243,28 @@ function buildBlockDecos(state: EditorState): DecorationSet {
 
       if (node.name === 'HorizontalRule' || node.name === 'Table') {
         // Skip HR nodes that are the --- delimiters of a frontmatter block
-        if (fm && node.name === 'HorizontalRule' && node.from < fm.blockTo) return
+        if (fm && node.name === 'HorizontalRule' && node.from < fm.blockTo)
+          return
         // +1 to include the trailing \n — block decorations must cover complete lines
         const to = Math.min(node.to + 1, state.doc.length)
         if (sel.from < to && sel.to >= node.from) return
 
         if (node.name === 'HorizontalRule') {
-          builder.add(node.from, to, Decoration.replace({ widget: new HRWidget(), block: true }))
+          builder.add(
+            node.from,
+            to,
+            Decoration.replace({ widget: new HRWidget(), block: true }),
+          )
           return
         }
 
         const text = state.doc.sliceString(node.from, node.to)
-        builder.add(node.from, to, Decoration.replace({ widget: new TableWidget(text), block: true }))
-        return false  // skip Table children — handled as one unit
+        builder.add(
+          node.from,
+          to,
+          Decoration.replace({ widget: new TableWidget(text), block: true }),
+        )
+        return false // skip Table children — handled as one unit
       }
     },
   })
@@ -215,13 +273,16 @@ function buildBlockDecos(state: EditorState): DecorationSet {
 }
 
 const blockPreviewField = StateField.define<DecorationSet>({
-  create(state) { return buildBlockDecos(state) },
+  create(state) {
+    return buildBlockDecos(state)
+  },
   update(decos, tr) {
-    const selMoved = tr.state.selection.main.head !== tr.startState.selection.main.head
+    const selMoved =
+      tr.state.selection.main.head !== tr.startState.selection.main.head
     if (tr.docChanged || selMoved) return buildBlockDecos(tr.state)
     return decos.map(tr.changes)
   },
-  provide: f => EditorView.decorations.from(f),
+  provide: (f) => EditorView.decorations.from(f),
 })
 
 // ── ViewPlugin: inline decorations (bold / italic / code / wikilink) ─────────
@@ -240,7 +301,7 @@ function buildInlineDecos(view: EditorView): DecorationSet {
         switch (node.name) {
           case 'FencedCode':
           case 'CodeBlock':
-            return false  // skip — content handled by blockPreviewField; embedded language nodes can break ordering
+            return false // skip — content handled by blockPreviewField; embedded language nodes can break ordering
 
           case 'QuoteMark': {
             // Use line-level check: cursor anywhere on the blockquote line reveals >
@@ -250,13 +311,36 @@ function buildInlineDecos(view: EditorView): DecorationSet {
             break
           }
 
+          case 'ListMark': {
+            if (selOverlaps) return
+            const mark = state.doc.sliceString(node.from, node.to)
+            if (mark !== '-' && mark !== '*' && mark !== '+') break
+            // If this list item is a task ("- [ ]"), hide the mark + space so the
+            // checkbox widget (from TaskMarker) becomes the leading element.
+            const rest = state.doc.sliceString(node.to, node.to + 4)
+            if (/^ \[[ xX]\]/.test(rest)) {
+              builder.add(node.from, node.to + 1, hide)
+            } else {
+              builder.add(
+                node.from,
+                node.to,
+                Decoration.replace({ widget: new BulletWidget() }),
+              )
+            }
+            break
+          }
+
           case 'TaskMarker': {
             if (selOverlaps) return
             const text = state.doc.sliceString(node.from, node.to)
             const checked = text === '[x]' || text === '[X]'
-            builder.add(node.from, node.to, Decoration.replace({
-              widget: new CheckboxWidget(checked, node.from),
-            }))
+            builder.add(
+              node.from,
+              node.to,
+              Decoration.replace({
+                widget: new CheckboxWidget(checked, node.from),
+              }),
+            )
             break
           }
 
@@ -282,8 +366,11 @@ function buildInlineDecos(view: EditorView): DecorationSet {
             if (!c.firstChild()) return
             do {
               if (c.name === 'HeaderMark') {
-                const end = (c.to < node.to && state.doc.sliceString(c.to, c.to + 1) === ' ')
-                  ? c.to + 1 : c.to
+                const end =
+                  c.to < node.to &&
+                  state.doc.sliceString(c.to, c.to + 1) === ' '
+                    ? c.to + 1
+                    : c.to
                 builder.add(c.from, end, hide)
               }
             } while (c.nextSibling())
@@ -305,8 +392,10 @@ function buildInlineDecos(view: EditorView): DecorationSet {
             const c = node.node.cursor()
             if (!c.firstChild()) return false
             const children: { name: string; from: number; to: number }[] = []
-            do { children.push({ name: c.name, from: c.from, to: c.to }) } while (c.nextSibling())
-            const hasAlias = children.some(ch => ch.name === 'WikiLinkAlias')
+            do {
+              children.push({ name: c.name, from: c.from, to: c.to })
+            } while (c.nextSibling())
+            const hasAlias = children.some((ch) => ch.name === 'WikiLinkAlias')
             for (const ch of children) {
               if (ch.name === 'WikiLinkMark') {
                 builder.add(ch.from, ch.to, hide)
@@ -340,15 +429,19 @@ function buildInlineDecos(view: EditorView): DecorationSet {
             let urlFrom = -1
             if (c.firstChild()) {
               do {
-                if (c.name === 'URL') { urlFrom = c.from; break }
+                if (c.name === 'URL') {
+                  urlFrom = c.from
+                  break
+                }
               } while (c.nextSibling())
             }
             if (urlFrom < 0) return false
-            const prefixLen = node.name === 'Image' ? 2 : 1  // `![` vs `[`
+            const prefixLen = node.name === 'Image' ? 2 : 1 // `![` vs `[`
             const labelStart = node.from + prefixLen
-            const labelEnd = urlFrom - 2  // position of `](`
+            const labelEnd = urlFrom - 2 // position of `](`
             builder.add(node.from, labelStart, hide)
-            if (labelEnd > labelStart) builder.add(labelStart, labelEnd, mdLinkMark)
+            if (labelEnd > labelStart)
+              builder.add(labelStart, labelEnd, mdLinkMark)
             builder.add(labelEnd, node.to, hide)
             return false
           }
@@ -372,7 +465,7 @@ const inlinePreviewPlugin = ViewPlugin.fromClass(
       }
     }
   },
-  { decorations: v => v.decorations },
+  { decorations: (v) => v.decorations },
 )
 
 // ── Public export ────────────────────────────────────────────────────────────

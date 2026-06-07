@@ -71,10 +71,12 @@ const wikiLinkInlineParser: InlineParser = {
 
 export const wikiLinkParser: MarkdownConfig = {
   defineNodes: [
-    { name: 'WikiLink',       style: tags.link },
+    // Target/Alias intentionally have no highlight style: the .cm-wikilink mark
+    // (in livePreviewExtension) owns their color so the accent applies cleanly.
+    { name: 'WikiLink' },
     { name: 'WikiLinkMark',   style: tags.processingInstruction },
-    { name: 'WikiLinkTarget', style: tags.link },
-    { name: 'WikiLinkAlias',  style: tags.labelName },
+    { name: 'WikiLinkTarget' },
+    { name: 'WikiLinkAlias' },
   ],
   parseInline: [wikiLinkInlineParser],
 }

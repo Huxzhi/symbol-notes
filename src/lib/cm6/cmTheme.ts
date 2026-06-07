@@ -1,10 +1,14 @@
-import { EditorView } from '@codemirror/view'
 import { HighlightStyle } from '@codemirror/language'
+import { EditorView } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 
 export const darkTheme = EditorView.theme(
   {
-    '&': { backgroundColor: 'var(--bg-base)', color: 'var(--text)', height: '100%' },
+    '&': {
+      backgroundColor: 'var(--bg-base)',
+      color: 'var(--text)',
+      height: '100%',
+    },
     '.cm-content': {
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       fontSize: '14px',
@@ -15,8 +19,12 @@ export const darkTheme = EditorView.theme(
     },
     '.cm-cursor': { borderLeftColor: 'var(--caret)', borderLeftWidth: '2px' },
     '.cm-gutters': { display: 'none' },
-    '.cm-selectionBackground, ::selection': { backgroundColor: 'var(--bg-active) !important' },
-    '&.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--bg-active2) !important' },
+    '.cm-selectionBackground, ::selection': {
+      backgroundColor: 'var(--bg-active) !important',
+    },
+    '&.cm-focused .cm-selectionBackground': {
+      backgroundColor: 'var(--bg-active2) !important',
+    },
     '.cm-line': { padding: '0' },
     '.cm-blockquote': {
       borderLeft: '3px solid var(--accent)',
@@ -28,14 +36,17 @@ export const darkTheme = EditorView.theme(
       marginRight: '4px',
       accentColor: 'var(--accent)',
     },
+    '.cm-wikilink, .cm-wikilink *': {
+      color: 'var(--accent) !important',
+    },
     '.cm-wikilink': {
-      color: 'var(--link)',
-      textDecoration: 'underline',
-      textDecorationStyle: 'dotted',
+      borderRadius: '4px',
+      padding: '1px 4px',
+      fontWeight: '500',
       cursor: 'pointer',
     },
     '.cm-mdlink': {
-      color: 'var(--link-2)',
+      color: 'var(--accent)',
       textDecoration: 'underline',
       textDecorationStyle: 'dotted',
       cursor: 'pointer',
@@ -91,6 +102,7 @@ export const darkTheme = EditorView.theme(
       borderLeft: '1px solid var(--border-2)',
       borderRight: '1px solid var(--border-2)',
       background: 'var(--bg-elevated)',
+      padding: '0 12px',
     },
     '.cm-fenced-bottom': {
       borderLeft: '1px solid var(--border-2)',
@@ -99,6 +111,7 @@ export const darkTheme = EditorView.theme(
       borderRadius: '0 0 6px 6px',
       background: 'var(--bg-elevated)',
       height: '6px',
+      marginBottom: '16px',
     },
     '.cm-frontmatter-widget': {
       background: 'var(--bg-elevated)',
@@ -106,6 +119,7 @@ export const darkTheme = EditorView.theme(
       borderRadius: '6px',
       padding: '10px 16px',
       display: 'block',
+      marginBottom: '16px',
     },
     '.cm-frontmatter-row': {
       display: 'flex',
@@ -174,27 +188,59 @@ export const darkTheme = EditorView.theme(
       marginBottom: '8px',
     },
     '.cm-hashtag': {
-      color: 'var(--tag)',
+      color: 'var(--accent)',
       cursor: 'pointer',
+    },
+    '.cm-list-bullet': {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '1ch',
+      height: '1em',
+      verticalAlign: 'middle',
+      flexShrink: '0',
+    },
+    '.cm-list-bullet::before': {
+      content: '""',
+      display: 'block',
+      width: '4px',
+      height: '4px',
+      borderRadius: '50%',
+      flexShrink: '0',
+      backgroundColor: 'var(--text)',
     },
   },
   { dark: true },
 )
 
 export const darkHighlightStyle = HighlightStyle.define([
-  { tag: tags.heading1, color: 'var(--cm-h1)', fontWeight: 'bold', fontSize: '1.35em' },
-  { tag: tags.heading2, color: 'var(--cm-h2)', fontWeight: 'bold', fontSize: '1.15em' },
+  {
+    tag: tags.heading1,
+    color: 'var(--cm-h1)',
+    fontWeight: 'bold',
+    fontSize: '1.35em',
+  },
+  {
+    tag: tags.heading2,
+    color: 'var(--cm-h2)',
+    fontWeight: 'bold',
+    fontSize: '1.15em',
+  },
   { tag: tags.heading3, color: 'var(--cm-h3)', fontWeight: '600' },
   { tag: tags.heading4, color: 'var(--cm-h4)' },
   { tag: tags.heading5, color: 'var(--cm-h4)' },
   { tag: tags.heading6, color: 'var(--cm-h4)' },
   { tag: tags.strong, color: 'var(--cm-strong)', fontWeight: 'bold' },
   { tag: tags.emphasis, color: 'var(--cm-em)', fontStyle: 'italic' },
-  { tag: tags.strikethrough, color: 'var(--cm-strike)', textDecoration: 'line-through' },
+  {
+    tag: tags.strikethrough,
+    color: 'var(--cm-strike)',
+    textDecoration: 'line-through',
+  },
   { tag: tags.link, color: 'var(--cm-em)' },
   { tag: tags.url, color: 'var(--cm-em)' },
   { tag: tags.monospace, color: 'var(--cm-code)', fontFamily: 'monospace' },
   { tag: tags.quote, color: 'var(--cm-quote)', fontStyle: 'italic' },
-  { tag: tags.list, color: 'var(--cm-list)' },
+  { tag: tags.list, color: 'var(--text)' },
   { tag: tags.meta, color: 'var(--cm-meta)' },
 ])

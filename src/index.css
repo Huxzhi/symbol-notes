@@ -72,10 +72,7 @@ html, body, #root {
   --tag:         #279367;
   --caret:       #5a52e8;
 
-  --cm-h1: #5a52e8; --cm-h2: #7a72f0; --cm-h3: #9a92f4;
-  --cm-h4: #b0aaf6; --cm-strong: #1a1a2c; --cm-em: #2980b9;
-  --cm-strike: #9898b0; --cm-code: #7a52a8; --cm-quote: #7a7a90;
-  --cm-list: #5a52e8; --cm-meta: #9898b0;
+
 }
 
 /* ── Theme: Nord (极光) ──────────────────────────────── */
@@ -104,10 +101,7 @@ html, body, #root {
   --tag:         #a3be8c;
   --caret:       #88c0d0;
 
-  --cm-h1: #88c0d0; --cm-h2: #8fbcbb; --cm-h3: #a3b8c0;
-  --cm-h4: #b0c4c8; --cm-strong: #eceff4; --cm-em: #81a1c1;
-  --cm-strike: #7b8494; --cm-code: #b48ead; --cm-quote: #7b8494;
-  --cm-list: #88c0d0; --cm-meta: #7b8494;
+
 }
 
 /* ── Semantic utility classes ────────────────────────── */
