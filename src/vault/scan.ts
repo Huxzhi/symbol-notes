@@ -1,20 +1,39 @@
 // 职责：FS walk → FileMeta（buildScan），内容解析（runPhase1），快速重扫（rescanTree）
 // isIndexing / scanAndIndex / Phase2 索引构建 在 index.ts
 import { parseFrontmatter } from '../lib/parseFrontmatter'
+import { createMarkdownParser } from '../lib/parseMarkdown'
+import type { FileMeta, TaskItem } from '../stores/types'
+import { setVaultStore, vaultStore } from './index'
+import {
+  getCachedMeta,
+  getManyMeta,
+  hashContent,
+  setCachedMeta,
+  setFileStatEntry,
+} from './indexStorage'
+import { listAll, readFile } from './io'
 
 // ── Content parsing helpers ───────────────────────────────────────────────────
 
 export function extractTags(raw: unknown): string[] {
   if (!raw) return []
   if (Array.isArray(raw)) return raw.map(String)
-  if (typeof raw === 'string') return raw.split(',').map(s => s.trim()).filter(Boolean)
+  if (typeof raw === 'string')
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   return []
 }
 
 export function extractAliases(raw: unknown): string[] {
   if (!raw) return []
   if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
-  if (typeof raw === 'string') return raw.split(',').map(s => s.trim()).filter(Boolean)
+  if (typeof raw === 'string')
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
   return []
 }
 
@@ -23,7 +42,10 @@ function expandEtag(etag: string): string[] {
   return parts.map((_, i) => parts.slice(0, i + 1).join('/'))
 }
 
-export function mergeTagsWithBody(fmTags: string[], bodyEtags: string[]): string[] {
+export function mergeTagsWithBody(
+  fmTags: string[],
+  bodyEtags: string[],
+): string[] {
   const set = new Set(fmTags)
   for (const etag of bodyEtags) for (const t of expandEtag(etag)) set.add(t)
   return [...set]
@@ -41,17 +63,6 @@ export function extractDateFromName(name: string): string | null {
   if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
   return null
 }
-import { createMarkdownParser } from '../lib/parseMarkdown'
-import type { FileMeta, TaskItem } from '../stores/types'
-import { setVaultStore, vaultStore } from './index'
-import {
-  getCachedMeta,
-  getManyMeta,
-  hashContent,
-  setCachedMeta,
-  setFileStatEntry,
-} from './indexStorage'
-import { listAll, readFile } from './io'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +79,7 @@ function yieldToMain(): Promise<void> {
 // Cache-hit application is cheap → batch yields to keep the count-up smooth.
 const UNCHANGED_YIELD_EVERY = 50
 // Changed files are parsed (expensive) → yield after every file.
-const CHANGED_YIELD_EVERY = 1
+const CHANGED_YIELD_EVERY = 10
 
 // ── FS Walk → FileMeta (stat only) ───────────────────────────────────────────
 
@@ -79,7 +90,13 @@ export interface ScanResult {
 
 const EMPTY_CONTENT: Pick<
   FileMeta,
-  'frontmatter' | 'outLinks' | 'etags' | 'tags' | 'aliases' | 'updated' | 'tasks'
+  | 'frontmatter'
+  | 'outLinks'
+  | 'etags'
+  | 'tags'
+  | 'aliases'
+  | 'updated'
+  | 'tasks'
 > = {
   frontmatter: {},
   outLinks: [],
@@ -90,9 +107,7 @@ const EMPTY_CONTENT: Pick<
   tasks: [],
 }
 
-export async function buildScan(
-  onDetected?: () => void,
-): Promise<ScanResult> {
+export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
   const result: ScanResult = { files: {}, activePaths: new Set() }
   const epoch = new Date(0).toISOString().slice(0, 10)
   for await (const entry of listAll()) {
