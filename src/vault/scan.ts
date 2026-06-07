@@ -85,7 +85,9 @@ const EMPTY_CONTENT: Pick<
   tasks: [],
 }
 
-export async function buildScan(): Promise<ScanResult> {
+export async function buildScan(
+  onDetected?: () => void,
+): Promise<ScanResult> {
   const result: ScanResult = { files: {}, activePaths: new Set() }
   const epoch = new Date(0).toISOString().slice(0, 10)
   for await (const entry of listAll()) {
@@ -118,6 +120,7 @@ export async function buildScan(): Promise<ScanResult> {
         dated: extractDateFromName(name) ?? mtimeStr,
       }
       result.activePaths.add(path)
+      onDetected?.()
     }
   }
   return result
@@ -130,6 +133,7 @@ export async function runPhase1(
   unchanged: string[],
   changed: string[],
   activeHashes: Set<string>,
+  onParsed?: () => void,
 ): Promise<void> {
   const parser = createMarkdownParser()
   const hashes = unchanged.map((p) => vaultStore.files[p]?.hash ?? '')
@@ -146,6 +150,7 @@ export async function runPhase1(
     const meta = metas[i]
     if (meta) {
       setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...meta }))
+      onParsed?.()
     } else {
       changed.push(path)
     }
@@ -173,40 +178,46 @@ export async function runPhase1(
           hash,
           ...cachedMeta,
         }))
-        continue
+      } else {
+        const { frontmatter } = parseFrontmatter(content)
+        const {
+          outLinks,
+          inlineTags,
+          tasks: rawTaskItems,
+        } = parser.parse(content)
+        const created =
+          extractDateString(frontmatter.created) ??
+          new Date(entry.mtime).toISOString().slice(0, 10)
+        const updated = extractDateString(frontmatter.updated) ?? null
+        const dated = extractDateString(frontmatter.dated) ?? created
+        const tasks: TaskItem[] = rawTaskItems.map((t) => ({
+          ...t,
+          dueDate: t.dueDate ?? dated,
+          completedDate: t.checked ? (t.completedDate ?? dated) : null,
+        }))
+        const fmTags = extractTags(frontmatter.tags)
+        const parsed = {
+          frontmatter,
+          outLinks,
+          etags: [...new Set([...fmTags, ...inlineTags])],
+          tags: mergeTagsWithBody(fmTags, inlineTags),
+          aliases: extractAliases(frontmatter.aliases),
+          created,
+          updated,
+          dated,
+          tasks,
+        }
+        await setCachedMeta(hash, parsed)
+        setVaultStore('files', path, (f: FileMeta) => ({
+          ...f,
+          hash,
+          ...parsed,
+        }))
       }
-      const { frontmatter } = parseFrontmatter(content)
-      const {
-        outLinks,
-        inlineTags,
-        tasks: rawTaskItems,
-      } = parser.parse(content)
-      const created =
-        extractDateString(frontmatter.created) ??
-        new Date(entry.mtime).toISOString().slice(0, 10)
-      const updated = extractDateString(frontmatter.updated) ?? null
-      const dated = extractDateString(frontmatter.dated) ?? created
-      const tasks: TaskItem[] = rawTaskItems.map((t) => ({
-        ...t,
-        dueDate: t.dueDate ?? dated,
-        completedDate: t.checked ? (t.completedDate ?? dated) : null,
-      }))
-      const fmTags = extractTags(frontmatter.tags)
-      const parsed = {
-        frontmatter,
-        outLinks,
-        etags: [...new Set([...fmTags, ...inlineTags])],
-        tags: mergeTagsWithBody(fmTags, inlineTags),
-        aliases: extractAliases(frontmatter.aliases),
-        created,
-        updated,
-        dated,
-        tasks,
-      }
-      await setCachedMeta(hash, parsed)
-      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...parsed }))
     } catch {
       /* individual file errors are non-fatal */
+    } finally {
+      onParsed?.()
     }
   }
 }
