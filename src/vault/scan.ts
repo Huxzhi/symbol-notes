@@ -65,10 +65,10 @@ function yieldToMain(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-// Cache-hit application is cheap → large batch (few yields, less overhead).
-const UNCHANGED_YIELD_EVERY = 1000
-// Changed files are parsed (expensive) → small batch (more responsive).
-const CHANGED_YIELD_EVERY = 50
+// Cache-hit application is cheap → batch yields to keep the count-up smooth.
+const UNCHANGED_YIELD_EVERY = 50
+// Changed files are parsed (expensive) → yield after every file.
+const CHANGED_YIELD_EVERY = 1
 
 // ── FS Walk → FileMeta (stat only) ───────────────────────────────────────────
 
