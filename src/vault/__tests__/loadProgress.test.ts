@@ -6,10 +6,33 @@ import {
   setLoadPhase,
   incDetected,
   incParsed,
+  easeCount,
 } from '../loadProgress'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
+
+describe('easeCount', () => {
+  it('returns the target when already reached', () => {
+    expect(easeCount(0, 0)).toBe(0)
+    expect(easeCount(5, 5)).toBe(5)
+  })
+  it('always advances by at least 1 toward the target', () => {
+    expect(easeCount(0, 1)).toBe(1)
+    expect(easeCount(0, 2)).toBeGreaterThanOrEqual(1)
+  })
+  it('never overshoots the target', () => {
+    expect(easeCount(0, 100)).toBeLessThanOrEqual(100)
+  })
+  it('clamps down if current somehow exceeds target', () => {
+    expect(easeCount(50, 10)).toBe(10)
+  })
+  it('converges to the target', () => {
+    let v = 0
+    for (let i = 0; i < 500 && v < 1000; i++) v = easeCount(v, 1000)
+    expect(v).toBe(1000)
+  })
+})
 
 describe('loadProgress', () => {
   it('starts hidden in scanning phase', () => {
@@ -39,25 +62,29 @@ describe('loadProgress', () => {
     expect(loadProgress().visible).toBe(false)
   })
 
-  it('samples raw counters into the snapshot every 500ms', () => {
+  it('eases the displayed count up toward the raw target across frames', () => {
     const s = {}
     beginLoadProgress(s)
-    incDetected()
-    incDetected()
-    incParsed()
-    expect(loadProgress().detected).toBe(0) // not yet sampled
-    vi.advanceTimersByTime(500)
-    expect(loadProgress().detected).toBe(2)
-    expect(loadProgress().parsed).toBe(1)
+    for (let i = 0; i < 100; i++) incDetected()
+    expect(loadProgress().detected).toBe(0) // no frame has run yet
+    vi.advanceTimersByTime(16) // one frame
+    const after1 = loadProgress().detected
+    expect(after1).toBeGreaterThan(0)
+    expect(after1).toBeLessThan(100)
+    vi.advanceTimersByTime(16 * 80) // many frames
+    expect(loadProgress().detected).toBe(100)
     endLoadProgress(s)
   })
 
-  it('does a final sample and hides on end', () => {
+  it('snaps to the exact raw totals on end', () => {
     const s = {}
     beginLoadProgress(s)
     incDetected()
+    incParsed()
+    incParsed()
     endLoadProgress(s)
     expect(loadProgress().detected).toBe(1)
+    expect(loadProgress().parsed).toBe(2)
     expect(loadProgress().visible).toBe(false)
     expect(loadProgress().phase).toBe('done')
   })
