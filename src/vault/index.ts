@@ -15,6 +15,13 @@ import {
 import { LocalAdapter } from './fs/LocalAdapter'
 import type { FileSystemAdapter } from './fs/types'
 import {
+  beginLoadProgress,
+  endLoadProgress,
+  setLoadPhase,
+  incDetected,
+  incParsed,
+} from './loadProgress'
+import {
   deleteFileStatEntry,
   getCachedMeta,
   hashContent,
@@ -115,47 +122,54 @@ export async function scanAndIndex(): Promise<void> {
 
   if (!isReady()) return
   setIsIndexing(true)
+  beginLoadProgress(session)
 
-  const [{ files, activePaths }, idbStats] = await Promise.all([
-    buildScan(),
-    loadAllFileStats(),
-  ])
+  try {
+    const [{ files, activePaths }, idbStats] = await Promise.all([
+      buildScan(incDetected),
+      loadAllFileStats(),
+    ])
 
-  if (session.cancelled) return
+    if (session.cancelled) return
 
-  const MAX_PARSE_BYTES = 20 * 1024 * 1024
-  const mdUnchanged: string[] = []
-  const mdChanged: string[] = []
+    const MAX_PARSE_BYTES = 20 * 1024 * 1024
+    const mdUnchanged: string[] = []
+    const mdChanged: string[] = []
 
-  for (const [path, file] of Object.entries(files)) {
-    if (file.kind !== 'file' || !path.endsWith('.md')) continue
-    if (file.size > MAX_PARSE_BYTES) continue
-    const stat = idbStats.get(path)
-    if (stat && stat.size === file.size && stat.mtime === file.mtime) {
-      files[path] = { ...file, hash: stat.hash }
-      mdUnchanged.push(path)
-    } else {
-      mdChanged.push(path)
+    for (const [path, file] of Object.entries(files)) {
+      if (file.kind !== 'file' || !path.endsWith('.md')) continue
+      if (file.size > MAX_PARSE_BYTES) continue
+      const stat = idbStats.get(path)
+      if (stat && stat.size === file.size && stat.mtime === file.mtime) {
+        files[path] = { ...file, hash: stat.hash }
+        mdUnchanged.push(path)
+      } else {
+        mdChanged.push(path)
+      }
+    }
+
+    setVaultStore('files', files)
+    setLoadPhase(session, 'parsing')
+
+    const activeHashes = new Set<string>()
+    await runPhase1(session, mdUnchanged, mdChanged, activeHashes, incParsed)
+
+    if (!session.cancelled) {
+      const mdFiles = Object.fromEntries(
+        Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
+      )
+      buildBacklinks(mdFiles)
+      buildTags(mdFiles)
+      buildTasks(mdFiles)
+      pruneFileStatCache(activePaths).catch(() => {})
+      pruneCache(activeHashes).catch(() => {})
+    }
+  } finally {
+    if (currentSession === session) {
+      setIsIndexing(false)
+      endLoadProgress(session)
     }
   }
-
-  setVaultStore('files', files)
-
-  const activeHashes = new Set<string>()
-  await runPhase1(session, mdUnchanged, mdChanged, activeHashes)
-
-  if (!session.cancelled) {
-    const mdFiles = Object.fromEntries(
-      Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
-    )
-    buildBacklinks(mdFiles)
-    buildTags(mdFiles)
-    buildTasks(mdFiles)
-    pruneFileStatCache(activePaths).catch(() => {})
-    pruneCache(activeHashes).catch(() => {})
-  }
-
-  if (currentSession === session) setIsIndexing(false)
 }
 
 type ContentFields = Pick<
