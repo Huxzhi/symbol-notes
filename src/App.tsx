@@ -27,6 +27,8 @@ import { LinksPlugin } from './plugins/links'
 import { OutlinePlugin } from './plugins/outline'
 import { SearchPlugin } from './plugins/search'
 import { TagsPlugin } from './plugins/tags'
+import { TemplatesPlugin } from './plugins/templates'
+import { TemplatePicker } from './plugins/templates/TemplatePicker'
 import { restoreVault } from './vault'
 import { settingsStore } from './stores/settingsStore'
 import { activeRoot } from './stores/workspaceStore'
@@ -61,6 +63,7 @@ registerPlugin(CalendarPlugin)
 registerPlugin(DailyNotePlugin)
 registerPlugin(DashboardPlugin)
 registerPlugin(ExcalidrawPlugin)
+registerPlugin(TemplatesPlugin)
 startPlugins()
 
 export default function App() {
@@ -103,6 +106,7 @@ export default function App() {
       <ToastContainer />
       <ConfirmModal />
       <ConflictModal />
+      <TemplatePicker />
     </div>
   )
 }
