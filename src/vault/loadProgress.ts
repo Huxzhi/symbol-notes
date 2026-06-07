@@ -7,6 +7,8 @@ export interface LoadSnapshot {
   phase: LoadPhase
   detected: number
   parsed: number
+  /** Total markdown files to parse in phase 2 (0 until known). */
+  parsedTotal: number
 }
 
 const SHOW_DELAY_MS = 300
@@ -24,6 +26,7 @@ const [snapshot, setSnapshot] = createSignal<LoadSnapshot>({
   phase: 'idle',
   detected: 0,
   parsed: 0,
+  parsedTotal: 0,
 })
 
 /** Reactive accessor for the current load progress snapshot. */
@@ -81,7 +84,13 @@ export function beginLoadProgress(session: object): void {
   detectedRaw = 0
   parsedRaw = 0
   stopTimers()
-  setSnapshot({ visible: false, phase: 'scanning', detected: 0, parsed: 0 })
+  setSnapshot({
+    visible: false,
+    phase: 'scanning',
+    detected: 0,
+    parsed: 0,
+    parsedTotal: 0,
+  })
   showTimer = setTimeout(() => {
     if (currentSession !== session) return
     setSnapshot((s) => ({ ...s, visible: true }))
@@ -94,14 +103,21 @@ export function setLoadPhase(session: object, phase: LoadPhase): void {
   setSnapshot((s) => ({ ...s, phase }))
 }
 
+/** Record how many markdown files phase 2 will parse (for the "M / N" display). */
+export function setParseTotal(session: object, total: number): void {
+  if (currentSession !== session) return
+  setSnapshot((s) => ({ ...s, parsedTotal: total }))
+}
+
 export function endLoadProgress(session: object): void {
   if (currentSession !== session) return
   stopTimers()
-  setSnapshot({
+  setSnapshot((s) => ({
+    ...s,
     visible: false,
     phase: 'done',
     detected: detectedRaw,
     parsed: parsedRaw,
-  })
+  }))
   currentSession = null
 }

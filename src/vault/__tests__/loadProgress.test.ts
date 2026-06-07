@@ -4,6 +4,7 @@ import {
   beginLoadProgress,
   endLoadProgress,
   setLoadPhase,
+  setParseTotal,
   incDetected,
   incParsed,
   easeCount,
@@ -87,6 +88,16 @@ describe('loadProgress', () => {
     expect(loadProgress().parsed).toBe(2)
     expect(loadProgress().visible).toBe(false)
     expect(loadProgress().phase).toBe('done')
+  })
+
+  it('records the parse total and preserves it on end', () => {
+    const s = {}
+    beginLoadProgress(s)
+    expect(loadProgress().parsedTotal).toBe(0)
+    setParseTotal(s, 400)
+    expect(loadProgress().parsedTotal).toBe(400)
+    endLoadProgress(s)
+    expect(loadProgress().parsedTotal).toBe(400)
   })
 
   it('updates phase only for the current session', () => {

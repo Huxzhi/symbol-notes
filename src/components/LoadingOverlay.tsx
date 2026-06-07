@@ -37,7 +37,9 @@ export function LoadingOverlay() {
                 p().phase === 'parsing' ? 'text-(--text)' : 'text-(--text-3)'
               }
             >
-              第二阶段：已解析 {p().parsed} 个文件
+              第二阶段：已解析 {p().parsed}
+              {p().parsedTotal > 0 ? ` / ${p().parsedTotal}` : ''} 个 Markdown
+              文件
             </span>
           </div>
         </div>

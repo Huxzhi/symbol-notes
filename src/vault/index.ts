@@ -18,6 +18,7 @@ import {
   beginLoadProgress,
   endLoadProgress,
   setLoadPhase,
+  setParseTotal,
   incDetected,
   incParsed,
 } from './loadProgress'
@@ -149,6 +150,7 @@ export async function scanAndIndex(): Promise<void> {
     }
 
     setVaultStore('files', files)
+    setParseTotal(session, mdUnchanged.length + mdChanged.length)
     setLoadPhase(session, 'parsing')
 
     const activeHashes = new Set<string>()
