@@ -170,21 +170,42 @@ export type MenuItem =
 
 type ContextMenuFactory = (dataset: DOMStringMap) => MenuItem[]
 
-const _contextMenuRegistry = new Map<string, ContextMenuFactory>()
+const _contextMenuRegistry = new Map<string, ContextMenuFactory[]>()
 
 export function registerContextMenu(
   type: string,
   factory: ContextMenuFactory,
 ): void {
-  _contextMenuRegistry.set(type, factory)
+  const list = _contextMenuRegistry.get(type)
+  if (list) list.push(factory)
+  else _contextMenuRegistry.set(type, [factory])
 }
 
-export function unregisterContextMenu(type: string): void {
-  _contextMenuRegistry.delete(type)
+export function unregisterContextMenu(
+  type: string,
+  factory?: ContextMenuFactory,
+): void {
+  if (!factory) {
+    _contextMenuRegistry.delete(type)
+    return
+  }
+  const list = _contextMenuRegistry.get(type)
+  if (!list) return
+  const next = list.filter((f) => f !== factory)
+  if (next.length > 0) _contextMenuRegistry.set(type, next)
+  else _contextMenuRegistry.delete(type)
 }
 
 export function getMenuItems(type: string, dataset: DOMStringMap): MenuItem[] {
-  return _contextMenuRegistry.get(type)?.(dataset) ?? []
+  const list = _contextMenuRegistry.get(type)
+  if (!list || list.length === 0) return []
+  const groups = list.map((f) => f(dataset)).filter((g) => g.length > 0)
+  const out: MenuItem[] = []
+  groups.forEach((g, i) => {
+    if (i > 0) out.push({ separator: true })
+    out.push(...g)
+  })
+  return out
 }
 
 export function _resetContextMenuForTest(): void {
@@ -303,7 +324,7 @@ function loadPlugin(def: PluginDef): () => void {
       },
       contextMenu(type, factory) {
         registerContextMenu(type, factory)
-        onCleanup(() => unregisterContextMenu(type))
+        onCleanup(() => unregisterContextMenu(type, factory))
       },
       vault: {
         ready: () => vaultFs() !== null,
