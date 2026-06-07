@@ -171,12 +171,13 @@ html, body, #root {
 
 @keyframes loading-overlay-slide {
   0% {
-    left: -33%;
+    transform: translateX(-100%);
   }
   100% {
-    left: 100%;
+    transform: translateX(300%);
   }
 }
 .loading-overlay-bar {
   animation: loading-overlay-slide 1.1s ease-in-out infinite;
+  will-change: transform;
 }

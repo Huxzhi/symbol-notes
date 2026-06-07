@@ -144,6 +144,14 @@ export async function runPhase1(
   const metas = await getManyMeta(hashes)
   for (let i = 0; i < unchanged.length; i++) {
     if (session.cancelled) return
+    // Yield periodically so the main thread isn't blocked by a large
+    // synchronous cache-hit burst — lets the progress sampler fire and the
+    // UI repaint (otherwise the parsed count appears stuck and the overlay
+    // animation stutters).
+    if (i > 0 && (i & 255) === 0) {
+      await idle()
+      if (session.cancelled) return
+    }
     const path = unchanged[i]
     const hash = hashes[i]
     if (!hash) continue

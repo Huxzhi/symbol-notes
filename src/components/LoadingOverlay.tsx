@@ -20,7 +20,7 @@ export function LoadingOverlay() {
             {p().phase === 'parsing' ? '解析文件中…' : '检测文件中…'}
           </div>
           <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-(--bg-active)">
-            <div class="loading-overlay-bar absolute inset-y-0 w-1/3 rounded-full bg-(--accent)" />
+            <div class="loading-overlay-bar absolute inset-y-0 left-0 w-1/3 rounded-full bg-(--accent)" />
           </div>
           <div class="flex flex-col gap-1 text-[12px] text-(--text-2)">
             <span>检测到 {p().detected} 个文件</span>
