@@ -1,13 +1,16 @@
+import { For } from 'solid-js'
 import { BookOpen } from 'lucide-solid'
 import type { SettingsTabProps } from '../../lib/pluginRegistry'
 import { definePlugin } from '../../lib/pluginRegistry'
 import { closeModal, showModal } from '../../stores/modalStore'
+import { listTemplates, resolveTemplate } from '../../lib/templates'
 import { todayPath } from './formatDate'
 
 const DEFAULTS = {
   folder: 'journal',
   dateFormat: 'YYYY-MM-DD',
   autoCreate: false,
+  template: '', // 模板文件 path；空 = 不使用
 }
 
 function TextRow(props: {
@@ -88,6 +91,22 @@ function DailyNoteSettings(props: SettingsTabProps) {
         checked={config().autoCreate as boolean}
         onChange={(v) => props.setConfig({ autoCreate: v })}
       />
+      <div class="flex flex-col gap-1">
+        <div class="text-[13px] t-base font-medium">模板</div>
+        <div class="text-[11px] t-3 leading-relaxed">
+          新建日记时套用的模板（来自“模板”设置里配置的文件夹）。
+        </div>
+        <select
+          class="mt-1 px-2 py-1 text-[13px] rounded border border-(--border) bg-(--bg-base) text-(--text) focus:outline-none focus:border-(--accent)"
+          value={config().template as string}
+          onChange={(e) => props.setConfig({ template: e.currentTarget.value })}
+        >
+          <option value="">无</option>
+          <For each={listTemplates()}>
+            {(t) => <option value={t.path}>{t.name}</option>}
+          </For>
+        </select>
+      </div>
     </div>
   )
 }
@@ -109,9 +128,27 @@ export const DailyNotePlugin = definePlugin({
         return
       }
 
-      if (autoCreate) {
+      const { template } = ctx.settings.getConfig(DEFAULTS)
+
+      const createWithTemplate = async () => {
         const created = await ctx.vault.createFile(path)
-        if (created) ctx.workspace.openFile(created)
+        if (!created) return
+        const tpl = template as string
+        if (tpl) {
+          try {
+            const raw = await ctx.vault.readFile(tpl)
+            const fileName = path.split('/').pop()!.replace(/\.md$/, '')
+            const { text } = resolveTemplate(raw, { title: fileName })
+            await ctx.vault.saveFile(created, text)
+          } catch {
+            // 模板读取失败：保持空文件
+          }
+        }
+        ctx.workspace.openFile(created)
+      }
+
+      if (autoCreate) {
+        await createWithTemplate()
         return
       }
 
@@ -125,9 +162,7 @@ export const DailyNotePlugin = definePlugin({
             variant: 'primary',
             onClick: () => {
               closeModal()
-              void ctx.vault.createFile(path).then((created) => {
-                if (created) ctx.workspace.openFile(created)
-              })
+              void createWithTemplate()
             },
           },
         ],
