@@ -157,6 +157,11 @@ export async function scanAndIndex(): Promise<void> {
     await runPhase1(session, mdUnchanged, mdChanged, activeHashes, incParsed)
 
     if (!session.cancelled) {
+      setLoadPhase(session, 'building')
+      // Let the overlay paint the "building" phase before the synchronous
+      // index builds block the main thread.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      if (session.cancelled) return
       const mdFiles = Object.fromEntries(
         Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
       )
