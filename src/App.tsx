@@ -29,6 +29,7 @@ import { SearchPlugin } from './plugins/search'
 import { TagsPlugin } from './plugins/tags'
 import { TemplatesPlugin } from './plugins/templates'
 import { TemplatePicker } from './plugins/templates/TemplatePicker'
+import { LoadingOverlay } from './components/LoadingOverlay'
 import { restoreVault } from './vault'
 import { settingsStore } from './stores/settingsStore'
 import { activeRoot } from './stores/workspaceStore'
@@ -107,6 +108,7 @@ export default function App() {
       <ConfirmModal />
       <ConflictModal />
       <TemplatePicker />
+      <LoadingOverlay />
     </div>
   )
 }
