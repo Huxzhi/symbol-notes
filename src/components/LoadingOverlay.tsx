@@ -17,14 +17,28 @@ export function LoadingOverlay() {
             正在加载笔记库…
           </div>
           <div class="text-[12px] text-(--text-3)">
-            {p().phase === 'parsing' ? '解析文件中…' : '检测文件中…'}
+            {p().phase === 'parsing'
+              ? '第二阶段 · 解析文件内容…'
+              : '第一阶段 · 读取本地文件夹信息…'}
           </div>
           <div class="relative h-1.5 w-full overflow-hidden rounded-full bg-(--bg-active)">
             <div class="loading-overlay-bar absolute inset-y-0 left-0 w-1/3 rounded-full bg-(--accent)" />
           </div>
           <div class="flex flex-col gap-1 text-[12px] text-(--text-2)">
-            <span>检测到 {p().detected} 个文件</span>
-            <span>已解析 {p().parsed} 个文件</span>
+            <span
+              class={
+                p().phase === 'parsing' ? 'text-(--text-3)' : 'text-(--text)'
+              }
+            >
+              第一阶段：检测到 {p().detected} 个文件
+            </span>
+            <span
+              class={
+                p().phase === 'parsing' ? 'text-(--text)' : 'text-(--text-3)'
+              }
+            >
+              第二阶段：已解析 {p().parsed} 个文件
+            </span>
           </div>
         </div>
       </div>
