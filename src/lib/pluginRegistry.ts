@@ -270,6 +270,10 @@ export interface PluginContext {
     activeOutLinks(): OutLink[]
     /** Headings parsed from the active editor. Reactive. Empty when no editor is open. */
     activeHeadings(): Heading[]
+    /** Insert text at the cursor of the active editor. cursorPos = offset within
+     *  the inserted text to place the caret (null/undefined → end of insert).
+     *  Returns false when no editor is active. */
+    insertAtCursor(text: string, cursorPos?: number | null): boolean
   }
   settings: {
     tab(def: SettingsTabInput): void
@@ -376,6 +380,20 @@ function loadPlugin(def: PluginDef): () => void {
         activeHeadings: () => {
           const id = activeLayout().activeLeafId
           return id ? (leafInstances[id]?.headings ?? []) : []
+        },
+        insertAtCursor: (text, cursorPos) => {
+          const id = activeLayout().activeLeafId
+          if (!id) return false
+          const view = leafInstances[id]?.cmView
+          if (!view) return false
+          const sel = view.state.selection.main
+          const caret = sel.from + (cursorPos ?? text.length)
+          view.dispatch({
+            changes: { from: sel.from, to: sel.to, insert: text },
+            selection: { anchor: caret },
+          })
+          view.focus()
+          return true
         },
       },
       settings: {
