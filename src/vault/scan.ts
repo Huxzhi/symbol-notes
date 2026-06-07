@@ -55,15 +55,20 @@ import { listAll, readFile } from './io'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function idle(): Promise<void> {
-  return new Promise((resolve) => {
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(() => resolve(), { timeout: 500 })
-    } else {
-      setTimeout(resolve, 0)
-    }
-  })
+/**
+ * Yield to the event loop via a macrotask so the browser can paint and the
+ * progress count-up can advance. setTimeout(0) is predictable (no
+ * requestIdleCallback "wait for idle" up-to-500ms uncertainty); we call it in
+ * batches to keep throughput high.
+ */
+function yieldToMain(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
 }
+
+// Cache-hit application is cheap → large batch (few yields, less overhead).
+const UNCHANGED_YIELD_EVERY = 1000
+// Changed files are parsed (expensive) → small batch (more responsive).
+const CHANGED_YIELD_EVERY = 50
 
 // ── FS Walk → FileMeta (stat only) ───────────────────────────────────────────
 
@@ -144,12 +149,11 @@ export async function runPhase1(
   const metas = await getManyMeta(hashes)
   for (let i = 0; i < unchanged.length; i++) {
     if (session.cancelled) return
-    // Yield periodically so the main thread isn't blocked by a large
-    // synchronous cache-hit burst — lets the progress sampler fire and the
-    // UI repaint (otherwise the parsed count appears stuck and the overlay
-    // animation stutters).
-    if (i > 0 && (i & 255) === 0) {
-      await idle()
+    // Yield in batches so the main thread isn't blocked by a large
+    // synchronous cache-hit burst — lets the UI repaint and the progress
+    // count-up advance.
+    if (i > 0 && i % UNCHANGED_YIELD_EVERY === 0) {
+      await yieldToMain()
       if (session.cancelled) return
     }
     const path = unchanged[i]
@@ -164,10 +168,13 @@ export async function runPhase1(
     }
   }
 
-  for (const path of changed) {
+  for (let ci = 0; ci < changed.length; ci++) {
+    const path = changed[ci]
     if (session.cancelled) return
-    await idle()
-    if (session.cancelled) return
+    if (ci > 0 && ci % CHANGED_YIELD_EVERY === 0) {
+      await yieldToMain()
+      if (session.cancelled) return
+    }
     try {
       const content = await readFile(path)
       const hash = hashContent(content)
