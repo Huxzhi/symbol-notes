@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { tasksField, isTaskLine, offsetISO, todayISO, nextMondayISO, completionLineEdit } from '../cm6/tasksField'
+import { tasksField, isTaskLine, offsetISO, todayISO, nextMondayISO, completionLineEdit, taskFieldComplete, fieldCompletionSource, valueCompletionSource } from '../cm6/tasksField'
+import { CompletionContext } from '@codemirror/autocomplete'
 
 function parse(content: string) {
   const state = EditorState.create({
@@ -146,5 +147,58 @@ describe('completionLineEdit', () => {
   })
   it('does nothing when unchecking a task without completion', () => {
     expect(completionLineEdit('- [x] task', false, '2026-06-09')).toEqual({})
+  })
+})
+
+describe('completion sources', () => {
+  function ctxAt(doc: string, pos: number) {
+    const state = EditorState.create({
+      doc,
+      extensions: [markdown({ extensions: [GFM] })],
+    })
+    return new CompletionContext(state, pos, true)
+  }
+
+  it('field source lists due/completion/priority after [ on a task line', () => {
+    const doc = '- [ ] task ['
+    const res = fieldCompletionSource(ctxAt(doc, doc.length))
+    expect(res).not.toBeNull()
+    expect(res!.options.map((o) => o.label)).toEqual(['due', 'completion', 'priority'])
+    expect(res!.from).toBe(doc.length - 1)
+  })
+
+  it('field source ignores non-task lines', () => {
+    const doc = 'plain text ['
+    expect(fieldCompletionSource(ctxAt(doc, doc.length))).toBeNull()
+  })
+
+  it('field source ignores wikilink [[', () => {
+    const doc = '- [ ] task [['
+    expect(fieldCompletionSource(ctxAt(doc, doc.length))).toBeNull()
+  })
+
+  it('value source lists priority values after [priority::', () => {
+    const doc = '- [ ] task [priority::'
+    const res = valueCompletionSource(ctxAt(doc, doc.length))
+    expect(res).not.toBeNull()
+    expect(res!.options.map((o) => o.label)).toEqual(['high', 'medium', 'low'])
+  })
+
+  it('value source lists date options after [due::', () => {
+    const doc = '- [ ] task [due::'
+    const res = valueCompletionSource(ctxAt(doc, doc.length))
+    expect(res).not.toBeNull()
+    expect(res!.options.map((o) => o.label)).toContain('今天')
+    const today = res!.options.find((o) => o.label === '今天')!
+    expect(today.apply).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('value source returns null when not after a field', () => {
+    const doc = '- [ ] task'
+    expect(valueCompletionSource(ctxAt(doc, doc.length))).toBeNull()
+  })
+
+  it('taskFieldComplete is a defined extension', () => {
+    expect(taskFieldComplete).toBeDefined()
   })
 })

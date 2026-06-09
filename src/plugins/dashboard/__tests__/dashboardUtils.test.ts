@@ -19,6 +19,7 @@ function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
     line: 0,
     dueDate: null,
     completedDate: null,
+    priority: null,
     fields: {},
     ...overrides,
   }

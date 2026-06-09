@@ -1,6 +1,13 @@
 import { syntaxTree } from '@codemirror/language'
 import { StateField } from '@codemirror/state'
 import type { EditorState } from '@codemirror/state'
+import {
+  autocompletion,
+  startCompletion,
+  type CompletionContext,
+  type CompletionResult,
+} from '@codemirror/autocomplete'
+import type { EditorView } from '@codemirror/view'
 import type { TaskItem } from '../../stores/types'
 
 const INLINE_FIELD_RE = /\[([^\]]+?)::([^\]]*)\]/g
@@ -133,4 +140,76 @@ export const tasksField = StateField.define<TaskItem[]>({
     if (tr.docChanged) return extractTasks(tr.state)
     return tasks
   },
+})
+
+// ── Inline-field autocomplete ────────────────────────────────────────────────
+
+const FIELD_KEYS = ['due', 'completion', 'priority'] as const
+const PRIORITY_VALUES = ['high', 'medium', 'low'] as const
+const VALUE_TRIGGER_RE = /\[(due|completion|priority)::([^\]\n]*)$/
+
+type DateOption = { label: string; resolve: () => string }
+const DATE_OPTIONS: DateOption[] = [
+  { label: '今天', resolve: () => offsetISO(0) },
+  { label: '明天', resolve: () => offsetISO(1) },
+  { label: '后天', resolve: () => offsetISO(2) },
+  { label: '昨天', resolve: () => offsetISO(-1) },
+  { label: '一周后', resolve: () => offsetISO(7) },
+  { label: '上周', resolve: () => offsetISO(-7) },
+  { label: '下周一', resolve: () => nextMondayISO() },
+]
+
+/** 任务行内输入单个 `[`（非 `[[`）→ 字段补全：due/completion/priority。 */
+export function fieldCompletionSource(ctx: CompletionContext): CompletionResult | null {
+  const line = ctx.state.doc.lineAt(ctx.pos)
+  if (!isTaskLine(line.text)) return null
+  const match = ctx.matchBefore(/\[$/)
+  if (!match) return null
+  // 排除 wikilink `[[`：`[` 前一字符不能是 `[`
+  if (match.from > 0 && ctx.state.sliceDoc(match.from - 1, match.from) === '[') return null
+  return {
+    from: match.from,
+    options: FIELD_KEYS.map((key) => ({
+      label: key,
+      type: 'property',
+      apply: (view: EditorView, _c: unknown, from: number, to: number) => {
+        const insert = `[${key}::]`
+        view.dispatch({
+          changes: { from, to, insert },
+          selection: { anchor: from + insert.length - 1 }, // 落在 `]` 前
+        })
+        startCompletion(view)
+      },
+    })),
+  }
+}
+
+/** 光标在 `[due::|completion::|priority::` 之后 → 值补全（日期 / 优先级）。 */
+export function valueCompletionSource(ctx: CompletionContext): CompletionResult | null {
+  const line = ctx.state.doc.lineAt(ctx.pos)
+  if (!isTaskLine(line.text)) return null
+  const match = ctx.matchBefore(VALUE_TRIGGER_RE)
+  if (!match) return null
+  const m = VALUE_TRIGGER_RE.exec(match.text)
+  if (!m) return null
+  const field = m[1]
+  const valueStart = match.from + match.text.indexOf('::') + 2
+  if (field === 'priority') {
+    return {
+      from: valueStart,
+      options: PRIORITY_VALUES.map((v) => ({ label: v, type: 'enum' })),
+    }
+  }
+  return {
+    from: valueStart,
+    options: DATE_OPTIONS.map((opt) => {
+      const date = opt.resolve()
+      return { label: opt.label, detail: date, apply: date, type: 'text' }
+    }),
+  }
+}
+
+export const taskFieldComplete = autocompletion({
+  override: [fieldCompletionSource, valueCompletionSource],
+  activateOnTyping: true,
 })
