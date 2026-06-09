@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { tasksField, isTaskLine, offsetISO, todayISO, nextMondayISO } from '../cm6/tasksField'
+import { tasksField, isTaskLine, offsetISO, todayISO, nextMondayISO, completionLineEdit } from '../cm6/tasksField'
 
 function parse(content: string) {
   const state = EditorState.create({
@@ -127,5 +127,24 @@ describe('isTaskLine', () => {
     expect(isTaskLine('- plain item')).toBe(false)
     expect(isTaskLine('just text')).toBe(false)
     expect(isTaskLine('[due::x]')).toBe(false)
+  })
+})
+
+describe('completionLineEdit', () => {
+  it('appends completion field when checking a task without one', () => {
+    expect(completionLineEdit('- [ ] task', true, '2026-06-09')).toEqual({
+      append: ' [completion::2026-06-09]',
+    })
+  })
+  it('does nothing when checking a task that already has completion', () => {
+    expect(completionLineEdit('- [ ] task [completion::2026-01-01]', true, '2026-06-09')).toEqual({})
+  })
+  it('removes completion field (with leading space) when unchecking', () => {
+    const text = '- [x] task [completion::2026-06-09]'
+    const r = completionLineEdit(text, false, '2026-06-09')
+    expect(r.remove).toEqual({ from: text.indexOf(' [completion'), to: text.length })
+  })
+  it('does nothing when unchecking a task without completion', () => {
+    expect(completionLineEdit('- [x] task', false, '2026-06-09')).toEqual({})
   })
 })

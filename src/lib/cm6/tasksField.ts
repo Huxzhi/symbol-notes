@@ -41,6 +41,28 @@ export function nextMondayISO(base: Date = new Date()): string {
   return isoFromDate(d)
 }
 
+const COMPLETION_FIELD_RE = / ?\[completion::[^\]\n]*\]/
+
+/**
+ * 勾选/取消勾选任务时对行尾的编辑。
+ * - willCheck=true 且该行无 completion → 追加 ` [completion::<today>]`
+ * - willCheck=false 且该行有 completion → 删除该片段（含前导空格），返回行内相对区间
+ * 其余情况返回 {}（不改动）。区间 from/to 相对行首。
+ */
+export function completionLineEdit(
+  lineText: string,
+  willCheck: boolean,
+  today: string,
+): { append?: string; remove?: { from: number; to: number } } {
+  if (willCheck) {
+    if (COMPLETION_FIELD_RE.test(lineText)) return {}
+    return { append: ` [completion::${today}]` }
+  }
+  const m = COMPLETION_FIELD_RE.exec(lineText)
+  if (!m) return {}
+  return { remove: { from: m.index, to: m.index + m[0].length } }
+}
+
 function parseInlineFields(text: string): { fields: Record<string, string>; cleanText: string } {
   const fields: Record<string, string> = {}
   INLINE_FIELD_RE.lastIndex = 0
