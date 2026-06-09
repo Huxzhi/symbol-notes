@@ -66,6 +66,7 @@ export interface TaskItem {
   line: number                    // 0-based line number in file
   dueDate: string | null          // [due::YYYY-MM-DD] → dated fallback
   completedDate: string | null    // checked=true: [completion::...] → dated; checked=false: null
+  priority: string | null         // [priority::high|medium|low] → null when absent
   fields: Record<string, string>  // all other [key::value] inline fields
 }
 

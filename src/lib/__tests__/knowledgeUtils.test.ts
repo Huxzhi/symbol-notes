@@ -5,11 +5,11 @@ import type { TaskItem } from '../../stores/types'
 
 const task1: TaskItem = {
   text: '- [ ] buy milk', cleanText: 'buy milk', checked: false,
-  status: ' ', line: 0, dueDate: null, completedDate: null, fields: {},
+  status: ' ', line: 0, dueDate: null, completedDate: null, priority: null, fields: {},
 }
 const task2: TaskItem = {
   text: '- [x] done', cleanText: 'done', checked: true,
-  status: 'x', line: 1, dueDate: null, completedDate: null, fields: {},
+  status: 'x', line: 1, dueDate: null, completedDate: null, priority: null, fields: {},
 }
 
 describe('buildTaskMap', () => {

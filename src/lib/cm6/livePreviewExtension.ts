@@ -13,6 +13,7 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { detectFrontmatter } from './frontmatterField'
+import { completionLineEdit, todayISO } from './tasksField'
 
 // ── Shared decorations ──────────────────────────────────────────────────────
 
@@ -41,13 +42,26 @@ class CheckboxWidget extends WidgetType {
     el.className = 'cm-task-checkbox'
     el.addEventListener('mousedown', (e) => {
       e.preventDefault()
-      view.dispatch({
-        changes: {
+      const willCheck = !this.checked
+      const line = view.state.doc.lineAt(this.markerFrom)
+      const changes: { from: number; to: number; insert: string }[] = [
+        {
           from: this.markerFrom,
           to: this.markerFrom + 3,
-          insert: this.checked ? '[ ]' : '[x]',
+          insert: willCheck ? '[x]' : '[ ]',
         },
-      })
+      ]
+      const edit = completionLineEdit(line.text, willCheck, todayISO())
+      if (edit.append) {
+        changes.push({ from: line.to, to: line.to, insert: edit.append })
+      } else if (edit.remove) {
+        changes.push({
+          from: line.from + edit.remove.from,
+          to: line.from + edit.remove.to,
+          insert: '',
+        })
+      }
+      view.dispatch({ changes })
     })
     return el
   }
