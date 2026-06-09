@@ -159,24 +159,30 @@ const DATE_OPTIONS: DateOption[] = [
   { label: '下周一', resolve: () => nextMondayISO() },
 ]
 
-/** 任务行内输入单个 `[`（非 `[[`）→ 字段补全：due/completion/priority。 */
+/**
+ * 任务行内输入 `[`（非 `[[`）→ 字段补全：due/completion/priority。
+ * 关键：result.from 必须落在 `[` 之后——补全列表用 from..cursor 之间的文本做过滤，
+ * 若把 `[` 算进去，"["` 不匹配任何字段标签，下拉会被全部过滤掉而不显示。
+ * 匹配 `\[\w*` 让用户输入字段名时仍能继续按前缀过滤。
+ */
 export function fieldCompletionSource(ctx: CompletionContext): CompletionResult | null {
   const line = ctx.state.doc.lineAt(ctx.pos)
   if (!isTaskLine(line.text)) return null
-  const match = ctx.matchBefore(/\[$/)
+  const match = ctx.matchBefore(/\[\w*$/)
   if (!match) return null
+  const bracket = match.from // `[` 的位置
   // 排除 wikilink `[[`：`[` 前一字符不能是 `[`
-  if (match.from > 0 && ctx.state.sliceDoc(match.from - 1, match.from) === '[') return null
+  if (bracket > 0 && ctx.state.sliceDoc(bracket - 1, bracket) === '[') return null
   return {
-    from: match.from,
+    from: bracket + 1, // `[` 之后
     options: FIELD_KEYS.map((key) => ({
       label: key,
       type: 'property',
       apply: (view: EditorView, _c: unknown, from: number, to: number) => {
-        const insert = `[${key}::]`
+        const insert = `${key}:: ]` // `[` 已在文档中；`::` 后留一个空格（Dataview 习惯）
         view.dispatch({
           changes: { from, to, insert },
-          selection: { anchor: from + insert.length - 1 }, // 落在 `]` 前
+          selection: { anchor: from + insert.length - 1 }, // 落在 `]` 前（即空格之后）
         })
         startCompletion(view)
       },
@@ -193,7 +199,9 @@ export function valueCompletionSource(ctx: CompletionContext): CompletionResult 
   const m = VALUE_TRIGGER_RE.exec(match.text)
   if (!m) return null
   const field = m[1]
-  const valueStart = match.from + match.text.indexOf('::') + 2
+  let valueStart = match.from + match.text.indexOf('::') + 2
+  // 跳过 `::` 后的空格，让插入的值落在空格之后：[due:: 2026-05-21]
+  while (ctx.state.sliceDoc(valueStart, valueStart + 1) === ' ') valueStart++
   if (field === 'priority') {
     return {
       from: valueStart,

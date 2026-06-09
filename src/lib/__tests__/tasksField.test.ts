@@ -164,7 +164,16 @@ describe('completion sources', () => {
     const res = fieldCompletionSource(ctxAt(doc, doc.length))
     expect(res).not.toBeNull()
     expect(res!.options.map((o) => o.label)).toEqual(['due', 'completion', 'priority'])
-    expect(res!.from).toBe(doc.length - 1)
+    // from 落在 `[` 之后，使过滤文本为空、整列可见
+    expect(res!.from).toBe(doc.length)
+  })
+
+  it('field source filters by typed key prefix', () => {
+    const doc = '- [ ] task [du'
+    const res = fieldCompletionSource(ctxAt(doc, doc.length))
+    expect(res).not.toBeNull()
+    expect(res!.from).toBe(doc.indexOf('[du') + 1) // 仍在 `[` 之后
+    expect(res!.options.map((o) => o.label)).toEqual(['due', 'completion', 'priority'])
   })
 
   it('field source ignores non-task lines', () => {
@@ -191,6 +200,14 @@ describe('completion sources', () => {
     expect(res!.options.map((o) => o.label)).toContain('今天')
     const today = res!.options.find((o) => o.label === '今天')!
     expect(today.apply).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('value source skips the space after :: so the value lands after it', () => {
+    const doc = '- [ ] task [due:: '
+    const res = valueCompletionSource(ctxAt(doc, doc.length))
+    expect(res).not.toBeNull()
+    expect(res!.from).toBe(doc.length) // 落在空格之后，而非紧贴 ::
+    expect(res!.options.map((o) => o.label)).toContain('今天')
   })
 
   it('value source returns null when not after a field', () => {
