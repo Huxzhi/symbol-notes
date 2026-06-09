@@ -29,6 +29,7 @@ function buildTask(status: string, markerEnd: number, state: EditorState): TaskI
     line: line.number - 1,
     dueDate: fields['due'] ?? null,
     completedDate: fields['completion'] ?? null,
+    priority: fields['priority'] ?? null,
     fields,
   }
 }

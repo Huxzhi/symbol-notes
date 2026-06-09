@@ -50,6 +50,17 @@ describe('tasksField', () => {
     expect(tasks[0].completedDate).toBe('2024-05-26')
   })
 
+  it('extracts priority inline field', () => {
+    const tasks = parse('- [ ] Task [priority::high]')
+    expect(tasks[0].priority).toBe('high')
+    expect(tasks[0].fields).toMatchObject({ priority: 'high' })
+  })
+
+  it('priority is null when absent', () => {
+    const tasks = parse('- [ ] Task')
+    expect(tasks[0].priority).toBeNull()
+  })
+
   it('extracts multiple inline fields', () => {
     const tasks = parse('- [ ] Task [due::2024-05-30] [project::work]')
     expect(tasks[0].fields).toEqual({ due: '2024-05-30', project: 'work' })
