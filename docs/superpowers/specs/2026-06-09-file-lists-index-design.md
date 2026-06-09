@@ -33,7 +33,7 @@ export interface ListItem {
   visual: string                  // text 再去掉 [k:: v] 内联字段后的纯展示文本
   line: number                    // 0-based 起始行
   lineCount: number               // 该列表项跨的物理行数（≥1）
-  marker: string                  // 列表符号：'-' / '*' / '+'
+  symbol: string                  // 列表标记原文：'-' / '*' / '+'，或有序列表的 '1.' / '2.' / '1)'
   signifier: string | null        // 前导单个非词字符（* = ~ ! & … ）；无则 null
   status: string | null           // 复选框字符 ' '/'x'/'X'/'/'/'>' …；非复选框为 null
   checked: boolean                // status === 'x' || status === 'X'
@@ -57,7 +57,7 @@ export interface ListItem {
 
 `syntaxTree(state).iterate`，遇 `FencedCode`/`CodeBlock` 整段跳过（`return false`，沿用 tasksField 的做法）。
 对每个 `ListItem` 节点：
-- `marker`：该节点 `ListMark` 子节点的文本（`-`/`*`/`+`；有序列表的 `1.` 等本期忽略，只处理无序列表）。
+- `symbol`：该节点 `ListMark` 子节点的原文——无序 `-`/`*`/`+`，有序 `1.`/`2.`/`1)` 等，原样保存。
 - 起始行 `line = doc.lineAt(ListMark.from).number - 1`。
 - `lineCount = doc.lineAt(node.to).number - doc.lineAt(node.from).number + 1`（节点跨行数，≥1）。
 - 待解析内容 `content`：`ListMark` 之后到该项首行行尾的文本（即 `doc.sliceString(listMarkEnd+1, firstLine.to)`，再 `trimStart`）。
@@ -145,7 +145,7 @@ export interface ListItem {
 ## 边界与错误处理
 
 - 代码块内的"列表"不计入（语法树整段跳过）。
-- 有序列表（`1.`）本期忽略，只处理 `-`/`*`/`+`。
+- 有序列表（`1.`/`1)`）与无序列表一视同仁，`symbol` 存原始标记；内容解析（复选框/信号字符/字段）一致。
 - `- *斜体*`、`- [[链接]]`、`- #tag`（符号后无空格）→ 普通列表项，`signifier` 为 null，`text` 保留原文。
 - 空任务 `- [ ]`（复选框后无正文）：`text`/`visual` 为空串，`task=true`，合法收录。
 - 旧缓存缺 `lists` → 重解析覆盖，不报错。
@@ -153,7 +153,8 @@ export interface ListItem {
 ## 测试
 
 扩展 `src/lib/__tests__/tasksField.test.ts`（或新建 `listsField.test.ts`）：
-- 普通列表项：`- 买牛奶` → `{ task:false, signifier:null, status:null, text:'买牛奶', visual:'买牛奶', marker:'-' }`。
+- 普通列表项：`- 买牛奶` → `{ task:false, signifier:null, status:null, text:'买牛奶', visual:'买牛奶', symbol:'-' }`。
+- 有序列表项：`1. 第一步` → `{ symbol:'1.', task:false, text:'第一步' }`；`2. [ ] 做事` → `{ symbol:'2.', task:true, status:' ' }`。
 - 任务：`- [ ] 写报告 [due:: 2026-06-09]` → `{ task:true, status:' ', checked:false, text:'写报告 [due:: 2026-06-09]', visual:'写报告', fields:{due:'2026-06-09'} }`。
 - 完成任务：`- [x] done` → `{ task:true, checked:true, status:'x' }`。
 - 信号字符：`- * 看了电影` → `{ signifier:'*', task:false, text:'看了电影', visual:'看了电影' }`；
@@ -171,4 +172,3 @@ export interface ListItem {
 - 输入手感（input rule / 快捷插入）。
 - dashboard / 视图按 `signifier` 类型过滤与展示。
 - 列表项嵌套父子结构（本期扁平，`lineCount` 仅记跨度）。
-- 有序列表索引。
