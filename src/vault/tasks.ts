@@ -1,10 +1,11 @@
-import type { FileMeta, TaskItem } from '../stores/types'
+import type { FileMeta, ListItem } from '../stores/types'
 import { setVaultStore } from './index'
 
-export function buildTaskMap(files: Record<string, { tasks: TaskItem[] }>): Record<string, TaskItem[]> {
-  const result: Record<string, TaskItem[]> = {}
+export function buildTaskMap(files: Record<string, { lists: ListItem[] }>): Record<string, ListItem[]> {
+  const result: Record<string, ListItem[]> = {}
   for (const [path, meta] of Object.entries(files)) {
-    if (meta.tasks.length > 0) result[path] = meta.tasks
+    const tasks = meta.lists.filter((l) => l.task)
+    if (tasks.length > 0) result[path] = tasks
   }
   return result
 }
@@ -14,12 +15,12 @@ export function buildTasks(mdFiles: Record<string, FileMeta>): void {
   setVaultStore('taskMap', buildTaskMap(mdFiles))
 }
 
-/** 单文件 tasks 变化时增量更新 */
-export function applyFileTasks(path: string, tasks: TaskItem[]): void {
-  setVaultStore('taskMap', path, tasks)
+/** 单文件 lists 变化时增量更新任务子集 */
+export function applyFileTasks(path: string, lists: ListItem[]): void {
+  setVaultStore('taskMap', path, lists.filter((l) => l.task))
 }
 
 /** 文件删除：清理 taskMap 条目 */
 export function removeFileTasks(path: string): void {
-  setVaultStore('taskMap', path, undefined as unknown as TaskItem[])
+  setVaultStore('taskMap', path, undefined as unknown as ListItem[])
 }

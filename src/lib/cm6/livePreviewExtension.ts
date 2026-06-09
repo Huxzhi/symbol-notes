@@ -13,7 +13,7 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { detectFrontmatter } from './frontmatterField'
-import { completionLineEdit, todayISO } from './tasksField'
+import { completionLineEdit, todayISO } from './listsField'
 
 // ── Shared decorations ──────────────────────────────────────────────────────
 
