@@ -17,17 +17,19 @@
 ## 方案
 
 采用 CodeMirror 官方的 `@codemirror/autocomplete`（需新增依赖，版本对齐 `@codemirror/view` ^6），
-新增扩展文件 `src/lib/cm6/taskFieldComplete.ts`，注册两个链式补全源；
+把补全逻辑加进现有的 `src/lib/cm6/tasksField.ts`（任务相关逻辑集中一处），注册两个链式补全源；
 勾选行为改在现有 `src/lib/cm6/livePreviewExtension.ts` 的 `CheckboxWidget` 中实现。
 
 ## 组件与改动
 
-### 1. 新文件 `src/lib/cm6/taskFieldComplete.ts`
+### 1. 扩充 `src/lib/cm6/tasksField.ts`
 
-导出：
+在现有 `tasksField`（StateField 解析器）之外，新增导出：
 
 - `taskFieldComplete`：CM6 扩展（`autocompletion({ override: [fieldSource, valueSource] })`）。
 - `todayISO(): string`：返回今天的 `YYYY-MM-DD`（本地时区），供 `livePreviewExtension` 复用。
+
+无循环依赖：`tasksField.ts` 不 import `livePreviewExtension.ts`，反向由后者 import 前者的 `todayISO`。
 
 辅助：
 
@@ -88,7 +90,7 @@
   若 `line.text` 含 `[completion::…]`（正则 ` ?\[completion::[^\]\n]*\]`），从行内删除该片段（连同前导空格）。
 - 标记改动（`from=markerFrom, to=markerFrom+3`）与行尾改动放进同一次 `view.dispatch` 的 `changes` 数组。
 
-从 `taskFieldComplete.ts` 导入 `todayISO`。
+从 `tasksField.ts` 导入 `todayISO`。
 
 ### 4. 接线
 
@@ -113,11 +115,11 @@
 
 ## 测试
 
-- 单元测试 `src/lib/cm6/__tests__/taskFieldComplete.test.ts`：
+- 在现有 `src/lib/__tests__/tasksField.test.ts` 中扩展：
   - `isTaskLine` 对标准/非标准/普通列表/普通文本的判定。
   - `offsetISO` / `nextMondayISO` / `todayISO` 的日期计算（注入固定 `Date`）。
   - `fieldSource` / `valueSource`：构造 `CompletionContext`，断言返回的选项与替换区间、`due/priority` 分支。
-- 解析器：`src/lib/__tests__/tasksField.test.ts`（若已存在则扩展）断言 `[priority::high]` → `priority: 'high'`。
+  - 解析器：断言 `[priority::high]` → `priority: 'high'`。
 - 勾选行为：对 `CheckboxWidget` 的逻辑可抽出纯函数 `toggleTaskLine(text, willCheck) → {markerInsert, lineEdit}` 便于单测追加/删除 `[completion::…]`。
 
 ## 不做（YAGNI）
