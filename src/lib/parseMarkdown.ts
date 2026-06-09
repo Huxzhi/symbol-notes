@@ -4,20 +4,20 @@ import { GFM } from '@lezer/markdown'
 import { wikiLinkParser } from './cm6/wikiLinkParser'
 import { outLinksField } from './cm6/outLinksField'
 import { inlineTagsField } from './cm6/inlineTagsField'
-import { tasksField } from './cm6/tasksField'
-import type { TaskItem } from '../stores/types'
+import { listsField } from './cm6/listsField'
+import type { ListItem } from '../stores/types'
 
 export interface ParseResult {
   outLinks: string[]
   inlineTags: string[]
-  tasks: TaskItem[]
+  lists: ListItem[]
 }
 
 const EXTENSIONS = [
   markdown({ extensions: [GFM, wikiLinkParser] }),
   outLinksField,
   inlineTagsField,
-  tasksField,
+  listsField,
 ]
 
 function extractResult(state: EditorState): ParseResult {
@@ -26,7 +26,7 @@ function extractResult(state: EditorState): ParseResult {
       .filter(l => l.type === 'wiki')
       .map(l => l.target.endsWith('.md') ? l.target : `${l.target}.md`),
     inlineTags: state.field(inlineTagsField).map(m => m.tag),
-    tasks: state.field(tasksField),
+    lists: state.field(listsField),
   }
 }
 

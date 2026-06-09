@@ -22,7 +22,7 @@ import { headingsField } from '../../lib/cm6/headingsField'
 import { inlineTagDecoField, inlineTagsField } from '../../lib/cm6/inlineTagsField'
 import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
-import { tasksField, taskFieldComplete } from '../../lib/cm6/tasksField'
+import { listsField, taskFieldComplete } from '../../lib/cm6/listsField'
 import {
   formatTimestamp,
   parseFrontmatter,
@@ -76,7 +76,7 @@ function buildEditorState(
       outLinksField,
       inlineTagsField,
       inlineTagDecoField,
-      tasksField,
+      listsField,
       taskFieldComplete,
       headingsField,
       EditorView.updateListener.of(onDocChange),
@@ -127,11 +127,11 @@ export function EditorViewer(props: ViewComponentProps) {
           .filter((l) => l.type === 'wiki')
           .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
         const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
-        const tasks = view.state.field(tasksField)
+        const lists = view.state.field(listsField)
         void reindexFile(p, view.state.doc.toString(), {
           outLinks,
           inlineTags,
-          tasks,
+          lists,
         })
       }
     }, 800)
@@ -257,8 +257,8 @@ export function EditorViewer(props: ViewComponentProps) {
       .filter((l) => l.type === 'wiki')
       .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
     const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
-    const tasks = view.state.field(tasksField)
-    await fileActions.saveFile(p, content, { outLinks, inlineTags, tasks })
+    const lists = view.state.field(listsField)
+    await fileActions.saveFile(p, content, { outLinks, inlineTags, lists })
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
   }
