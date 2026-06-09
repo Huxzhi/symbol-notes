@@ -22,7 +22,7 @@ import { headingsField } from '../../lib/cm6/headingsField'
 import { inlineTagDecoField, inlineTagsField } from '../../lib/cm6/inlineTagsField'
 import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
-import { tasksField } from '../../lib/cm6/tasksField'
+import { tasksField, taskFieldComplete } from '../../lib/cm6/tasksField'
 import {
   formatTimestamp,
   parseFrontmatter,
@@ -77,6 +77,7 @@ function buildEditorState(
       inlineTagsField,
       inlineTagDecoField,
       tasksField,
+      taskFieldComplete,
       headingsField,
       EditorView.updateListener.of(onDocChange),
       EditorView.domEventHandlers({ keydown: onKeyDown, mousedown: onMouseDown }),
