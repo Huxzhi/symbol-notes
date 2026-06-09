@@ -8,7 +8,7 @@ function m(
   return {
     size: 0, mtime: 0, hash: '',
     frontmatter: {}, outLinks: [], etags: [], tags: [], aliases: [],
-    created: '2026-01-01', updated: null, dated: '2026-01-01', tasks: [],
+    created: '2026-01-01', updated: null, dated: '2026-01-01', lists: [],
     ...overrides,
   }
 }

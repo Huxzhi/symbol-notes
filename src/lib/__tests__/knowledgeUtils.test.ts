@@ -1,26 +1,26 @@
 import { describe, it, expect } from 'vitest'
 import { extractDateFromName, buildStemIndex, resolveLink, buildLinkMaps } from '../../vault'
 import { buildTaskMap } from '../../vault/tasks'
-import type { TaskItem } from '../../stores/types'
+import type { ListItem } from '../../stores/types'
 
-const task1: TaskItem = {
-  text: '- [ ] buy milk', cleanText: 'buy milk', checked: false,
-  status: ' ', line: 0, dueDate: null, completedDate: null, priority: null, fields: {},
+const task1: ListItem = {
+  text: 'buy milk', visual: 'buy milk', line: 0, lineCount: 1,
+  symbol: '-', signifier: null, status: ' ', checked: false, task: true, fields: {}, tags: [],
 }
-const task2: TaskItem = {
-  text: '- [x] done', cleanText: 'done', checked: true,
-  status: 'x', line: 1, dueDate: null, completedDate: null, priority: null, fields: {},
+const task2: ListItem = {
+  text: 'done', visual: 'done', line: 1, lineCount: 1,
+  symbol: '-', signifier: null, status: 'x', checked: true, task: true, fields: {}, tags: [],
 }
 
 describe('buildTaskMap', () => {
   it('keys result by file path', () => {
-    const map = buildTaskMap({ 'a.md': { tasks: [task1] }, 'b.md': { tasks: [task2] } })
+    const map = buildTaskMap({ 'a.md': { lists: [task1] }, 'b.md': { lists: [task2] } })
     expect(map['a.md']).toEqual([task1])
     expect(map['b.md']).toEqual([task2])
   })
 
   it('omits files with no tasks', () => {
-    const map = buildTaskMap({ 'a.md': { tasks: [] }, 'b.md': { tasks: [task1] } })
+    const map = buildTaskMap({ 'a.md': { lists: [] }, 'b.md': { lists: [task1] } })
     expect(Object.keys(map)).toEqual(['b.md'])
   })
 

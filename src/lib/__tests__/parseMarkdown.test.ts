@@ -20,20 +20,21 @@ describe('parseMarkdown', () => {
 
   it('extracts unchecked tasks', () => {
     const result = parseMarkdown('- [ ] buy milk')
-    expect(result.tasks).toHaveLength(1)
-    expect(result.tasks[0].checked).toBe(false)
-    expect(result.tasks[0].cleanText).toBe('buy milk')
+    expect(result.lists).toHaveLength(1)
+    expect(result.lists[0].task).toBe(true)
+    expect(result.lists[0].checked).toBe(false)
+    expect(result.lists[0].visual).toBe('buy milk')
   })
 
   it('extracts checked tasks', () => {
     const result = parseMarkdown('- [x] done')
-    expect(result.tasks[0].checked).toBe(true)
+    expect(result.lists[0].checked).toBe(true)
   })
 
   it('returns empty arrays for plain text', () => {
     const result = parseMarkdown('just some text')
     expect(result.outLinks).toEqual([])
     expect(result.inlineTags).toEqual([])
-    expect(result.tasks).toEqual([])
+    expect(result.lists).toEqual([])
   })
 })

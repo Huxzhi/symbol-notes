@@ -20,7 +20,7 @@ function file(path: string): FileMeta {
     created: '',
     updated: null,
     dated: '',
-    tasks: [],
+    lists: [],
   } as FileMeta
 }
 

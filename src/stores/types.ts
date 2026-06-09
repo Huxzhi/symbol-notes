@@ -58,16 +58,18 @@ export type ThemeId = 'dark' | 'light' | 'nord'
 
 // ── Task items ────────────────────────────────────────────────────────────────
 
-export interface TaskItem {
-  text: string                    // raw text after checkbox (includes [key::value])
-  cleanText: string               // text with [key::value] removed
-  checked: boolean                // status === 'x'
-  status: string                  // single char: ' ' / 'x' / '/' / '>' / '-' etc.
-  line: number                    // 0-based line number in file
-  dueDate: string | null          // [due::YYYY-MM-DD] → dated fallback
-  completedDate: string | null    // checked=true: [completion::...] → dated; checked=false: null
-  priority: string | null         // [priority::high|medium|low] → null when absent
-  fields: Record<string, string>  // all other [key::value] inline fields
+export interface ListItem {
+  text: string                    // 列表标记后、剥掉前导 token（复选框/信号字符）的正文；仍含 [k:: v]
+  visual: string                  // text 再去掉 [k:: v] 内联字段后的纯展示文本
+  line: number                    // 0-based 起始行
+  lineCount: number               // 该列表项跨的物理行数（≥1）
+  symbol: string                  // 列表标记原文：'-' / '*' / '+'，或有序 '1.' / '2.' / '1)'
+  signifier: string | null        // 前导单个 ASCII 标点（* = ~ ! & …）；无则 null
+  status: string | null           // 复选框字符 ' '/'x'/'X'/'/'/'>' …；非复选框为 null
+  checked: boolean                // status === 'x' || status === 'X'
+  task: boolean                   // status !== null
+  fields: Record<string, string>  // [k:: v] 内联字段（key/val 均 trim）
+  tags: string[]                  // 行内 #标签（不含 #）
 }
 
 // ── File cache ───────────────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ export interface FileMeta {
   created: string        // YYYY-MM-DD: frontmatter.created → mtime (never null)
   updated: string | null // YYYY-MM-DD: frontmatter.updated → null if absent
   dated: string          // YYYY-MM-DD: frontmatter.dated → created (never null)
-  tasks: TaskItem[]      // extracted task items, no path (implicit from record key)
+  lists: ListItem[]      // 全部列表项；task===true 为任务子集
 }
 
 export interface VaultState {
@@ -99,7 +101,7 @@ export interface VaultState {
   backlinkMap: Record<string, string[]>
   unresolvedMap: Record<string, string[]>
   tagMap: Record<string, string[]>
-  taskMap: Record<string, TaskItem[]>
+  taskMap: Record<string, ListItem[]>
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

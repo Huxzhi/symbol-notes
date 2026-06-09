@@ -2,7 +2,7 @@
 // isIndexing / scanAndIndex / Phase2 索引构建 在 index.ts
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { createMarkdownParser } from '../lib/parseMarkdown'
-import type { FileMeta, TaskItem } from '../stores/types'
+import type { FileMeta } from '../stores/types'
 import { setVaultStore, vaultStore } from './index'
 import {
   getCachedMeta,
@@ -96,7 +96,7 @@ const EMPTY_CONTENT: Pick<
   | 'tags'
   | 'aliases'
   | 'updated'
-  | 'tasks'
+  | 'lists'
 > = {
   frontmatter: {},
   outLinks: [],
@@ -104,7 +104,7 @@ const EMPTY_CONTENT: Pick<
   tags: [],
   aliases: [],
   updated: null,
-  tasks: [],
+  lists: [],
 }
 
 export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
@@ -175,7 +175,7 @@ export async function runPhase1(
     const hash = hashes[i]
     if (!hash) continue
     const meta = metas[i]
-    if (meta) {
+    if (meta && Array.isArray(meta.lists)) {
       setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...meta }))
       onParsed?.()
     } else {
@@ -202,7 +202,7 @@ export async function runPhase1(
           hash,
         })
       const cachedMeta = await getCachedMeta(hash)
-      if (cachedMeta) {
+      if (cachedMeta && Array.isArray(cachedMeta.lists)) {
         setVaultStore('files', path, (f: FileMeta) => ({
           ...f,
           hash,
@@ -210,21 +210,12 @@ export async function runPhase1(
         }))
       } else {
         const { frontmatter } = parseFrontmatter(content)
-        const {
-          outLinks,
-          inlineTags,
-          tasks: rawTaskItems,
-        } = parser.parse(content)
+        const { outLinks, inlineTags, lists } = parser.parse(content)
         const created =
           extractDateString(frontmatter.created) ??
           new Date(entry.mtime).toISOString().slice(0, 10)
         const updated = extractDateString(frontmatter.updated) ?? null
         const dated = extractDateString(frontmatter.dated) ?? created
-        const tasks: TaskItem[] = rawTaskItems.map((t) => ({
-          ...t,
-          dueDate: t.dueDate ?? dated,
-          completedDate: t.checked ? (t.completedDate ?? dated) : null,
-        }))
         const fmTags = extractTags(frontmatter.tags)
         const parsed = {
           frontmatter,
@@ -235,7 +226,7 @@ export async function runPhase1(
           created,
           updated,
           dated,
-          tasks,
+          lists,
         }
         await setCachedMeta(hash, parsed)
         setVaultStore('files', path, (f: FileMeta) => ({

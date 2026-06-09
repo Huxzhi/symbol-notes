@@ -4,7 +4,7 @@ import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import type { ParseResult } from '../lib/parseMarkdown'
 import { parseMarkdown } from '../lib/parseMarkdown'
-import type { FileMeta, TaskItem, VaultState } from '../stores/types'
+import type { FileMeta, VaultState } from '../stores/types'
 import {
   applyFileBacklinks,
   buildBacklinks,
@@ -189,7 +189,7 @@ type ContentFields = Pick<
   | 'created'
   | 'updated'
   | 'dated'
-  | 'tasks'
+  | 'lists'
 >
 
 /** 单文件保存后：解析内容 → 更新 FileMeta → 增量更新三个索引 */
@@ -202,26 +202,17 @@ export async function reindexFile(
   const hash = hashContent(content)
   const cached = await getCachedMeta(hash)
   let fields: ContentFields
-  if (cached) {
+  if (cached && Array.isArray(cached.lists)) {
     fields = cached
   } else {
     const { frontmatter } = parseFrontmatter(content)
-    const {
-      outLinks,
-      inlineTags,
-      tasks: rawTasks,
-    } = cmParsed ?? parseMarkdown(content)
+    const { outLinks, inlineTags, lists } = cmParsed ?? parseMarkdown(content)
     const existingMtime = vaultStore.files[path]?.mtime ?? Date.now()
     const created =
       extractDateString(frontmatter.created) ??
       new Date(existingMtime).toISOString().slice(0, 10)
     const updated = extractDateString(frontmatter.updated) ?? null
     const dated = extractDateString(frontmatter.dated) ?? created
-    const tasks: TaskItem[] = rawTasks.map((t) => ({
-      ...t,
-      dueDate: t.dueDate ?? dated,
-      completedDate: t.checked ? (t.completedDate ?? dated) : null,
-    }))
     const fmTags = extractTags(frontmatter.tags)
     fields = {
       frontmatter,
@@ -232,7 +223,7 @@ export async function reindexFile(
       created,
       updated,
       dated,
-      tasks,
+      lists,
     }
     await setCachedMeta(hash, fields)
   }
@@ -241,7 +232,7 @@ export async function reindexFile(
   setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...fields }))
   applyFileBacklinks(path, prev?.outLinks ?? [], fields.outLinks)
   applyFileTags(path, prev?.tags ?? [], fields.tags)
-  applyFileTasks(path, fields.tasks)
+  applyFileTasks(path, fields.lists)
 
   if (persistStat) {
     const entry = vaultStore.files[path]
@@ -378,7 +369,7 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null,
       dated: new Date(0).toISOString().slice(0, 10),
-      tasks: [],
+      lists: [],
     }
     setVaultStore('files', path, entry)
     invalidateStemIndex()
@@ -408,7 +399,7 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null,
       dated: new Date(0).toISOString().slice(0, 10),
-      tasks: [],
+      lists: [],
     }
     setVaultStore('files', name, entry)
     invalidateStemIndex()
@@ -451,7 +442,7 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null,
       dated: new Date(0).toISOString().slice(0, 10),
-      tasks: [],
+      lists: [],
     }
     setVaultStore('files', newPath, entry)
     invalidateStemIndex()
@@ -531,7 +522,7 @@ export const fileActions = {
       created: new Date(0).toISOString().slice(0, 10),
       updated: null,
       dated: new Date(0).toISOString().slice(0, 10),
-      tasks: [],
+      lists: [],
     }
     setVaultStore('files', newPath, entry)
     invalidateStemIndex()

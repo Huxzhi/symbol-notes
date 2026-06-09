@@ -8,11 +8,16 @@ import {
   type CompletionResult,
 } from '@codemirror/autocomplete'
 import type { EditorView } from '@codemirror/view'
-import type { TaskItem } from '../../stores/types'
+import type { SyntaxNodeRef } from '@lezer/common'
+import type { ListItem } from '../../stores/types'
 
 const INLINE_FIELD_RE = /\[([^\]]+?)::([^\]]*)\]/g
-// Matches list task markers not handled by GFM: - [/], - [-], - [>] etc.
-const NONSTANDARD_TASK_RE = /^[-*+] \[([^ x])\] /
+// 复选框：[ ] / [x] / [/] / [>] 等任意单字符状态；允许其后无空格（空任务 [ ]）
+const CHECKBOX_RE = /^\[(.)\]\s*(.*)$/
+// 信号字符：单个 ASCII 标点/符号 + 至少一个空格 + 正文
+const SIGNIFIER_RE = /^([\x21-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E])\s+(.*)$/
+// 行内标签（复用 inlineTagsField 的模式）
+const TAG_RE = /(?<!\S)#([a-zA-Z_一-龥][a-zA-Z0-9_一-龥/-]*)/g
 
 const TASK_LINE_RE = /^\s*[-*+] \[.\] /
 
@@ -70,75 +75,98 @@ export function completionLineEdit(
   return { remove: { from: m.index, to: m.index + m[0].length } }
 }
 
-function parseInlineFields(text: string): { fields: Record<string, string>; cleanText: string } {
+function parseInlineFields(text: string): { fields: Record<string, string>; visual: string } {
   const fields: Record<string, string> = {}
   INLINE_FIELD_RE.lastIndex = 0
-  const cleanText = text.replace(INLINE_FIELD_RE, (_, key: string, val: string) => {
+  const visual = text.replace(INLINE_FIELD_RE, (_, key: string, val: string) => {
     fields[key.trim()] = val.trim()
     return ''
   }).replace(/\s+/g, ' ').trim()
-  return { fields, cleanText }
+  return { fields, visual }
 }
 
-function buildTask(status: string, markerEnd: number, state: EditorState): TaskItem {
-  const line = state.doc.lineAt(markerEnd)
-  const rawText = state.doc.sliceString(markerEnd, line.to).trim()
-  const { fields, cleanText } = parseInlineFields(rawText)
-  return {
-    text: rawText,
-    cleanText,
-    checked: status === 'x' || status === 'X',
-    status,
-    line: line.number - 1,
-    dueDate: fields['due'] ?? null,
-    completedDate: fields['completion'] ?? null,
-    priority: fields['priority'] ?? null,
-    fields,
+function extractTagsFrom(text: string): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  TAG_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = TAG_RE.exec(text)) !== null) {
+    if (!seen.has(m[1])) {
+      seen.add(m[1])
+      out.push(m[1])
+    }
   }
+  return out
 }
 
-function extractTasks(state: EditorState): TaskItem[] {
-  const tasks: TaskItem[] = []
-
-  // Collect code block ranges to skip
-  const codeRanges: [number, number][] = []
-  syntaxTree(state).iterate({
-    enter(node) {
-      if (node.name === 'FencedCode' || node.name === 'CodeBlock') {
-        codeRanges.push([node.from, node.to])
-        return false
+function buildListItem(node: SyntaxNodeRef, state: EditorState): ListItem {
+  // 找 ListMark 子节点 → symbol 与标记结束位置
+  let markFrom = node.from
+  let markTo = node.from
+  const cur = node.node.cursor()
+  if (cur.firstChild()) {
+    do {
+      if (cur.name === 'ListMark') {
+        markFrom = cur.from
+        markTo = cur.to
+        break
       }
-      // GFM standard: [ ] and [x]/[X]
-      if (node.name === 'TaskMarker') {
-        const status = state.doc.sliceString(node.from + 1, node.to - 1)
-        tasks.push(buildTask(status, node.to, state))
-      }
-    },
-  })
+    } while (cur.nextSibling())
+  }
+  const symbol = state.doc.sliceString(markFrom, markTo)
+  const markLine = state.doc.lineAt(markTo)
+  const content = state.doc.sliceString(markTo, markLine.to).replace(/^\s+/, '')
 
-  // Non-standard status chars ([/] [-] [>] etc.) — regex scan, skip code ranges
-  for (let i = 1; i <= state.doc.lines; i++) {
-    const line = state.doc.line(i)
-    const inCode = codeRanges.some(([f, t]) => line.from >= f && line.from < t)
-    if (inCode) continue
-    const m = NONSTANDARD_TASK_RE.exec(line.text)
-    if (m) {
-      const markerEnd = line.from + m[0].length
-      tasks.push(buildTask(m[1], markerEnd, state))
+  let status: string | null = null
+  let signifier: string | null = null
+  let rawBody = content
+  const cm = CHECKBOX_RE.exec(content)
+  if (cm) {
+    status = cm[1]
+    rawBody = cm[2]
+  } else {
+    const sm = SIGNIFIER_RE.exec(content)
+    if (sm) {
+      signifier = sm[1]
+      rawBody = sm[2]
     }
   }
 
-  // Sort by position so tasks appear in document order
-  tasks.sort((a, b) => a.line - b.line)
+  const { fields, visual } = parseInlineFields(rawBody)
+  const endLine = state.doc.lineAt(Math.max(markTo, node.to - 1)).number
 
-  return tasks
+  return {
+    text: rawBody.trim(),
+    visual,
+    line: markLine.number - 1,
+    lineCount: Math.max(1, endLine - markLine.number + 1),
+    symbol,
+    signifier,
+    status,
+    checked: status === 'x' || status === 'X',
+    task: status !== null,
+    fields,
+    tags: extractTagsFrom(rawBody),
+  }
 }
 
-export const tasksField = StateField.define<TaskItem[]>({
-  create: extractTasks,
-  update(tasks, tr) {
-    if (tr.docChanged) return extractTasks(tr.state)
-    return tasks
+function extractLists(state: EditorState): ListItem[] {
+  const items: ListItem[] = []
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (node.name === 'FencedCode' || node.name === 'CodeBlock') return false
+      if (node.name === 'ListItem') items.push(buildListItem(node, state))
+    },
+  })
+  items.sort((a, b) => a.line - b.line)
+  return items
+}
+
+export const listsField = StateField.define<ListItem[]>({
+  create: extractLists,
+  update(items, tr) {
+    if (tr.docChanged) return extractLists(tr.state)
+    return items
   },
 })
 
