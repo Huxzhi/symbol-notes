@@ -209,12 +209,12 @@ function WeekTaskGrid(props: {
                       task.checked ? 'line-through text-(--text-4)' : 'text-(--text-2)'
                     }`}
                     onClick={() => props.onTaskClick(task.path)}
-                    title={task.cleanText}
+                    title={task.visual}
                   >
                     <span class="mr-0.5 text-[9px] opacity-60">
                       {task.checked ? '✓' : '○'}
                     </span>
-                    {task.cleanText}
+                    {task.visual}
                   </button>
                 )}
               </For>

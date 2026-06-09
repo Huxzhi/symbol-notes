@@ -1,6 +1,6 @@
-import type { TaskItem, FileMeta } from '../../stores/types'
+import type { ListItem, FileMeta } from '../../stores/types'
 
-export type Task = TaskItem & { path: string }
+export type Task = ListItem & { path: string }
 
 export const WEEKDAYS_SHORT = ['一', '二', '三', '四', '五', '六', '日']
 export const WEEKDAYS_LONG = [
@@ -89,12 +89,18 @@ export function buildRangeRows(startYear: number, startMonth: number, count: num
   return rows
 }
 
-export function buildTaskDayData(taskMap: Record<string, TaskItem[]>): Record<string, Task[]> {
+export function buildTaskDayData(
+  taskMap: Record<string, ListItem[]>,
+  files: Record<string, FileMeta>,
+): Record<string, Task[]> {
   const map: Record<string, Task[]> = {}
   for (const [path, tasks] of Object.entries(taskMap)) {
+    // 复刻原 dueDate 行为：显式 [due::] 优先，否则回退到文件的 dated
+    const fallback = files[path]?.dated ?? null
     for (const task of tasks) {
-      if (!task.dueDate) continue
-      ;(map[task.dueDate] ??= []).push({ ...task, path })
+      const due = task.fields['due'] ?? fallback
+      if (!due) continue
+      ;(map[due] ??= []).push({ ...task, path })
     }
   }
   return map

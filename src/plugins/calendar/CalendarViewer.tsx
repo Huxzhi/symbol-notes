@@ -159,7 +159,7 @@ function WeekRowComp(props: {
                         onClick={() => props.onOpenFile(item.task.path)}
                         title={item.task.path}
                       >
-                        ☐ {item.task.cleanText}
+                        ☐ {item.task.visual}
                       </button>
                     )
                     if (item.kind === 'done') return (
@@ -168,7 +168,7 @@ function WeekRowComp(props: {
                         onClick={() => props.onOpenFile(item.task.path)}
                         title={item.task.path}
                       >
-                        ☑ {item.task.cleanText}
+                        ☑ {item.task.visual}
                       </button>
                     )
                     return null
@@ -204,7 +204,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
 
   // Vault data — deferred so rapid per-file vault updates don't cause frame drops
   const dayData = createDeferred(() => buildDayData(vaultStore.files))
-  const taskDayData = createDeferred(() => buildTaskDayData(vaultStore.taskMap))
+  const taskDayData = createDeferred(() => buildTaskDayData(vaultStore.taskMap, vaultStore.files))
 
   // Row list — mutable head/tail month tracking (not reactive, just boundary markers)
   let head = normalizeYM(now.getFullYear(), now.getMonth() - 3)

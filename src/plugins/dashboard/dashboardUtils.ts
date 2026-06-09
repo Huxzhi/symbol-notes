@@ -39,9 +39,9 @@ export function monthFilePath(folder: string, date: Date): string {
 
 // ── Weekly task data (dashboard-specific) ─────────────────────────────────────
 
-import type { TaskItem } from '../../stores/types'
+import type { ListItem } from '../../stores/types'
 
-export type WeekTask = TaskItem & { path: string }
+export type WeekTask = ListItem & { path: string }
 
 function stemDate(path: string): string | null {
   const stem = path.split('/').pop()?.replace(/\.md$/, '') ?? ''
@@ -50,7 +50,7 @@ function stemDate(path: string): string | null {
 }
 
 export function buildWeekTaskData(
-  taskMap: Record<string, TaskItem[]>,
+  taskMap: Record<string, ListItem[]>,
 ): Record<string, WeekTask[]> {
   const map: Record<string, WeekTask[]> = {}
   for (const [path, tasks] of Object.entries(taskMap)) {
