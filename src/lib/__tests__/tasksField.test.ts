@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
 import { GFM } from '@lezer/markdown'
-import { tasksField } from '../cm6/tasksField'
+import { tasksField, isTaskLine, offsetISO, todayISO, nextMondayISO } from '../cm6/tasksField'
 
 function parse(content: string) {
   const state = EditorState.create({
@@ -89,5 +89,43 @@ describe('tasksField', () => {
     const tasks = parse('```\n- [ ] Not a task\n```\n\n- [ ] Real task')
     expect(tasks).toHaveLength(1)
     expect(tasks[0].text).toBe('Real task')
+  })
+})
+
+describe('date helpers', () => {
+  // 2026-06-09 是周二
+  const base = new Date(2026, 5, 9)
+
+  it('offsetISO computes relative dates', () => {
+    expect(offsetISO(0, base)).toBe('2026-06-09')
+    expect(offsetISO(1, base)).toBe('2026-06-10')
+    expect(offsetISO(2, base)).toBe('2026-06-11')
+    expect(offsetISO(-1, base)).toBe('2026-06-08')
+    expect(offsetISO(7, base)).toBe('2026-06-16')
+    expect(offsetISO(-7, base)).toBe('2026-06-02')
+  })
+
+  it('todayISO equals offsetISO(0)', () => {
+    expect(todayISO(base)).toBe('2026-06-09')
+  })
+
+  it('nextMondayISO returns the following Monday', () => {
+    expect(nextMondayISO(base)).toBe('2026-06-15') // 周二 → 下周一
+    expect(nextMondayISO(new Date(2026, 5, 15))).toBe('2026-06-22') // 周一 → +7
+    expect(nextMondayISO(new Date(2026, 5, 14))).toBe('2026-06-15') // 周日 → +1
+  })
+})
+
+describe('isTaskLine', () => {
+  it('matches standard and non-standard task lines', () => {
+    expect(isTaskLine('- [ ] todo')).toBe(true)
+    expect(isTaskLine('- [x] done')).toBe(true)
+    expect(isTaskLine('  * [/] indented')).toBe(true)
+    expect(isTaskLine('+ [>] forwarded')).toBe(true)
+  })
+  it('rejects plain lists and text', () => {
+    expect(isTaskLine('- plain item')).toBe(false)
+    expect(isTaskLine('just text')).toBe(false)
+    expect(isTaskLine('[due::x]')).toBe(false)
   })
 })

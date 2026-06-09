@@ -7,6 +7,40 @@ const INLINE_FIELD_RE = /\[([^\]]+?)::([^\]]*)\]/g
 // Matches list task markers not handled by GFM: - [/], - [-], - [>] etc.
 const NONSTANDARD_TASK_RE = /^[-*+] \[([^ x])\] /
 
+const TASK_LINE_RE = /^\s*[-*+] \[.\] /
+
+/** 判定一行是否任务行（含非标准状态字符 [/] [>] [-] 等）。 */
+export function isTaskLine(text: string): boolean {
+  return TASK_LINE_RE.test(text)
+}
+
+function isoFromDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** 今天加 days 天后的 YYYY-MM-DD（本地时区）。base 仅供测试注入。 */
+export function offsetISO(days: number, base: Date = new Date()): string {
+  const d = new Date(base)
+  d.setDate(d.getDate() + days)
+  return isoFromDate(d)
+}
+
+/** 今天的 YYYY-MM-DD。base 仅供测试注入。 */
+export function todayISO(base: Date = new Date()): string {
+  return offsetISO(0, base)
+}
+
+/** 下一个周一的 YYYY-MM-DD（今天是周一则 +7）。base 仅供测试注入。 */
+export function nextMondayISO(base: Date = new Date()): string {
+  const d = new Date(base)
+  const delta = (8 - d.getDay()) % 7 || 7
+  d.setDate(d.getDate() + delta)
+  return isoFromDate(d)
+}
+
 function parseInlineFields(text: string): { fields: Record<string, string>; cleanText: string } {
   const fields: Record<string, string> = {}
   INLINE_FIELD_RE.lastIndex = 0
