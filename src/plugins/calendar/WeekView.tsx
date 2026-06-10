@@ -65,7 +65,7 @@ export function WeekView(props: {
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto p-1 flex flex-col gap-0.5">
                   <For each={items()}>
-                    {(item) => <CellItemButton item={item} onOpenFile={props.onOpenFile} />}
+                    {(item) => <CellItemButton item={item} onOpenFile={props.onOpenFile} wrap />}
                   </For>
                 </div>
               </div>
