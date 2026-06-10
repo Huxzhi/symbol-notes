@@ -4,6 +4,11 @@ import {
   buildRangeRows,
   toIsoDate,
   buildEntryDayData,
+  getISOWeek,
+  getISOWeekString,
+  getISOWeekDates,
+  weekFilePath,
+  parseISODate,
 } from '../calendarUtils'
 import type { MonthHeaderRow, WeekRow } from '../calendarUtils'
 import type { FileMeta, ListItem } from '../../../stores/types'
@@ -145,5 +150,34 @@ describe('buildEntryDayData', () => {
     const dir: FileMeta = { ...fileMeta('d', '2026-06-01', []), kind: 'directory' }
     const noDate: FileMeta = { ...fileMeta('n.md', '', [listItem({ signifier: '-' })]), dated: '' }
     expect(buildEntryDayData({ 'd': dir, 'n.md': noDate })).toEqual({})
+  })
+})
+
+describe('ISO week helpers', () => {
+  it('getISOWeek handles mid-year and year boundaries', () => {
+    expect(getISOWeek(new Date(2026, 5, 2))).toEqual({ year: 2026, week: 23 }) // 周二
+    expect(getISOWeek(new Date(2021, 0, 1))).toEqual({ year: 2020, week: 53 }) // 跨年归上年 W53
+    expect(getISOWeek(new Date(2019, 11, 31))).toEqual({ year: 2020, week: 1 }) // 归下年 W1
+  })
+
+  it('getISOWeekString formats as YYYY-Www', () => {
+    expect(getISOWeekString(new Date(2026, 5, 2))).toBe('2026-W23')
+  })
+
+  it('getISOWeekDates returns Mon..Sun of the ISO week', () => {
+    const days = getISOWeekDates(new Date(2026, 5, 10)) // 2026-06-10 周三
+    expect(days).toHaveLength(7)
+    expect(days[0]).toBe('2026-06-08') // 周一
+    expect(days[6]).toBe('2026-06-14') // 周日
+  })
+
+  it('weekFilePath joins folder and ISO week name', () => {
+    expect(weekFilePath('weekly', new Date(2026, 5, 10))).toBe('weekly/2026-W24.md')
+    expect(weekFilePath('', new Date(2026, 5, 10))).toBe('2026-W24.md')
+  })
+
+  it('parseISODate parses to a local date', () => {
+    const d = parseISODate('2026-06-10')
+    expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2026, 5, 10])
   })
 })
