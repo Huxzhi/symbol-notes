@@ -13,7 +13,8 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { detectFrontmatter } from './frontmatterField'
-import { completionLineEdit, todayISO } from './listsField'
+import { completionLineEdit, todayISO, listsField } from './listsField'
+import { bujoHighlight } from './bujoHighlight'
 
 // ── Shared decorations ──────────────────────────────────────────────────────
 
@@ -484,4 +485,4 @@ const inlinePreviewPlugin = ViewPlugin.fromClass(
 
 // ── Public export ────────────────────────────────────────────────────────────
 
-export const livePreviewExtension = [inlinePreviewPlugin, blockPreviewField]
+export const livePreviewExtension = [listsField, inlinePreviewPlugin, blockPreviewField, bujoHighlight]

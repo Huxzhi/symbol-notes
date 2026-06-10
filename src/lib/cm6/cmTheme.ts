@@ -209,6 +209,11 @@ export const darkTheme = EditorView.theme(
       flexShrink: '0',
       backgroundColor: 'var(--text)',
     },
+    '.cm-bujo-event':     { backgroundColor: 'color-mix(in srgb, #4aa3ff 12%, transparent)' },
+    '.cm-bujo-mood':      { backgroundColor: 'color-mix(in srgb, #56c596 12%, transparent)' },
+    '.cm-bujo-idea':      { backgroundColor: 'color-mix(in srgb, #9d8dff 14%, transparent)' },
+    '.cm-bujo-important': { backgroundColor: 'color-mix(in srgb, #ff5a5a 14%, transparent)' },
+    '.cm-bujo-attention': { backgroundColor: 'color-mix(in srgb, #ffcc44 16%, transparent)' },
   },
   { dark: true },
 )
