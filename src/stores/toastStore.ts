@@ -16,7 +16,7 @@ let _id = 0
 export function showToast(
   msg: string,
   opts?: { level?: ToastLevel; requireClick?: boolean; duration?: number },
-): void {
+): number {
   const id = _id++
   const item: Toast = {
     id,
@@ -29,6 +29,12 @@ export function showToast(
   if (!item.requireClick) {
     setTimeout(() => dismissToast(id), item.duration)
   }
+  return id
+}
+
+/** 更新已存在 toast 的文案（用于进度类常驻 toast）；id 不存在则忽略。 */
+export function updateToast(id: number, msg: string): void {
+  setToastStore('items', (t) => t.id === id, 'msg', msg)
 }
 
 export function showError(
