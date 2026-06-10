@@ -9,6 +9,8 @@ import {
   buildEntryDayData,
   buildCellItems,
   buildRangeRows,
+  toIsoDate,
+  parseISODate,
   FILTER_DEFAULTS,
   WEEKDAYS_LONG,
   type CalRow,
@@ -18,6 +20,7 @@ import {
   type FilterKey,
 } from './calendarUtils'
 import { CellItemButton } from './CalendarCell'
+import { WeekView } from './WeekView'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,6 +138,29 @@ export function CalendarViewer(props: CalendarViewerProps) {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
+  // View mode & anchored week — persisted via leaf viewState
+  const initMode: 'week' | 'month' = props.viewState.mode === 'week' ? 'week' : 'month'
+  const initAnchor = typeof props.viewState.weekAnchor === 'string' ? props.viewState.weekAnchor : todayStr
+  const [mode, setMode] = createSignal<'week' | 'month'>(initMode)
+  const [weekAnchor, setWeekAnchor] = createSignal(initAnchor)
+
+  function applyState(nextMode: 'week' | 'month', nextAnchor: string) {
+    setMode(nextMode)
+    setWeekAnchor(nextAnchor)
+    workspaceActions.setLeafViewState(props.leafId, {
+      type: 'calendar',
+      state: { mode: nextMode, weekAnchor: nextAnchor },
+    })
+  }
+
+  function shiftWeek(days: number) {
+    const d = parseISODate(weekAnchor())
+    d.setDate(d.getDate() + days)
+    applyState('week', toIsoDate(d.getFullYear(), d.getMonth(), d.getDate()))
+  }
+
+  const weeklyFolder = () => String(props.getConfig({ weeklyFolder: 'weekly' }).weeklyFolder)
+
   // Filter state — persisted via plugin config
   const filter = () => {
     const cfg = props.getConfig({ filter: FILTER_DEFAULTS })
@@ -237,6 +263,16 @@ export function CalendarViewer(props: CalendarViewerProps) {
         >
           今天
         </button>
+        <div class="flex items-center rounded border border-(--border) overflow-hidden">
+          <button
+            class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'month' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
+            onClick={() => applyState('month', weekAnchor())}
+          >月</button>
+          <button
+            class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'week' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
+            onClick={() => applyState('week', weekAnchor())}
+          >周</button>
+        </div>
         <div class="flex items-center gap-3 flex-wrap">
           <FilterChip
             label="日记"
@@ -289,6 +325,21 @@ export function CalendarViewer(props: CalendarViewerProps) {
         </div>
       </div>
 
+      <Show
+        when={mode() === 'month'}
+        fallback={
+          <WeekView
+            weekAnchor={weekAnchor}
+            filter={filter}
+            weeklyFolder={weeklyFolder}
+            todayStr={todayStr}
+            onOpenFile={workspaceActions.openFile}
+            onPrevWeek={() => shiftWeek(-7)}
+            onNextWeek={() => shiftWeek(7)}
+            onToday={() => applyState('week', todayStr)}
+          />
+        }
+      >
       {/* Weekday header — fixed above scroll area */}
       <div class="grid grid-cols-7 border-b border-(--border) bg-[var(--bg-surface)] shrink-0">
         <For each={WEEKDAYS_LONG}>
@@ -350,6 +401,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
           </For>
         </div>
       </div>
+      </Show>
     </div>
   )
 }
