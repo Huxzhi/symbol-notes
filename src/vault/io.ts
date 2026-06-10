@@ -67,6 +67,14 @@ export async function* listAll(): AsyncGenerator<
   yield* _adapter.listAll()
 }
 
+export async function scanTree(
+  concurrency?: number,
+  onStat?: () => void,
+): Promise<import('./fs/types').DirEntry[]> {
+  if (!_adapter) return []
+  return _adapter.scanTree(concurrency, onStat)
+}
+
 export function invalidateFile(path: string): void {
   contentCache.delete(path)
 }

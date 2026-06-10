@@ -114,6 +114,13 @@ export function setParseTotal(session: object, total: number): void {
   setSnapshot((s) => ({ ...s, parsedTotal: total }))
 }
 
+/** 扫描完成：撤掉全屏遮挡（解析进度改走 toast）。 */
+export function endScanOverlay(session: object): void {
+  if (currentSession !== session) return
+  stopTimers()
+  setSnapshot((s) => ({ ...s, visible: false }))
+}
+
 export function endLoadProgress(session: object): void {
   if (currentSession !== session) return
   stopTimers()
