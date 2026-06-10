@@ -25,10 +25,7 @@ const mdLinkMark = Decoration.mark({ class: 'cm-mdlink' })
 // ── Widgets ──────────────────────────────────────────────────────────────────
 
 class CheckboxWidget extends WidgetType {
-  constructor(
-    readonly checked: boolean,
-    readonly markerFrom: number,
-  ) {
+  constructor(readonly checked: boolean) {
     super()
   }
 
@@ -43,12 +40,17 @@ class CheckboxWidget extends WidgetType {
     el.className = 'cm-task-checkbox'
     el.addEventListener('mousedown', (e) => {
       e.preventDefault()
+      // Derive the marker position live from the DOM. A stored position goes
+      // stale: CheckboxWidget.eq() compares only `checked`, so CM6 reuses this
+      // DOM (and its listener) after edits shift the task, leaving a captured
+      // position pointing at the wrong line.
+      const markerFrom = view.posAtDOM(el)
       const willCheck = !this.checked
-      const line = view.state.doc.lineAt(this.markerFrom)
+      const line = view.state.doc.lineAt(markerFrom)
       const changes: { from: number; to: number; insert: string }[] = [
         {
-          from: this.markerFrom,
-          to: this.markerFrom + 3,
+          from: markerFrom,
+          to: markerFrom + 3,
           insert: willCheck ? '[x]' : '[ ]',
         },
       ]
@@ -353,7 +355,7 @@ function buildInlineDecos(view: EditorView): DecorationSet {
               node.from,
               node.to,
               Decoration.replace({
-                widget: new CheckboxWidget(checked, node.from),
+                widget: new CheckboxWidget(checked),
               }),
             )
             break
