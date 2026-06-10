@@ -106,6 +106,26 @@ export function buildTaskDayData(
   return map
 }
 
+const ENTRY_SIGNIFIERS = new Set(['-', '=', '~'])
+
+/** 事件/心情/想法条目按日期聚合：fields['due'] 优先，否则文件 dated。 */
+export function buildEntryDayData(
+  files: Record<string, FileMeta>,
+): Record<string, Task[]> {
+  const map: Record<string, Task[]> = {}
+  for (const [path, meta] of Object.entries(files)) {
+    if (meta.kind !== 'file') continue
+    const fallback = meta.dated || null
+    for (const it of meta.lists) {
+      if (!it.signifier || !ENTRY_SIGNIFIERS.has(it.signifier)) continue
+      const date = it.fields['due'] ?? fallback
+      if (!date) continue
+      ;(map[date] ??= []).push({ ...it, path })
+    }
+  }
+  return map
+}
+
 export function buildDayData(index: Record<string, FileMeta>) {
   const created: Record<string, string[]> = {}
   const updated: Record<string, string[]> = {}

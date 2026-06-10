@@ -3,8 +3,10 @@ import {
   buildMonthRows,
   buildRangeRows,
   toIsoDate,
+  buildEntryDayData,
 } from '../calendarUtils'
 import type { MonthHeaderRow, WeekRow } from '../calendarUtils'
+import type { FileMeta, ListItem } from '../../../stores/types'
 
 describe('buildMonthRows', () => {
   it('first row is month-header with correct year/month', () => {
@@ -83,5 +85,65 @@ describe('buildRangeRows', () => {
     expect(headers[0]).toEqual({ type: 'month-header', year: 2025, month: 9 })
     expect(headers[1]).toEqual({ type: 'month-header', year: 2025, month: 10 })
     expect(headers[2]).toEqual({ type: 'month-header', year: 2025, month: 11 })
+  })
+})
+
+function listItem(over: Partial<ListItem>): ListItem {
+  return {
+    text: '', visual: '', line: 0, lineCount: 1, symbol: '-',
+    signifier: null, status: null, checked: false, task: false,
+    fields: {}, tags: [], ...over,
+  }
+}
+
+function fileMeta(path: string, dated: string, lists: ListItem[]): FileMeta {
+  return {
+    name: path.split('/').pop()!, path, kind: 'file', parent: null,
+    size: 0, mtime: 0, hash: '', frontmatter: {}, outLinks: [], etags: [],
+    tags: [], aliases: [], created: dated, updated: null, dated, lists,
+  }
+}
+
+describe('buildEntryDayData', () => {
+  it('places event/mood/idea on the file dated', () => {
+    const files = {
+      'journal/2026-06-10.md': fileMeta('journal/2026-06-10.md', '2026-06-10', [
+        listItem({ signifier: '-', visual: '看了电影' }),
+        listItem({ signifier: '=', visual: '很开心' }),
+        listItem({ signifier: '~', visual: '一个点子' }),
+      ]),
+    }
+    const map = buildEntryDayData(files)
+    expect(map['2026-06-10'].map(e => e.signifier)).toEqual(['-', '=', '~'])
+    expect(map['2026-06-10'][0].path).toBe('journal/2026-06-10.md')
+  })
+
+  it('uses explicit [due::] over file dated', () => {
+    const files = {
+      'a.md': fileMeta('a.md', '2026-06-01', [
+        listItem({ signifier: '-', fields: { due: '2026-06-20' } }),
+      ]),
+    }
+    const map = buildEntryDayData(files)
+    expect(map['2026-06-20']).toHaveLength(1)
+    expect(map['2026-06-01']).toBeUndefined()
+  })
+
+  it('skips tasks, plain lists, and ! & signifiers', () => {
+    const files = {
+      'a.md': fileMeta('a.md', '2026-06-01', [
+        listItem({ task: true, status: ' ' }),       // 任务
+        listItem({ signifier: null }),                // 普通列表
+        listItem({ signifier: '!' }),                 // 重要
+        listItem({ signifier: '&' }),                 // 留意
+      ]),
+    }
+    expect(buildEntryDayData(files)).toEqual({})
+  })
+
+  it('skips directories and items with no resolvable date', () => {
+    const dir: FileMeta = { ...fileMeta('d', '2026-06-01', []), kind: 'directory' }
+    const noDate: FileMeta = { ...fileMeta('n.md', '', [listItem({ signifier: '-' })]), dated: '' }
+    expect(buildEntryDayData({ 'd': dir, 'n.md': noDate })).toEqual({})
   })
 })

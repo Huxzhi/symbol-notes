@@ -1,4 +1,4 @@
-import { createDeferred, createMemo, createSignal, For, Show } from 'solid-js'
+import { createDeferred, createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -6,6 +6,7 @@ import type { ViewComponentProps } from '../../stores/types'
 import {
   buildDayData,
   buildTaskDayData,
+  buildEntryDayData,
   buildRangeRows,
   WEEKDAYS_LONG,
   type CalRow,
@@ -27,14 +28,25 @@ const FILTER_DEFAULTS = {
   updated: true,
   pending: true,
   done: true,
+  event: true,
+  mood: true,
+  idea: true,
 }
 type FilterKey = keyof typeof FILTER_DEFAULTS
 
 type CellItem =
   | { kind: 'dated' | 'created' | 'updated'; path: string }
   | { kind: 'pending' | 'done'; task: Task }
+  | { kind: 'event' | 'mood' | 'idea'; entry: Task }
 
 const MAX_CELL_ITEMS = 5
+
+// 与第二期 a 的事件/心情/想法配色一致（日历 DOM 用 hue 值）
+const ENTRY_STYLE: Record<'event' | 'mood' | 'idea', { hue: string; sig: string }> = {
+  event: { hue: '#4aa3ff', sig: '-' },
+  mood:  { hue: '#56c596', sig: '=' },
+  idea:  { hue: '#9d8dff', sig: '~' },
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,7 +63,8 @@ function estimateRowsHeight(rows: CalRow[]): number {
 
 function FilterChip(props: {
   label: string
-  colorClass: string
+  colorClass?: string
+  dotStyle?: JSX.CSSProperties
   active: boolean
   onClick: () => void
 }) {
@@ -62,7 +75,7 @@ function FilterChip(props: {
       onClick={props.onClick}
       title={`${props.active ? '隐藏' : '显示'}${props.label}`}
     >
-      <span class={`w-2 h-2 rounded-sm shrink-0 ${props.colorClass}`} />
+      <span class={`w-2 h-2 rounded-sm shrink-0 ${props.colorClass ?? ''}`} style={props.dotStyle} />
       <span class="text-[var(--text-3)]">{props.label}</span>
     </button>
   )
@@ -80,6 +93,7 @@ function WeekRowComp(props: {
   row: WeekRow
   dayData: () => ReturnType<typeof buildDayData>
   taskDayData: () => Record<string, Task[]>
+  entryDayData: () => Record<string, Task[]>
   filter: () => typeof FILTER_DEFAULTS
   todayStr: string
   onOpenFile: (path: string) => void
@@ -102,12 +116,17 @@ function WeekRowComp(props: {
             const f = props.filter()
             const d = props.dayData()
             const td = props.taskDayData()
+            const ed = props.entryDayData()
+            const entries = ed[dayStr] ?? []
             const all: CellItem[] = [
               ...(f.dated ? (d.dated[dayStr] ?? []).map((path): CellItem => ({ kind: 'dated', path })) : []),
               ...(f.created ? (d.created[dayStr] ?? []).map((path): CellItem => ({ kind: 'created', path })) : []),
               ...(f.updated ? (d.updated[dayStr] ?? []).map((path): CellItem => ({ kind: 'updated', path })) : []),
               ...(f.pending ? (td[dayStr] ?? []).filter(t => !t.checked).map((task): CellItem => ({ kind: 'pending', task })) : []),
               ...(f.done ? (td[dayStr] ?? []).filter(t => t.checked).map((task): CellItem => ({ kind: 'done', task })) : []),
+              ...(f.event ? entries.filter(e => e.signifier === '-').map((entry): CellItem => ({ kind: 'event', entry })) : []),
+              ...(f.mood ? entries.filter(e => e.signifier === '=').map((entry): CellItem => ({ kind: 'mood', entry })) : []),
+              ...(f.idea ? entries.filter(e => e.signifier === '~').map((entry): CellItem => ({ kind: 'idea', entry })) : []),
             ]
             if (all.length <= MAX_CELL_ITEMS) return { items: all, more: 0 }
             return { items: all.slice(0, MAX_CELL_ITEMS - 1), more: all.length - (MAX_CELL_ITEMS - 1) }
@@ -171,6 +190,19 @@ function WeekRowComp(props: {
                         ☑ {item.task.visual}
                       </button>
                     )
+                    if (item.kind === 'event' || item.kind === 'mood' || item.kind === 'idea') {
+                      const st = ENTRY_STYLE[item.kind]
+                      return (
+                        <button
+                          class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate hover:opacity-80"
+                          style={{ color: st.hue, 'background-color': `color-mix(in srgb, ${st.hue} 16%, transparent)` }}
+                          onClick={() => props.onOpenFile(item.entry.path)}
+                          title={item.entry.path}
+                        >
+                          {st.sig} {item.entry.visual}
+                        </button>
+                      )
+                    }
                     return null
                   }}
                 </For>
@@ -205,6 +237,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
   // Vault data — deferred so rapid per-file vault updates don't cause frame drops
   const dayData = createDeferred(() => buildDayData(vaultStore.files))
   const taskDayData = createDeferred(() => buildTaskDayData(vaultStore.taskMap, vaultStore.files))
+  const entryDayData = createDeferred(() => buildEntryDayData(vaultStore.files))
 
   // Row list — mutable head/tail month tracking (not reactive, just boundary markers)
   let head = normalizeYM(now.getFullYear(), now.getMonth() - 3)
@@ -326,6 +359,24 @@ export function CalendarViewer(props: CalendarViewerProps) {
             active={filter().done}
             onClick={() => toggleFilter('done')}
           />
+          <FilterChip
+            label="事件"
+            dotStyle={{ 'background-color': '#4aa3ff' }}
+            active={filter().event}
+            onClick={() => toggleFilter('event')}
+          />
+          <FilterChip
+            label="心情"
+            dotStyle={{ 'background-color': '#56c596' }}
+            active={filter().mood}
+            onClick={() => toggleFilter('mood')}
+          />
+          <FilterChip
+            label="想法"
+            dotStyle={{ 'background-color': '#9d8dff' }}
+            active={filter().idea}
+            onClick={() => toggleFilter('idea')}
+          />
         </div>
       </div>
 
@@ -378,6 +429,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
                       row={row() as WeekRow}
                       dayData={dayData}
                       taskDayData={taskDayData}
+                      entryDayData={entryDayData}
                       filter={filter}
                       todayStr={todayStr}
                       onOpenFile={workspaceActions.openFile}
