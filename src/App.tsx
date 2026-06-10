@@ -19,7 +19,6 @@ import {
 
 import { CalendarPlugin } from './plugins/calendar'
 import { DailyNotePlugin } from './plugins/daily-note'
-import { DashboardPlugin } from './plugins/dashboard'
 import { EditorPlugin } from './plugins/editor'
 import { ExcalidrawPlugin } from './plugins/excalidraw'
 import { FilesPlugin } from './plugins/files'
@@ -62,7 +61,6 @@ registerPlugin(SearchPlugin)
 registerPlugin(AppPlugin)
 registerPlugin(CalendarPlugin)
 registerPlugin(DailyNotePlugin)
-registerPlugin(DashboardPlugin)
 registerPlugin(ExcalidrawPlugin)
 registerPlugin(TemplatesPlugin)
 startPlugins()
