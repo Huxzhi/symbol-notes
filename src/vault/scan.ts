@@ -148,13 +148,20 @@ export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
 
 // ── Phase 1: 内容解析，填充 FileMeta hash/frontmatter/outLinks/tags/tasks ────
 
-export async function runPhase1(
+export type ParsedFields = Partial<FileMeta>
+
+/**
+ * 后台解析所有 md（缓存优先），**不写 store**，把每个文件的 FileMeta 字段
+ * 攒进返回的 Map，由调用方一次性合并。
+ */
+export async function parseAll(
   session: { cancelled: boolean },
   unchanged: string[],
   changed: string[],
   activeHashes: Set<string>,
   onParsed?: () => void,
-): Promise<void> {
+): Promise<Map<string, ParsedFields>> {
+  const results = new Map<string, ParsedFields>()
   const parser = createMarkdownParser()
   const hashes = unchanged.map((p) => vaultStore.files[p]?.hash ?? '')
   hashes.forEach((h) => {
@@ -162,33 +169,31 @@ export async function runPhase1(
   })
 
   const metas = await getManyMeta(hashes)
+  const stillChanged: string[] = [...changed]
   for (let i = 0; i < unchanged.length; i++) {
-    if (session.cancelled) return
-    // Yield in batches so the main thread isn't blocked by a large
-    // synchronous cache-hit burst — lets the UI repaint and the progress
-    // count-up advance.
+    if (session.cancelled) return results
     if (i > 0 && i % UNCHANGED_YIELD_EVERY === 0) {
       await yieldToMain()
-      if (session.cancelled) return
+      if (session.cancelled) return results
     }
     const path = unchanged[i]
     const hash = hashes[i]
     if (!hash) continue
     const meta = metas[i]
     if (meta && Array.isArray(meta.lists)) {
-      setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...meta }))
+      results.set(path, { hash, ...meta })
       onParsed?.()
     } else {
-      changed.push(path)
+      stillChanged.push(path)
     }
   }
 
-  for (let ci = 0; ci < changed.length; ci++) {
-    const path = changed[ci]
-    if (session.cancelled) return
+  for (let ci = 0; ci < stillChanged.length; ci++) {
+    const path = stillChanged[ci]
+    if (session.cancelled) return results
     if (ci > 0 && ci % CHANGED_YIELD_EVERY === 0) {
       await yieldToMain()
-      if (session.cancelled) return
+      if (session.cancelled) return results
     }
     try {
       const content = await readFile(path)
@@ -203,11 +208,7 @@ export async function runPhase1(
         })
       const cachedMeta = await getCachedMeta(hash)
       if (cachedMeta && Array.isArray(cachedMeta.lists)) {
-        setVaultStore('files', path, (f: FileMeta) => ({
-          ...f,
-          hash,
-          ...cachedMeta,
-        }))
+        results.set(path, { hash, ...cachedMeta })
       } else {
         const { frontmatter } = parseFrontmatter(content)
         const { outLinks, inlineTags, lists } = parser.parse(content)
@@ -229,11 +230,7 @@ export async function runPhase1(
           lists,
         }
         await setCachedMeta(hash, parsed)
-        setVaultStore('files', path, (f: FileMeta) => ({
-          ...f,
-          hash,
-          ...parsed,
-        }))
+        results.set(path, { hash, ...parsed })
       }
     } catch {
       /* individual file errors are non-fatal */
@@ -241,6 +238,7 @@ export async function runPhase1(
       onParsed?.()
     }
   }
+  return results
 }
 
 // ── Quick rescan (no parsing) ─────────────────────────────────────────────────

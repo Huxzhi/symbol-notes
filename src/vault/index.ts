@@ -17,11 +17,10 @@ import type { FileSystemAdapter } from './fs/types'
 import {
   beginLoadProgress,
   endLoadProgress,
-  setLoadPhase,
-  setParseTotal,
+  endScanOverlay,
   incDetected,
-  incParsed,
 } from './loadProgress'
+import { showToast, updateToast, dismissToast } from '../stores/toastStore'
 import {
   deleteFileStatEntry,
   getCachedMeta,
@@ -48,7 +47,7 @@ import {
   extractDateString,
   extractTags,
   mergeTagsWithBody,
-  runPhase1,
+  parseAll,
 } from './scan'
 import { applyFileTags, buildTags, removeFileTags } from './tags'
 import { applyFileTasks, buildTasks, removeFileTasks } from './tasks'
@@ -149,27 +148,60 @@ export async function scanAndIndex(): Promise<void> {
       }
     }
 
+    // 阶段 1：仅 stat 的 FileMeta 入 store，撤遮挡，露出工作区/文件树
     setVaultStore('files', files)
-    setParseTotal(session, mdUnchanged.length + mdChanged.length)
-    setLoadPhase(session, 'parsing')
+    endScanOverlay(session)
 
+    // 阶段 2：后台解析（不写 store），右上角 toast 进度
+    const total = mdUnchanged.length + mdChanged.length
+    const toastId =
+      total > 0
+        ? showToast(`解析 0 / ${total}（双链/任务暂不完整）`, { requireClick: true })
+        : -1
+    let done = 0
     const activeHashes = new Set<string>()
-    await runPhase1(session, mdUnchanged, mdChanged, activeHashes, incParsed)
+    const results = await parseAll(
+      session,
+      mdUnchanged,
+      mdChanged,
+      activeHashes,
+      () => {
+        done++
+        if (toastId >= 0 && (done === total || done % 20 === 0)) {
+          updateToast(toastId, `解析 ${done} / ${total}（双链/任务暂不完整）`)
+        }
+      },
+    )
 
-    if (!session.cancelled) {
-      setLoadPhase(session, 'building')
-      // Let the overlay paint the "building" phase before the synchronous
-      // index builds block the main thread.
-      await new Promise<void>((resolve) => setTimeout(resolve, 0))
-      if (session.cancelled) return
-      const mdFiles = Object.fromEntries(
-        Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
-      )
-      buildBacklinks(mdFiles)
-      buildTags(mdFiles)
-      buildTasks(mdFiles)
-      pruneFileStatCache(activePaths).catch(() => {})
-      pruneCache(activeHashes).catch(() => {})
+    if (session.cancelled) {
+      if (toastId >= 0) dismissToast(toastId)
+      return
+    }
+
+    // 阶段 2.5：一次性就地合并完整 FileMeta（单次响应式更新）
+    setVaultStore(
+      'files',
+      produce((fs: Record<string, FileMeta>) => {
+        for (const [path, fields] of results) {
+          const f = fs[path]
+          if (f) Object.assign(f, fields)
+        }
+      }),
+    )
+
+    // 阶段 3：构建跨文件索引
+    const mdFiles = Object.fromEntries(
+      Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
+    )
+    buildBacklinks(mdFiles)
+    buildTags(mdFiles)
+    buildTasks(mdFiles)
+    pruneFileStatCache(activePaths).catch(() => {})
+    pruneCache(activeHashes).catch(() => {})
+
+    if (toastId >= 0) {
+      dismissToast(toastId)
+      showToast('解析完成', { duration: 2000 })
     }
   } finally {
     if (currentSession === session) {
