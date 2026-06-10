@@ -11,7 +11,7 @@ import {
   setCachedMeta,
   setFileStatEntry,
 } from './indexStorage'
-import { listAll, readFile } from './io'
+import { scanTree, readFile } from './io'
 
 // ── Content parsing helpers ───────────────────────────────────────────────────
 
@@ -110,7 +110,8 @@ const EMPTY_CONTENT: Pick<
 export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
   const result: ScanResult = { files: {}, activePaths: new Set() }
   const epoch = new Date(0).toISOString().slice(0, 10)
-  for await (const entry of listAll()) {
+  const entries = await scanTree(32, onDetected)
+  for (const entry of entries) {
     const { name, path, kind, parent, size, mtime } = entry
     if (kind === 'directory') {
       result.files[path] = {
@@ -140,7 +141,6 @@ export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
         dated: extractDateFromName(name) ?? mtimeStr,
       }
       result.activePaths.add(path)
-      onDetected?.()
     }
   }
   return result

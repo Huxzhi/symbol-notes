@@ -1,5 +1,6 @@
 import { get, set } from 'idb-keyval'
 import type { DirEntry, FileSystemAdapter } from './types'
+import { mapWithConcurrency } from './concurrency'
 
 declare global {
   interface Window {
@@ -99,5 +100,29 @@ export class LocalAdapter implements FileSystemAdapter {
         yield { name, path, kind: 'file', parent: parentPath, size: file.size, mtime: file.lastModified }
       }
     }
+  }
+
+  async scanTree(concurrency = 32, onStat?: () => void): Promise<DirEntry[]> {
+    const dirs: DirEntry[] = []
+    const fileStubs: { name: string; path: string; parent: string | null; handle: FileSystemFileHandle }[] = []
+    const walk = async (parentPath: string | null, dir: FileSystemDirectoryHandle): Promise<void> => {
+      for await (const [name, entry] of dir.entries()) {
+        if (name.startsWith('.')) continue
+        const path = parentPath ? `${parentPath}/${name}` : name
+        if (entry.kind === 'directory') {
+          dirs.push({ name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0 })
+          await walk(path, entry as FileSystemDirectoryHandle)
+        } else {
+          fileStubs.push({ name, path, parent: parentPath, handle: entry as FileSystemFileHandle })
+        }
+      }
+    }
+    await walk(null, this.rootHandle)
+    const files = await mapWithConcurrency(fileStubs, concurrency, async (s): Promise<DirEntry> => {
+      const f = await s.handle.getFile()
+      onStat?.()
+      return { name: s.name, path: s.path, kind: 'file', parent: s.parent, size: f.size, mtime: f.lastModified }
+    })
+    return [...dirs, ...files]
   }
 }

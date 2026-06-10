@@ -16,4 +16,5 @@ export interface FileSystemAdapter {
   deleteEntry(path: string, opts?: { recursive?: boolean }): Promise<void>
   createDirectory(path: string): Promise<void>
   listAll(): AsyncGenerator<DirEntry>
+  scanTree(concurrency?: number, onStat?: () => void): Promise<DirEntry[]>
 }
