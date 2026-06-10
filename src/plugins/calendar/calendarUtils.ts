@@ -153,3 +153,90 @@ export function buildDayData(index: Record<string, FileMeta>) {
   }
   return { created, updated, dated }
 }
+
+// ── ISO week helpers ──────────────────────────────────────────────────────────
+
+export function getISOWeek(date: Date): { year: number; week: number } {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dow = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dow)
+  const jan1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  const week = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + 1) / 7)
+  return { year: d.getUTCFullYear(), week }
+}
+
+export function getISOWeekString(date: Date): string {
+  const { year, week } = getISOWeek(date)
+  return `${year}-W${String(week).padStart(2, '0')}`
+}
+
+export function getISOWeekDates(date: Date): string[] {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dow = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() - (dow - 1))
+  return Array.from({ length: 7 }, (_, i) => {
+    const cur = new Date(d)
+    cur.setUTCDate(d.getUTCDate() + i)
+    return cur.toISOString().slice(0, 10)
+  })
+}
+
+export function weekFilePath(folder: string, date: Date): string {
+  const name = `${getISOWeekString(date)}.md`
+  return folder ? `${folder}/${name}` : name
+}
+
+export function parseISODate(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, d ?? 1)
+}
+
+// ── Calendar cell model (shared by month grid & week columns) ─────────────────
+
+export const FILTER_DEFAULTS = {
+  dated: true,
+  created: true,
+  updated: true,
+  pending: true,
+  done: true,
+  event: true,
+  mood: true,
+  idea: true,
+}
+export type FilterKey = keyof typeof FILTER_DEFAULTS
+export type FilterState = typeof FILTER_DEFAULTS
+
+export type CellItem =
+  | { kind: 'dated' | 'created' | 'updated'; path: string }
+  | { kind: 'pending' | 'done'; task: Task }
+  | { kind: 'event' | 'mood' | 'idea'; entry: Task }
+
+// 与第二期 a 的事件/心情/想法配色一致（日历 DOM 用 hue 值）
+export const ENTRY_STYLE: Record<'event' | 'mood' | 'idea', { hue: string; sig: string }> = {
+  event: { hue: '#4aa3ff', sig: '-' },
+  mood:  { hue: '#56c596', sig: '=' },
+  idea:  { hue: '#9d8dff', sig: '~' },
+}
+
+type DayData = ReturnType<typeof buildDayData>
+
+/** 某天的全部条目（不截断）。月视图自行 slice，周视图列内滚动。 */
+export function buildCellItems(
+  dayStr: string,
+  f: FilterState,
+  data: { dayData: DayData; taskDayData: Record<string, Task[]>; entryDayData: Record<string, Task[]> },
+): CellItem[] {
+  const d = data.dayData
+  const td = data.taskDayData
+  const entries = data.entryDayData[dayStr] ?? []
+  return [
+    ...(f.dated ? (d.dated[dayStr] ?? []).map((path): CellItem => ({ kind: 'dated', path })) : []),
+    ...(f.created ? (d.created[dayStr] ?? []).map((path): CellItem => ({ kind: 'created', path })) : []),
+    ...(f.updated ? (d.updated[dayStr] ?? []).map((path): CellItem => ({ kind: 'updated', path })) : []),
+    ...(f.pending ? (td[dayStr] ?? []).filter(t => !t.checked).map((task): CellItem => ({ kind: 'pending', task })) : []),
+    ...(f.done ? (td[dayStr] ?? []).filter(t => t.checked).map((task): CellItem => ({ kind: 'done', task })) : []),
+    ...(f.event ? entries.filter(e => e.signifier === '-').map((entry): CellItem => ({ kind: 'event', entry })) : []),
+    ...(f.mood ? entries.filter(e => e.signifier === '=').map((entry): CellItem => ({ kind: 'mood', entry })) : []),
+    ...(f.idea ? entries.filter(e => e.signifier === '~').map((entry): CellItem => ({ kind: 'idea', entry })) : []),
+  ]
+}

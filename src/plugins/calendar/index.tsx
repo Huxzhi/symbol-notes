@@ -8,6 +8,7 @@ function CalendarSettings(props: SettingsTabProps) {
   const config = () => props.getConfig({
     weekStartsMonday: true,
     showLunar: false,
+    weeklyFolder: 'weekly',
   })
 
   return (
@@ -24,6 +25,15 @@ function CalendarSettings(props: SettingsTabProps) {
         checked={config().showLunar}
         onChange={(v) => props.setConfig({ showLunar: v })}
       />
+      <label class="flex flex-col gap-1">
+        <span class="text-[13px] t-base font-medium">周记文件夹</span>
+        <span class="text-[11px] t-3">周视图“本周总结与反思”保存到该文件夹（ISO 周号命名，如 2026-W24.md）</span>
+        <input
+          class="mt-1 px-2 py-1 text-[12px] rounded border border-(--border) bg-(--bg-base) text-(--text) outline-none focus:border-(--accent)"
+          value={String(config().weeklyFolder)}
+          onChange={(e) => props.setConfig({ weeklyFolder: e.currentTarget.value.trim() })}
+        />
+      </label>
     </div>
   )
 }

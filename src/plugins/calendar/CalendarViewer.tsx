@@ -7,13 +7,20 @@ import {
   buildDayData,
   buildTaskDayData,
   buildEntryDayData,
+  buildCellItems,
   buildRangeRows,
+  toIsoDate,
+  parseISODate,
+  FILTER_DEFAULTS,
   WEEKDAYS_LONG,
   type CalRow,
   type MonthHeaderRow,
   type WeekRow,
   type Task,
+  type FilterKey,
 } from './calendarUtils'
+import { CellItemButton } from './CalendarCell'
+import { WeekView } from './WeekView'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,31 +29,7 @@ interface CalendarViewerProps extends ViewComponentProps {
   setConfig: (patch: Record<string, unknown>) => void
 }
 
-const FILTER_DEFAULTS = {
-  dated: true,
-  created: true,
-  updated: true,
-  pending: true,
-  done: true,
-  event: true,
-  mood: true,
-  idea: true,
-}
-type FilterKey = keyof typeof FILTER_DEFAULTS
-
-type CellItem =
-  | { kind: 'dated' | 'created' | 'updated'; path: string }
-  | { kind: 'pending' | 'done'; task: Task }
-  | { kind: 'event' | 'mood' | 'idea'; entry: Task }
-
 const MAX_CELL_ITEMS = 5
-
-// 与第二期 a 的事件/心情/想法配色一致（日历 DOM 用 hue 值）
-const ENTRY_STYLE: Record<'event' | 'mood' | 'idea', { hue: string; sig: string }> = {
-  event: { hue: '#4aa3ff', sig: '-' },
-  mood:  { hue: '#56c596', sig: '=' },
-  idea:  { hue: '#9d8dff', sig: '~' },
-}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,21 +96,11 @@ function WeekRowComp(props: {
           const isToday = dayStr === props.todayStr
 
           const cellData = () => {
-            const f = props.filter()
-            const d = props.dayData()
-            const td = props.taskDayData()
-            const ed = props.entryDayData()
-            const entries = ed[dayStr] ?? []
-            const all: CellItem[] = [
-              ...(f.dated ? (d.dated[dayStr] ?? []).map((path): CellItem => ({ kind: 'dated', path })) : []),
-              ...(f.created ? (d.created[dayStr] ?? []).map((path): CellItem => ({ kind: 'created', path })) : []),
-              ...(f.updated ? (d.updated[dayStr] ?? []).map((path): CellItem => ({ kind: 'updated', path })) : []),
-              ...(f.pending ? (td[dayStr] ?? []).filter(t => !t.checked).map((task): CellItem => ({ kind: 'pending', task })) : []),
-              ...(f.done ? (td[dayStr] ?? []).filter(t => t.checked).map((task): CellItem => ({ kind: 'done', task })) : []),
-              ...(f.event ? entries.filter(e => e.signifier === '-').map((entry): CellItem => ({ kind: 'event', entry })) : []),
-              ...(f.mood ? entries.filter(e => e.signifier === '=').map((entry): CellItem => ({ kind: 'mood', entry })) : []),
-              ...(f.idea ? entries.filter(e => e.signifier === '~').map((entry): CellItem => ({ kind: 'idea', entry })) : []),
-            ]
+            const all = buildCellItems(dayStr, props.filter(), {
+              dayData: props.dayData(),
+              taskDayData: props.taskDayData(),
+              entryDayData: props.entryDayData(),
+            })
             if (all.length <= MAX_CELL_ITEMS) return { items: all, more: 0 }
             return { items: all.slice(0, MAX_CELL_ITEMS - 1), more: all.length - (MAX_CELL_ITEMS - 1) }
           }
@@ -143,68 +116,7 @@ function WeekRowComp(props: {
               </div>
               <div class="flex flex-col gap-0.5 overflow-hidden">
                 <For each={cellData().items}>
-                  {(item) => {
-                    if (item.kind === 'dated') return (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--text-2)] truncate w-full cursor-pointer hover:bg-[var(--text-4)] hover:text-[var(--text)] transition-colors"
-                        onClick={() => props.onOpenFile(item.path)}
-                        title={item.path}
-                      >
-                        {item.path.split('/').pop()?.replace(/\.md$/, '')}
-                      </button>
-                    )
-                    if (item.kind === 'created') return (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--accent-bg) text-(--accent) truncate w-full cursor-pointer hover:bg-(--accent) hover:text-white transition-colors"
-                        onClick={() => props.onOpenFile(item.path)}
-                        title={item.path}
-                      >
-                        {item.path.split('/').pop()?.replace(/\.md$/, '')}
-                      </button>
-                    )
-                    if (item.kind === 'updated') return (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-(--bg-hover) text-[var(--link-2)] truncate w-full cursor-pointer hover:bg-[var(--link-2)] hover:text-white transition-colors"
-                        onClick={() => props.onOpenFile(item.path)}
-                        title={item.path}
-                      >
-                        {item.path.split('/').pop()?.replace(/\.md$/, '')}
-                      </button>
-                    )
-                    if (item.kind === 'pending') return (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate text-[var(--tag)] hover:opacity-80"
-                        style={{ 'background-color': 'color-mix(in srgb, var(--tag) 18%, transparent)' }}
-                        onClick={() => props.onOpenFile(item.task.path)}
-                        title={item.task.path}
-                      >
-                        ☐ {item.task.visual}
-                      </button>
-                    )
-                    if (item.kind === 'done') return (
-                      <button
-                        class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-3)] hover:text-[var(--text-2)] line-through w-full cursor-pointer transition-colors truncate"
-                        onClick={() => props.onOpenFile(item.task.path)}
-                        title={item.task.path}
-                      >
-                        ☑ {item.task.visual}
-                      </button>
-                    )
-                    if (item.kind === 'event' || item.kind === 'mood' || item.kind === 'idea') {
-                      const st = ENTRY_STYLE[item.kind]
-                      return (
-                        <button
-                          class="shrink-0 text-left text-[10px] leading-snug px-1.5 py-0.5 rounded w-full cursor-pointer transition-colors truncate hover:opacity-80"
-                          style={{ color: st.hue, 'background-color': `color-mix(in srgb, ${st.hue} 16%, transparent)` }}
-                          onClick={() => props.onOpenFile(item.entry.path)}
-                          title={item.entry.path}
-                        >
-                          {st.sig} {item.entry.visual}
-                        </button>
-                      )
-                    }
-                    return null
-                  }}
+                  {(item) => <CellItemButton item={item} onOpenFile={props.onOpenFile} />}
                 </For>
                 <Show when={cellData().more > 0}>
                   <div class="shrink-0 text-[10px] text-[var(--text-4)] px-1.5 py-0.5 select-none">
@@ -225,6 +137,29 @@ function WeekRowComp(props: {
 export function CalendarViewer(props: CalendarViewerProps) {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+  // View mode & anchored week — persisted via leaf viewState
+  const initMode: 'week' | 'month' = props.viewState.mode === 'week' ? 'week' : 'month'
+  const initAnchor = typeof props.viewState.weekAnchor === 'string' ? props.viewState.weekAnchor : todayStr
+  const [mode, setMode] = createSignal<'week' | 'month'>(initMode)
+  const [weekAnchor, setWeekAnchor] = createSignal(initAnchor)
+
+  function applyState(nextMode: 'week' | 'month', nextAnchor: string) {
+    setMode(nextMode)
+    setWeekAnchor(nextAnchor)
+    workspaceActions.setLeafViewState(props.leafId, {
+      type: 'calendar',
+      state: { mode: nextMode, weekAnchor: nextAnchor },
+    })
+  }
+
+  function shiftWeek(days: number) {
+    const d = parseISODate(weekAnchor())
+    d.setDate(d.getDate() + days)
+    applyState('week', toIsoDate(d.getFullYear(), d.getMonth(), d.getDate()))
+  }
+
+  const weeklyFolder = () => String(props.getConfig({ weeklyFolder: 'weekly' }).weeklyFolder)
 
   // Filter state — persisted via plugin config
   const filter = () => {
@@ -328,6 +263,16 @@ export function CalendarViewer(props: CalendarViewerProps) {
         >
           今天
         </button>
+        <div class="flex items-center rounded border border-(--border) overflow-hidden">
+          <button
+            class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'month' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
+            onClick={() => applyState('month', weekAnchor())}
+          >月</button>
+          <button
+            class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'week' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
+            onClick={() => applyState('week', weekAnchor())}
+          >周</button>
+        </div>
         <div class="flex items-center gap-3 flex-wrap">
           <FilterChip
             label="日记"
@@ -380,6 +325,21 @@ export function CalendarViewer(props: CalendarViewerProps) {
         </div>
       </div>
 
+      <Show
+        when={mode() === 'month'}
+        fallback={
+          <WeekView
+            weekAnchor={weekAnchor}
+            filter={filter}
+            weeklyFolder={weeklyFolder}
+            todayStr={todayStr}
+            onOpenFile={workspaceActions.openFile}
+            onPrevWeek={() => shiftWeek(-7)}
+            onNextWeek={() => shiftWeek(7)}
+            onToday={() => applyState('week', todayStr)}
+          />
+        }
+      >
       {/* Weekday header — fixed above scroll area */}
       <div class="grid grid-cols-7 border-b border-(--border) bg-[var(--bg-surface)] shrink-0">
         <For each={WEEKDAYS_LONG}>
@@ -441,6 +401,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
           </For>
         </div>
       </div>
+      </Show>
     </div>
   )
 }
