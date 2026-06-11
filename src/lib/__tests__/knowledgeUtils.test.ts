@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractDateFromName, buildStemIndex, resolveLink, buildLinkMaps } from '../../vault'
+import { extractDateFromName, buildStemIndex, buildAliasIndex, resolveLink, buildLinkMaps } from '../../vault'
 import { buildTaskMap } from '../../vault/tasks'
 import type { ListItem } from '../../stores/types'
 
@@ -146,5 +146,75 @@ describe('buildLinkMaps', () => {
     }
     const { backlinkMap } = buildLinkMaps(files)
     expect(backlinkMap['notes/foo.md']).toEqual(['src.md'])
+  })
+})
+
+describe('buildAliasIndex', () => {
+  it('maps lowercased alias to owning paths, skips non-md', () => {
+    const idx = buildAliasIndex({
+      'notes/todo.md': { aliases: ['待办', 'TODO'] },
+      'work/plan.md': { aliases: ['计划'] },
+      'image.png': { aliases: ['图'] },
+    })
+    expect(idx.get('待办')).toEqual(['notes/todo.md'])
+    expect(idx.get('todo')).toEqual(['notes/todo.md']) // 小写归一
+    expect(idx.get('计划')).toEqual(['work/plan.md'])
+    expect(idx.has('图')).toBe(false) // 非 .md 跳过
+  })
+
+  it('collects multiple paths sharing one alias', () => {
+    const idx = buildAliasIndex({
+      'a.md': { aliases: ['dup'] },
+      'b.md': { aliases: ['dup'] },
+    })
+    expect(idx.get('dup')).toEqual(['a.md', 'b.md'])
+  })
+})
+
+describe('resolveLink alias fallback', () => {
+  const files = {
+    'notes/todo.md': { aliases: ['待办'] },
+    'work/plan.md': { aliases: ['计划', 'shared'] },
+    'misc.md': { aliases: ['shared'] },
+  }
+  const stemIndex = buildStemIndex(files)
+  const aliasIndex = buildAliasIndex(files)
+
+  it('resolves a unique alias to its file path', () => {
+    expect(resolveLink('待办', stemIndex, files, aliasIndex)).toBe('notes/todo.md')
+  })
+
+  it('strips .md before alias lookup', () => {
+    expect(resolveLink('计划.md', stemIndex, files, aliasIndex)).toBe('work/plan.md')
+  })
+
+  it('is case-insensitive on alias', () => {
+    expect(resolveLink('待办', stemIndex, files, aliasIndex)).toBe('notes/todo.md')
+    expect(resolveLink('SHARED', stemIndex, files, aliasIndex)).toBeNull() // 多义
+  })
+
+  it('returns null for ambiguous alias', () => {
+    expect(resolveLink('shared', stemIndex, files, aliasIndex)).toBeNull()
+  })
+
+  it('prefers stem match over alias (no alias fallback when stem resolves)', () => {
+    const f = { 'todo.md': { aliases: [] }, 'other.md': { aliases: ['todo'] } }
+    expect(resolveLink('todo.md', buildStemIndex(f), f, buildAliasIndex(f))).toBe('todo.md')
+  })
+
+  it('works without aliasIndex (back-compat)', () => {
+    expect(resolveLink('待办', stemIndex, files)).toBeNull()
+  })
+})
+
+describe('buildLinkMaps alias resolution', () => {
+  it('registers [[alias]] backlink under the real file path', () => {
+    const files = {
+      'notes/todo.md': { aliases: ['待办'], outLinks: [] },
+      'journal.md': { aliases: [], outLinks: ['待办'] },
+    }
+    const { backlinkMap, unresolvedMap } = buildLinkMaps(files)
+    expect(backlinkMap['notes/todo.md']).toEqual(['journal.md'])
+    expect(unresolvedMap['待办']).toBeUndefined()
   })
 })

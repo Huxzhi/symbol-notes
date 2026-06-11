@@ -13,7 +13,7 @@ import {
   onCleanup,
   Show,
 } from 'solid-js'
-import { fileActions, reindexFile, vaultStore, getStemIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
+import { fileActions, reindexFile, vaultStore, getStemIndex, getAliasIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
 import { showConflict } from '../../stores/conflictStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
@@ -23,6 +23,7 @@ import { inlineTagDecoField, inlineTagsField } from '../../lib/cm6/inlineTagsFie
 import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
 import { listsField, taskFieldComplete } from '../../lib/cm6/listsField'
+import { wikiLinkComplete } from '../../lib/cm6/wikiLinkComplete'
 import {
   formatTimestamp,
   parseFrontmatter,
@@ -78,6 +79,7 @@ function buildEditorState(
       inlineTagDecoField,
       listsField,
       taskFieldComplete,
+      wikiLinkComplete,
       headingsField,
       EditorView.updateListener.of(onDocChange),
       EditorView.domEventHandlers({ keydown: onKeyDown, mousedown: onMouseDown }),
@@ -183,7 +185,7 @@ export function EditorViewer(props: ViewComponentProps) {
     const clean = (targetText as string).split('#')[0].trim()
     const withExt = clean.endsWith('.md') ? clean : `${clean}.md`
     const stemIndex = getStemIndex()
-    const resolved = resolveLink(withExt, stemIndex, vaultStore.files)
+    const resolved = resolveLink(withExt, stemIndex, vaultStore.files, getAliasIndex())
     if (!resolved) return false
 
     e.preventDefault()
