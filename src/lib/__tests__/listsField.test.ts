@@ -9,7 +9,6 @@ import {
   todayISO,
   nextMondayISO,
   completionLineEdit,
-  taskFieldComplete,
   fieldCompletionSource,
   valueCompletionSource,
 } from '../cm6/listsField'
@@ -216,9 +215,5 @@ describe('completion sources', () => {
   it('value source returns null when not after a field', () => {
     const doc = '- [ ] task'
     expect(valueCompletionSource(ctxAt(doc, doc.length))).toBeNull()
-  })
-
-  it('taskFieldComplete is a defined extension', () => {
-    expect(taskFieldComplete).toBeDefined()
   })
 })

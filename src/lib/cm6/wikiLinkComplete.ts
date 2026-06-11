@@ -1,5 +1,4 @@
 import {
-  autocompletion,
   type Completion,
   type CompletionContext,
   type CompletionResult,
@@ -59,6 +58,7 @@ export function wikiLinkCompletionSource(
   return { from, options, validFor: /^[^\[\]\n|]*$/ }
 }
 
-export const wikiLinkComplete = autocompletion({
-  override: [(ctx) => wikiLinkCompletionSource(ctx, vaultStore.files, Date.now())],
-})
+/** 绑定到响应式 vault 的补全源,供编辑器统一 autocompletion 组合使用。 */
+export function wikiLinkSource(ctx: CompletionContext): CompletionResult | null {
+  return wikiLinkCompletionSource(ctx, vaultStore.files, Date.now())
+}

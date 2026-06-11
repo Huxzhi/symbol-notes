@@ -2,7 +2,6 @@ import { syntaxTree } from '@codemirror/language'
 import { StateField } from '@codemirror/state'
 import type { EditorState } from '@codemirror/state'
 import {
-  autocompletion,
   startCompletion,
   type CompletionContext,
   type CompletionResult,
@@ -245,7 +244,3 @@ export function valueCompletionSource(ctx: CompletionContext): CompletionResult 
   }
 }
 
-export const taskFieldComplete = autocompletion({
-  override: [fieldCompletionSource, valueCompletionSource],
-  activateOnTyping: true,
-})
