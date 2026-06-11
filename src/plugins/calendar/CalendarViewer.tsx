@@ -12,6 +12,7 @@ import {
   toIsoDate,
   parseISODate,
   weekRowFilePath,
+  monthFilePath,
   FILTER_DEFAULTS,
   WEEKDAYS_LONG,
   type CalRow,
@@ -74,11 +75,32 @@ function FilterChip(props: {
   )
 }
 
-function MonthHeader(props: { year: number; month: number }) {
+function MonthHeader(props: {
+  year: number
+  month: number
+  monthlyFolder: () => string
+  editingPath: () => string | null
+  setEditingPath: (p: string | null) => void
+}) {
+  const path = () => monthFilePath(props.monthlyFolder(), props.year, props.month)
   return (
-    <div class="px-4 py-1.5 text-[13px] font-semibold text-[var(--text)] bg-[var(--bg-surface)] border-b border-(--border)">
-      {props.year}年{props.month + 1}月
-    </div>
+    <Show
+      when={props.editingPath() === path()}
+      fallback={
+        <div class="flex items-stretch gap-3 px-4 bg-[var(--bg-surface)] border-b border-(--border)">
+          <span class="shrink-0 py-1.5 text-[13px] font-semibold text-[var(--text)] self-center">
+            {props.year}年{props.month + 1}月
+          </span>
+          <div class="flex-1 min-w-0 self-center">
+            <PlanPreview path={path()} label="月计划" compact onEdit={() => props.setEditingPath(path())} />
+          </div>
+        </div>
+      }
+    >
+      <div class="border-b border-(--border) bg-[var(--bg-surface)]" style={{ height: '320px' }}>
+        <PlanCellEditor path={path()} label={`${props.year}年${props.month + 1}月 · 月计划`} onClose={() => props.setEditingPath(null)} />
+      </div>
+    </Show>
   )
 }
 
@@ -193,6 +215,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
   }
 
   const weeklyFolder = () => String(props.getConfig({ weeklyFolder: 'weekly' }).weeklyFolder)
+  const monthlyFolder = () => String(props.getConfig({ monthlyFolder: 'monthly' }).monthlyFolder)
 
   // Filter state — persisted via plugin config
   const filter = () => {
@@ -417,6 +440,9 @@ export function CalendarViewer(props: CalendarViewerProps) {
                     <MonthHeader
                       year={(row() as MonthHeaderRow).year}
                       month={(row() as MonthHeaderRow).month}
+                      monthlyFolder={monthlyFolder}
+                      editingPath={editingPath}
+                      setEditingPath={setEditingPath}
                     />
                   ) : (
                     <WeekRowComp
