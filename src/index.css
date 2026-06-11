@@ -33,7 +33,7 @@ html, body, #root {
 
   --accent:      #6c63ff;
   --accent-2:    #9d8dff;
-  --accent-bg:   rgba(108,99,255,.13);
+  --accent-bg:   color-mix(in srgb, var(--accent) 13%, transparent);
 
   --link:        #7ec8e3;
   --link-2:      #a09cf7;
@@ -65,14 +65,17 @@ html, body, #root {
 
   --accent:      #5a52e8;
   --accent-2:    #7a72f0;
-  --accent-bg:   rgba(90,82,232,.1);
+  --accent-bg:   color-mix(in srgb, var(--accent) 13%, transparent);
 
   --link:        #2980b9;
   --link-2:      #7a52a8;
   --tag:         #279367;
   --caret:       #5a52e8;
 
-
+  --cm-h1: #5a52e8; --cm-h2: #7a72f0; --cm-h3: #8a83e0;
+  --cm-h4: #a7a1e8; --cm-strong: #1a1a28; --cm-em: #2980b9;
+  --cm-strike: #9898b0; --cm-code: #7a52a8; --cm-quote: #6a6a80;
+  --cm-list: #5a52e8; --cm-meta: #9898b0;
 }
 
 /* ── Theme: Nord (极光) ──────────────────────────────── */
@@ -94,14 +97,17 @@ html, body, #root {
 
   --accent:      #88c0d0;
   --accent-2:    #8fbcbb;
-  --accent-bg:   rgba(136,192,208,.15);
+  --accent-bg:   color-mix(in srgb, var(--accent) 15%, transparent);
 
   --link:        #81a1c1;
   --link-2:      #b48ead;
   --tag:         #a3be8c;
   --caret:       #88c0d0;
 
-
+  --cm-h1: #88c0d0; --cm-h2: #8fbcbb; --cm-h3: #81a1c1;
+  --cm-h4: #5e81ac; --cm-strong: #eceff4; --cm-em: #81a1c1;
+  --cm-strike: #7b8494; --cm-code: #b48ead; --cm-quote: #aeb3be;
+  --cm-list: #88c0d0; --cm-meta: #7b8494;
 }
 
 /* ── Semantic utility classes ────────────────────────── */
