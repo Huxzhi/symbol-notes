@@ -22,8 +22,8 @@ import { headingsField } from '../../lib/cm6/headingsField'
 import { inlineTagDecoField, inlineTagsField } from '../../lib/cm6/inlineTagsField'
 import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
-import { listsField, taskFieldComplete } from '../../lib/cm6/listsField'
-import { wikiLinkComplete } from '../../lib/cm6/wikiLinkComplete'
+import { listsField } from '../../lib/cm6/listsField'
+import { editorCompletion } from '../../lib/cm6/editorCompletion'
 import {
   formatTimestamp,
   parseFrontmatter,
@@ -78,8 +78,7 @@ function buildEditorState(
       inlineTagsField,
       inlineTagDecoField,
       listsField,
-      taskFieldComplete,
-      wikiLinkComplete,
+      editorCompletion,
       headingsField,
       EditorView.updateListener.of(onDocChange),
       EditorView.domEventHandlers({ keydown: onKeyDown, mousedown: onMouseDown }),
