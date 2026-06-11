@@ -96,7 +96,8 @@ export function buildTaskDayData(
   const map: Record<string, Task[]> = {}
   for (const [path, tasks] of Object.entries(taskMap)) {
     // 复刻原 dueDate 行为：显式 [due::] 优先，否则回退到文件的 dated
-    const fallback = files[path]?.dated ?? null
+    // （周/月 dated 的文件 dated 为 ''，用 || 把空串也归到 null，不落到某天）
+    const fallback = files[path]?.dated || null
     for (const task of tasks) {
       const due = task.fields['due'] ?? fallback
       if (!due) continue

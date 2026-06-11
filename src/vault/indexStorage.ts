@@ -131,7 +131,8 @@ export function hashContent(str: string): string {
 
 // ── Parsed meta cache: contentHash → CachedFields ────────────────────────────
 
-const parsedMetaStore = createStore('sn-meta', 'cache')
+// v2: dated 字段对周/月格式不再回退到 created，旧缓存需失效以触发全量重解析
+const parsedMetaStore = createStore('sn-meta-v2', 'cache')
 
 export async function getManyMeta(hashes: string[]): Promise<(CachedFields | undefined)[]> {
   try {

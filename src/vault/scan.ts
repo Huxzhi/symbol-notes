@@ -56,6 +56,24 @@ export function extractDateString(val: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}/.test(val) ? val.slice(0, 10) : null
 }
 
+/** 周格式 2026-W22 或月格式 2026-06——周期笔记，不落到日历的某一天。 */
+export function isPeriodDated(val: unknown): boolean {
+  return typeof val === 'string' && /^\d{4}-(W\d{2}|\d{2})$/.test(val.trim())
+}
+
+/**
+ * 计算 FileMeta.dated（用于按天聚合 listItem）。
+ * - 完整日期 YYYY-MM-DD → 该天
+ * - 周/月格式 → ''（不参与每日聚合；文件本身仍按 created/updated 显示）
+ * - 缺失或无法识别 → 回退到 created
+ */
+export function resolveDatedField(rawDated: unknown, created: string): string {
+  const day = extractDateString(rawDated)
+  if (day) return day
+  if (isPeriodDated(rawDated)) return ''
+  return created
+}
+
 export function extractDateFromName(name: string): string | null {
   const hyphen = name.match(/(\d{4}-\d{2}-\d{2})/)
   if (hyphen) return hyphen[1]
@@ -216,7 +234,7 @@ export async function parseAll(
           extractDateString(frontmatter.created) ??
           new Date(entry.mtime).toISOString().slice(0, 10)
         const updated = extractDateString(frontmatter.updated) ?? null
-        const dated = extractDateString(frontmatter.dated) ?? created
+        const dated = resolveDatedField(frontmatter.dated, created)
         const fmTags = extractTags(frontmatter.tags)
         const parsed = {
           frontmatter,
