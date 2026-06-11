@@ -3,7 +3,12 @@ import { Dynamic } from "solid-js/web";
 import { settingsActions, settingsStore } from "../stores/settingsStore";
 import { getRegisteredPlugins } from "../lib/pluginRegistry";
 import { getSettingsTabs } from "../lib/pluginRegistry";
-import type { ThemeId } from "../stores/types";
+import {
+  PRESET_THEMES,
+  THEME_VARS,
+  snapshotTheme,
+  type ThemeMode,
+} from "../lib/theme";
 
 const BUILTIN_SECTIONS = [
   { id: "appearance", label: "外观" },
@@ -12,27 +17,16 @@ const BUILTIN_SECTIONS = [
   { id: "plugins", label: "插件" },
 ];
 
-const THEMES: { id: ThemeId; label: string; sub: string; swatch: string[] }[] =
-  [
-    {
-      id: "dark",
-      label: "深空",
-      sub: "Dark",
-      swatch: ["#0f0f1c", "#6c63ff", "#7ec8e3", "#cccccc"],
-    },
-    {
-      id: "light",
-      label: "晴日",
-      sub: "Light",
-      swatch: ["#f8f8fc", "#5a52e8", "#2980b9", "#2a2a3c"],
-    },
-    {
-      id: "nord",
-      label: "极光",
-      sub: "Nord",
-      swatch: ["#2e3440", "#88c0d0", "#81a1c1", "#eceff4"],
-    },
-  ];
+// <input type=color> 只接受 #rrggbb；非 hex（如 color-mix/rgb）回退到中性灰避免控件报错
+function normalizeHex(v: string | undefined): string {
+  const s = v?.trim() ?? "";
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s;
+  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+    const h = s.slice(1);
+    return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`;
+  }
+  return "#888888";
+}
 
 const SHORTCUTS = [
   { keys: "Ctrl / ⌘  S", desc: "保存文件" },
@@ -60,9 +54,6 @@ function Toggle(props: { checked: boolean; onChange: (v: boolean) => void }) {
 
 export function Settings(props: { onClose(): void }) {
   const [section, setSection] = createSignal("appearance");
-  const [draftTheme, setDraftTheme] = createSignal<ThemeId>(
-    settingsStore.theme,
-  );
   const [draftCSS, setDraftCSS] = createSignal(settingsStore.customCSS);
   const [draftAutoTs, setDraftAutoTs] = createSignal(
     settingsStore.autoTimestamps,
@@ -71,13 +62,70 @@ export function Settings(props: { onClose(): void }) {
     settingsStore.showOtherFiles,
   );
 
+  // 取消回滚：进入设置时快照已提交的主题态
+  const themeSnapshot = {
+    theme: settingsStore.theme,
+    customThemes: JSON.parse(
+      JSON.stringify(settingsStore.customThemes),
+    ) as typeof settingsStore.customThemes,
+  };
+
+  const presetById = (id: string) => PRESET_THEMES.find((p) => p.id === id);
+  const customById = (id: string) =>
+    settingsStore.customThemes.find((c) => c.id === id);
+  const selected = () => settingsStore.theme;
+  const selectedCustom = () => customById(selected());
+
+  const currentMode = (): ThemeMode => {
+    const c = customById(selected());
+    if (c) return c.mode;
+    return presetById(selected())?.mode ?? "dark";
+  };
+
+  // 统一的卡片数据：预设用静态 swatch；自定义从 vars 推导
+  type Card = { id: string; label: string; sub: string; swatch: string[] };
+  const customSwatch = (vars: Record<string, string>) =>
+    ["--bg-base", "--accent", "--link", "--text"].map((n) => vars[n] ?? "#888");
+  const cardsFor = (mode: ThemeMode): Card[] => [
+    ...PRESET_THEMES.filter((p) => p.mode === mode).map((p) => ({
+      id: p.id,
+      label: p.label,
+      sub: p.sub,
+      swatch: p.swatch,
+    })),
+    ...settingsStore.customThemes
+      .filter((c) => c.mode === mode)
+      .map((c) => ({
+        id: c.id,
+        label: c.name,
+        sub: "自定义",
+        swatch: customSwatch(c.vars),
+      })),
+  ];
+
+  const newCustomTheme = () => {
+    const id = settingsActions.addCustomTheme(
+      selected(),
+      currentMode(),
+      snapshotTheme(),
+    );
+    settingsActions.setTheme(id);
+  };
+
   const close = props.onClose;
 
+  // 应用：提交非主题草稿后关闭（主题已实时写入并持久化）
   const apply = () => {
-    settingsActions.setTheme(draftTheme());
     settingsActions.setCustomCSS(draftCSS());
     settingsActions.setAutoTimestamps(draftAutoTs());
     settingsActions.setShowOtherFiles(draftShowOtherFiles());
+    close();
+  };
+
+  // 取消：把主题态回滚到进入时的快照后关闭
+  const cancel = () => {
+    settingsActions.setCustomThemes(themeSnapshot.customThemes);
+    settingsActions.setTheme(themeSnapshot.theme);
     close();
   };
 
@@ -88,7 +136,7 @@ export function Settings(props: { onClose(): void }) {
     <div
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={(e) => {
-        if (e.target === e.currentTarget) close();
+        if (e.target === e.currentTarget) cancel();
       }}
     >
       <div class="bg-elevated border b-theme rounded-lg w-145 max-w-[92vw] max-h-[82vh] flex flex-col shadow-2xl overflow-hidden">
@@ -97,7 +145,7 @@ export function Settings(props: { onClose(): void }) {
           <h2 class="text-[14px] font-semibold t-base">设置</h2>
           <button
             class="w-6 h-6 flex items-center justify-center rounded text-[13px] text-(--text-3) cursor-pointer transition-[background,color] duration-150 hover:bg-(--bg-hover) hover:text-(--text)"
-            onClick={close}
+            onClick={cancel}
           >
             ✕
           </button>
@@ -139,36 +187,126 @@ export function Settings(props: { onClose(): void }) {
           <div class="flex-1 overflow-y-auto p-5 min-w-0">
             <Switch>
               <Match when={section() === "appearance"}>
-                <div class="text-[10px] t-3 mb-2.5 uppercase tracking-widest">
-                  主题
-                </div>
-                <div class="flex gap-2 mb-5">
-                  <For each={THEMES}>
-                    {(t) => (
-                      <button
-                        class={`flex-1 rounded-lg border-2 p-3 cursor-pointer transition-colors text-center ${draftTheme() === t.id ? "border-(--accent) bg-(--accent-bg)" : "border-(--border)] hover:border-(--border-2)"}`}
-                        onClick={() => setDraftTheme(t.id)}
-                      >
-                        <div class="flex gap-1 mb-2 justify-center">
-                          <For each={t.swatch}>
-                            {(c) => (
+                <For each={["light", "dark"] as ThemeMode[]}>
+                  {(mode) => (
+                    <>
+                      <div class="text-[10px] t-3 mb-2.5 uppercase tracking-widest">
+                        {mode === "light" ? "浅色" : "深色"}
+                      </div>
+                      <div class="flex flex-wrap gap-2 mb-4">
+                        <For each={cardsFor(mode)}>
+                          {(t) => (
+                            <button
+                              class={`w-[104px] rounded-lg border-2 p-3 cursor-pointer transition-colors text-center ${selected() === t.id ? "border-(--accent) bg-(--accent-bg)" : "border-(--border) hover:border-(--border-2)"}`}
+                              onClick={() => settingsActions.setTheme(t.id)}
+                            >
+                              <div class="flex gap-1 mb-2 justify-center">
+                                <For each={t.swatch}>
+                                  {(c) => (
+                                    <div
+                                      class="w-4 h-4 rounded-full border border-white/10"
+                                      style={{ background: c }}
+                                    />
+                                  )}
+                                </For>
+                              </div>
                               <div
-                                class="w-4 h-4 rounded-full border border-white/10"
-                                style={{ background: c }}
-                              />
-                            )}
-                          </For>
-                        </div>
-                        <div
-                          class={`text-[12px] font-medium ${draftTheme() === t.id ? "text-(--accent)" : "t-base"}`}
+                                class={`text-[12px] font-medium truncate ${selected() === t.id ? "text-(--accent)" : "t-base"}`}
+                              >
+                                {t.label}
+                              </div>
+                              <div class="text-[10px] t-3">{t.sub}</div>
+                            </button>
+                          )}
+                        </For>
+                        <Show when={mode === currentMode()}>
+                          <button
+                            class="w-[104px] rounded-lg border-2 border-dashed border-(--border-2) p-3 cursor-pointer text-(--text-3) hover:border-(--accent) hover:text-(--accent) transition-colors text-[12px]"
+                            onClick={newCustomTheme}
+                          >
+                            + 新建自定义
+                          </button>
+                        </Show>
+                      </div>
+                    </>
+                  )}
+                </For>
+
+                {/* 颜色编辑器：仅自定义主题可编辑 */}
+                <Show when={selectedCustom()}>
+                  {(theme) => (
+                    <div class="mt-1 mb-5">
+                      <div class="flex items-center gap-2 mb-3">
+                        <input
+                          class="flex-1 bg-(--bg-base) border border-(--border) rounded px-2 py-1 text-[12px] t-base outline-none focus:border-(--accent)"
+                          value={theme().name}
+                          onInput={(e) =>
+                            settingsActions.renameCustomTheme(
+                              theme().id,
+                              e.currentTarget.value,
+                            )
+                          }
+                        />
+                        <button
+                          class="px-2.5 py-1 text-[11px] rounded border border-(--border) text-(--text-3) hover:text-(--accent) hover:border-(--accent) transition-colors cursor-pointer"
+                          onClick={() =>
+                            settingsActions.deleteCustomTheme(theme().id)
+                          }
                         >
-                          {t.label}
-                        </div>
-                        <div class="text-[10px] t-3">{t.sub}</div>
-                      </button>
-                    )}
-                  </For>
-                </div>
+                          删除
+                        </button>
+                      </div>
+                      <For each={[...new Set(THEME_VARS.map((v) => v.group))]}>
+                        {(group) => (
+                          <div class="mb-3">
+                            <div class="text-[10px] t-3 mb-1.5 uppercase tracking-widest">
+                              {group}
+                            </div>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                              <For
+                                each={THEME_VARS.filter(
+                                  (v) => v.group === group,
+                                )}
+                              >
+                                {(v) => (
+                                  <div class="flex items-center gap-2">
+                                    <input
+                                      type="color"
+                                      class="w-6 h-6 shrink-0 rounded cursor-pointer bg-transparent border border-(--border)"
+                                      value={normalizeHex(theme().vars[v.name])}
+                                      onInput={(e) =>
+                                        settingsActions.updateCustomThemeVar(
+                                          theme().id,
+                                          v.name,
+                                          e.currentTarget.value,
+                                        )
+                                      }
+                                    />
+                                    <span class="text-[11px] t-2 w-16 shrink-0">
+                                      {v.label}
+                                    </span>
+                                    <input
+                                      class="flex-1 min-w-0 bg-(--bg-base) border border-(--border) rounded px-1.5 py-0.5 text-[11px] t-base font-mono outline-none focus:border-(--accent)"
+                                      value={theme().vars[v.name] ?? ""}
+                                      onChange={(e) =>
+                                        settingsActions.updateCustomThemeVar(
+                                          theme().id,
+                                          v.name,
+                                          e.currentTarget.value,
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                )}
+                              </For>
+                            </div>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  )}
+                </Show>
+
                 <div class="text-[10px] t-3 mb-2 uppercase tracking-widest">
                   自定义 CSS
                 </div>
@@ -353,7 +491,7 @@ export function Settings(props: { onClose(): void }) {
           <div class="flex justify-end gap-2 px-5 py-3 border-t border-(--border)] shrink-0">
             <button
               class="px-4 py-1.5 text-[12px] rounded border border-(--border)] text-(--text-3) cursor-pointer transition-[background,color] duration-150 hover:bg-(--bg-hover) hover:text-(--text)"
-              onClick={close}
+              onClick={cancel}
             >
               取消
             </button>
