@@ -1,6 +1,9 @@
 import type { EditorView } from '@codemirror/view'
 import type { OutLink } from '../lib/cm6/outLinksField'
 import type { Heading } from '../lib/cm6/headingsField'
+import type { CustomTheme, ThemeMode } from '../lib/theme'
+
+export type { CustomTheme, ThemeMode }
 
 // ── Workspace tree ──────────────────────────────────────────────────────────
 
@@ -107,7 +110,8 @@ export interface VaultState {
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 export interface SettingsState {
-  theme: ThemeId
+  theme: string                 // 预设或自定义主题 id
+  customThemes: CustomTheme[]
   customCSS: string
   autoTimestamps: boolean
   showOtherFiles: boolean
