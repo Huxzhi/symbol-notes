@@ -13,7 +13,7 @@ import {
   onCleanup,
   Show,
 } from 'solid-js'
-import { fileActions, reindexFile, vaultStore, getStemIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
+import { fileActions, reindexFile, vaultStore, getStemIndex, getAliasIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
 import { showConflict } from '../../stores/conflictStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
@@ -183,7 +183,7 @@ export function EditorViewer(props: ViewComponentProps) {
     const clean = (targetText as string).split('#')[0].trim()
     const withExt = clean.endsWith('.md') ? clean : `${clean}.md`
     const stemIndex = getStemIndex()
-    const resolved = resolveLink(withExt, stemIndex, vaultStore.files)
+    const resolved = resolveLink(withExt, stemIndex, vaultStore.files, getAliasIndex())
     if (!resolved) return false
 
     e.preventDefault()

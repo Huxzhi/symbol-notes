@@ -7,6 +7,7 @@ import { parseMarkdown } from '../lib/parseMarkdown'
 import type { FileMeta, VaultState } from '../stores/types'
 import {
   applyFileBacklinks,
+  buildAliasIndex,
   buildBacklinks,
   buildStemIndex,
   removeFileBacklinks,
@@ -73,14 +74,21 @@ export { setVaultStore, vaultStore }
 // ── Stem index (lazy cache) ───────────────────────────────────────────────────
 
 let _stemIndex: Map<string, string[]> | null = null
+let _aliasIndex: Map<string, string[]> | null = null
 
 export function invalidateStemIndex(): void {
   _stemIndex = null
+  _aliasIndex = null
 }
 
 export function getStemIndex(): Map<string, string[]> {
   if (!_stemIndex) _stemIndex = buildStemIndex(vaultStore.files)
   return _stemIndex
+}
+
+export function getAliasIndex(): Map<string, string[]> {
+  if (!_aliasIndex) _aliasIndex = buildAliasIndex(vaultStore.files)
+  return _aliasIndex
 }
 
 // ── Scan status ───────────────────────────────────────────────────────────────

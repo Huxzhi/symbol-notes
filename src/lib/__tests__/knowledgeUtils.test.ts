@@ -206,3 +206,15 @@ describe('resolveLink alias fallback', () => {
     expect(resolveLink('待办', stemIndex, files)).toBeNull()
   })
 })
+
+describe('buildLinkMaps alias resolution', () => {
+  it('registers [[alias]] backlink under the real file path', () => {
+    const files = {
+      'notes/todo.md': { aliases: ['待办'], outLinks: [] },
+      'journal.md': { aliases: [], outLinks: ['待办'] },
+    }
+    const { backlinkMap, unresolvedMap } = buildLinkMaps(files)
+    expect(backlinkMap['notes/todo.md']).toEqual(['journal.md'])
+    expect(unresolvedMap['待办']).toBeUndefined()
+  })
+})

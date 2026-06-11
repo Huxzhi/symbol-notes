@@ -14,6 +14,7 @@ import {
 import {
   fileActions,
   getStemIndex,
+  getAliasIndex,
   resolveLink,
   vaultFs,
   vaultStore,
@@ -333,23 +334,10 @@ function loadPlugin(def: PluginDef): () => void {
       vault: {
         ready: () => vaultFs() !== null,
         files: () => vaultStore.files,
-        backlinks: (path) => {
-          const f = vaultStore.files[path]
-          const aliases = f?.aliases ?? []
-          const keys = [path, ...aliases.map((a) => `${a}.md`)]
-          const seen = new Set<string>()
-          const result: string[] = []
-          for (const key of keys)
-            for (const bl of vaultStore.backlinkMap[key] ?? [])
-              if (!seen.has(bl)) {
-                seen.add(bl)
-                result.push(bl)
-              }
-          return result
-        },
+        backlinks: (path) => [...(vaultStore.backlinkMap[path] ?? [])],
         resolveLink: (target) => {
           const withExt = target.endsWith('.md') ? target : `${target}.md`
-          return resolveLink(withExt, getStemIndex(), vaultStore.files)
+          return resolveLink(withExt, getStemIndex(), vaultStore.files, getAliasIndex())
         },
         readFile: (path) => fileActions.readFile(path),
         saveFile: (path, c) => fileActions.saveFile(path, c),
