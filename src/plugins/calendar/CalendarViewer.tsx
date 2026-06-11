@@ -325,20 +325,14 @@ export function CalendarViewer(props: CalendarViewerProps) {
         </div>
       </div>
 
-      <Show
-        when={mode() === 'month'}
-        fallback={
-          <WeekView
-            weekAnchor={weekAnchor}
-            filter={filter}
-            weeklyFolder={weeklyFolder}
-            todayStr={todayStr}
-            onOpenFile={workspaceActions.openFile}
-            onPrevWeek={() => shiftWeek(-7)}
-            onNextWeek={() => shiftWeek(7)}
-            onToday={() => applyState('week', todayStr)}
-          />
-        }
+      {/* Month view — kept permanently mounted (toggled via display) so the
+          virtual list's scroll element never unmounts; the virtualizer binds it
+          once and its ResizeObserver repopulates rows when it becomes visible.
+          Unmounting it (via <Show>) leaves the virtualizer with a detached,
+          zero-height element and the grid renders blank. */}
+      <div
+        class="flex flex-col flex-1 min-h-0"
+        style={{ display: mode() === 'month' ? 'flex' : 'none' }}
       >
       {/* Weekday header — fixed above scroll area */}
       <div class="grid grid-cols-7 border-b border-(--border) bg-[var(--bg-surface)] shrink-0">
@@ -401,6 +395,19 @@ export function CalendarViewer(props: CalendarViewerProps) {
           </For>
         </div>
       </div>
+      </div>
+
+      <Show when={mode() === 'week'}>
+        <WeekView
+          weekAnchor={weekAnchor}
+          filter={filter}
+          weeklyFolder={weeklyFolder}
+          todayStr={todayStr}
+          onOpenFile={workspaceActions.openFile}
+          onPrevWeek={() => shiftWeek(-7)}
+          onNextWeek={() => shiftWeek(7)}
+          onToday={() => applyState('week', todayStr)}
+        />
       </Show>
     </div>
   )

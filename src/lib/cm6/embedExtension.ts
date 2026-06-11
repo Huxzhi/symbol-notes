@@ -219,7 +219,9 @@ export const embedPreviewPlugin = ViewPlugin.fromClass(
 export const embedTheme = EditorView.baseTheme({
   '.cm-embed': {
     display: 'block',
-    margin: '6px 0',
+    // Vertical spacing as inner padding (not margin) so CM6's offsetHeight
+    // measures it, keeping cursor mapping accurate below embeds.
+    padding: '6px 0',
     borderRadius: '6px',
     overflow: 'hidden',
     userSelect: 'none',

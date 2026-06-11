@@ -111,15 +111,19 @@ export const darkTheme = EditorView.theme(
       borderRadius: '0 0 6px 6px',
       background: 'var(--bg-elevated)',
       height: '6px',
-      marginBottom: '16px',
+      boxSizing: 'content-box',
+      // Spacing below the code block as inner padding (not margin) so CM6
+      // measures it via offsetHeight, keeping cursor mapping accurate.
+      paddingBottom: '6px',
     },
     '.cm-frontmatter-widget': {
       background: 'var(--bg-elevated)',
       border: '1px solid var(--border-2)',
       borderRadius: '6px',
-      padding: '10px 16px',
+      // Bottom spacing as inner padding (not margin) so CM6's offsetHeight
+      // measures it, keeping cursor mapping accurate below the block.
+      padding: '10px 16px 16px',
       display: 'block',
-      marginBottom: '16px',
     },
     '.cm-frontmatter-row': {
       display: 'flex',
@@ -209,11 +213,21 @@ export const darkTheme = EditorView.theme(
       flexShrink: '0',
       backgroundColor: 'var(--text)',
     },
-    '.cm-bujo-event':     { backgroundColor: 'color-mix(in srgb, #4aa3ff 12%, transparent)' },
-    '.cm-bujo-mood':      { backgroundColor: 'color-mix(in srgb, #56c596 12%, transparent)' },
-    '.cm-bujo-idea':      { backgroundColor: 'color-mix(in srgb, #9d8dff 14%, transparent)' },
-    '.cm-bujo-important': { backgroundColor: 'color-mix(in srgb, #ff5a5a 14%, transparent)' },
-    '.cm-bujo-attention': { backgroundColor: 'color-mix(in srgb, #ffcc44 16%, transparent)' },
+    '.cm-bujo-event': {
+      backgroundColor: 'color-mix(in srgb, #4aa3ff 12%, transparent)',
+    },
+    '.cm-bujo-mood': {
+      backgroundColor: 'color-mix(in srgb, #56c596 12%, transparent)',
+    },
+    '.cm-bujo-idea': {
+      backgroundColor: 'color-mix(in srgb, #9d8dff 14%, transparent)',
+    },
+    '.cm-bujo-important': {
+      backgroundColor: 'color-mix(in srgb, #ff5a5a 14%, transparent)',
+    },
+    '.cm-bujo-attention': {
+      backgroundColor: 'color-mix(in srgb, #ffcc44 16%, transparent)',
+    },
   },
   { dark: true },
 )
