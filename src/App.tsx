@@ -32,6 +32,7 @@ import { LoadingOverlay } from './components/LoadingOverlay'
 import { restoreVault } from './vault'
 import { settingsStore } from './stores/settingsStore'
 import { activeRoot } from './stores/workspaceStore'
+import { applyTheme, resolveTheme } from './lib/theme'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
@@ -67,7 +68,7 @@ startPlugins()
 
 export default function App() {
   createEffect(() => {
-    document.documentElement.setAttribute('data-theme', settingsStore.theme)
+    applyTheme(resolveTheme(settingsStore.theme, settingsStore.customThemes))
   })
 
   createEffect(() => {
