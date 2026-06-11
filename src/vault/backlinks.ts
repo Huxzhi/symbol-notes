@@ -15,17 +15,40 @@ export function buildStemIndex(files: Record<string, unknown>): Map<string, stri
   return index
 }
 
+export function buildAliasIndex(
+  files: Record<string, { aliases?: string[] }>,
+): Map<string, string[]> {
+  const index = new Map<string, string[]>()
+  for (const [path, meta] of Object.entries(files)) {
+    if (!path.endsWith('.md')) continue
+    for (const alias of meta.aliases ?? []) {
+      const key = alias.toLowerCase()
+      const list = index.get(key)
+      if (list) list.push(path)
+      else index.set(key, [path])
+    }
+  }
+  return index
+}
+
 export function resolveLink(
   target: string,
   stemIndex: Map<string, string[]>,
   files: Record<string, unknown>,
+  aliasIndex?: Map<string, string[]>,
 ): string | null {
   if (target in files) return target
   const stem = target.split('/').pop()!
   const candidates = stemIndex.get(stem) ?? []
   if (candidates.length === 1) return candidates[0]
   const pathMatches = candidates.filter(c => c === target || c.endsWith('/' + target))
-  return pathMatches.length === 1 ? pathMatches[0] : null
+  if (pathMatches.length === 1) return pathMatches[0]
+  if (aliasIndex) {
+    const aliasKey = target.replace(/\.md$/, '').toLowerCase()
+    const aliasHits = aliasIndex.get(aliasKey) ?? []
+    if (aliasHits.length === 1) return aliasHits[0]
+  }
+  return null
 }
 
 export function buildLinkMaps(

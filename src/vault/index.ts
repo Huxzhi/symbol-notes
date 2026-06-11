@@ -647,5 +647,5 @@ export {
 } from './io'
 
 // For non-vault consumers (pluginRegistry, EditorViewer, tests)
-export { buildLinkMaps, buildStemIndex, resolveLink } from './backlinks'
+export { buildLinkMaps, buildStemIndex, buildAliasIndex, resolveLink } from './backlinks'
 export { extractDateFromName } from './scan'
