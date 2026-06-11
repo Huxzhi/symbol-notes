@@ -24,6 +24,7 @@ import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
 import { listsField } from '../../lib/cm6/listsField'
 import { editorCompletion } from '../../lib/cm6/editorCompletion'
+import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import {
   formatTimestamp,
   parseFrontmatter,
@@ -68,6 +69,7 @@ function buildEditorState(
         codeLanguages: languages,
         extensions: [GFM, wikiLinkParser, wikiEmbedParser],
       }),
+      editorKeymap,
       syntaxHighlighting(darkHighlightStyle),
       darkTheme,
       livePreviewExtension,

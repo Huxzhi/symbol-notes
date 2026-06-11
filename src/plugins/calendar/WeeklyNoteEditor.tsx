@@ -9,6 +9,7 @@ import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
 import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { hideFrontmatterExtension } from '../../lib/cm6/hideFrontmatterExtension'
+import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import { readFile, fileActions, vaultStore } from '../../vault'
 
 export function WeeklyNoteEditor(props: { path: string; label: string }) {
@@ -57,6 +58,7 @@ export function WeeklyNoteEditor(props: { path: string; label: string }) {
       doc: text,
       extensions: [
         markdown({ codeLanguages: languages, extensions: [GFM] }),
+        editorKeymap,
         syntaxHighlighting(darkHighlightStyle),
         darkTheme,
         embedTheme,
