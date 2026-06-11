@@ -43,12 +43,16 @@ export function WeeklyNoteEditor(props: { path: string; label: string }) {
   }
 
   createEffect(() => {
+    const exists = fileExists()       // 跟踪 props.path 与该周记是否存在
     const text = content()
-    if (text === undefined) return
+    // 文件存在但仍在读取 → 保留当前编辑器,等加载完成(避免切周时闪烁)
+    if (exists && content.loading) return
+    // 其余情况一律先销毁旧编辑器:切到「没有周记」的周时,这一步保证
+    // 不把上一周的反思内容残留在屏上(根因——原来 text===undefined 直接 return)。
     if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
     cmView?.destroy()
     cmView = null
-    if (text === null) return
+    if (!exists || text == null) return
     const state = EditorState.create({
       doc: text,
       extensions: [
