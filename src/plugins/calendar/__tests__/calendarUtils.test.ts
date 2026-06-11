@@ -10,6 +10,9 @@ import {
   getISOWeekDates,
   weekFilePath,
   parseISODate,
+  getMonthString,
+  monthFilePath,
+  weekRowFilePath,
 } from '../calendarUtils'
 import type { MonthHeaderRow, WeekRow } from '../calendarUtils'
 import type { FileMeta, ListItem } from '../../../stores/types'
@@ -214,5 +217,38 @@ describe('ISO week helpers', () => {
   it('parseISODate parses to a local date', () => {
     const d = parseISODate('2026-06-10')
     expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2026, 5, 10])
+  })
+})
+
+describe('month helpers', () => {
+  it('getMonthString pads month and is local (not UTC)', () => {
+    expect(getMonthString(new Date(2026, 5, 10))).toBe('2026-06')  // June
+    expect(getMonthString(new Date(2026, 0, 1))).toBe('2026-01')   // January
+    expect(getMonthString(new Date(2026, 11, 31))).toBe('2026-12') // December
+  })
+
+  it('monthFilePath joins folder and YYYY-MM name', () => {
+    expect(monthFilePath('monthly', 2026, 5)).toBe('monthly/2026-06.md')
+    expect(monthFilePath('', 2026, 5)).toBe('2026-06.md')
+  })
+})
+
+describe('weekRowFilePath', () => {
+  it('derives the weekly file from the row first non-null day', () => {
+    const row = buildMonthRows(2026, 5).slice(1)[1] as WeekRow // 2nd week of June 2026
+    const first = row.cells.find(c => c !== null)!
+    expect(weekRowFilePath('weekly', row)).toBe(weekFilePath('weekly', parseISODate(first.dayStr)))
+  })
+
+  it('uses the first non-null cell when the row starts with null padding', () => {
+    // A month whose 1st is not Monday: leading nulls in the first week row.
+    const firstWeek = buildMonthRows(2026, 6).slice(1)[0] as WeekRow // July 2026 starts Wed
+    expect(firstWeek.cells[0]).toBeNull()
+    const first = firstWeek.cells.find(c => c !== null)!
+    expect(weekRowFilePath('weekly', firstWeek)).toBe(weekFilePath('weekly', parseISODate(first.dayStr)))
+  })
+
+  it('returns null for an all-null row', () => {
+    expect(weekRowFilePath('weekly', { type: 'week', cells: [null, null, null, null, null, null, null] })).toBeNull()
   })
 })

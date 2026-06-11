@@ -187,6 +187,22 @@ export function weekFilePath(folder: string, date: Date): string {
   return folder ? `${folder}/${name}` : name
 }
 
+export function getMonthString(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function monthFilePath(folder: string, year: number, month: number): string {
+  const name = `${year}-${String(month + 1).padStart(2, '0')}.md`
+  return folder ? `${folder}/${name}` : name
+}
+
+/** 由某周行的首个非空日推导该 ISO 周的周记路径；全空行返回 null。 */
+export function weekRowFilePath(folder: string, row: WeekRow): string | null {
+  const first = row.cells.find((c) => c !== null)
+  if (!first) return null
+  return weekFilePath(folder, parseISODate(first.dayStr))
+}
+
 export function parseISODate(s: string): Date {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, (m ?? 1) - 1, d ?? 1)
