@@ -49,6 +49,7 @@ import {
   extractTags,
   mergeTagsWithBody,
   parseAll,
+  resolveDatedField,
 } from './scan'
 import { applyFileTags, buildTags, removeFileTags } from './tags'
 import { applyFileTasks, buildTasks, removeFileTasks } from './tasks'
@@ -252,7 +253,7 @@ export async function reindexFile(
       extractDateString(frontmatter.created) ??
       new Date(existingMtime).toISOString().slice(0, 10)
     const updated = extractDateString(frontmatter.updated) ?? null
-    const dated = extractDateString(frontmatter.dated) ?? created
+    const dated = resolveDatedField(frontmatter.dated, created)
     const fmTags = extractTags(frontmatter.tags)
     fields = {
       frontmatter,

@@ -4,6 +4,7 @@ import {
   buildRangeRows,
   toIsoDate,
   buildEntryDayData,
+  buildTaskDayData,
   getISOWeek,
   getISOWeekString,
   getISOWeekDates,
@@ -150,6 +151,40 @@ describe('buildEntryDayData', () => {
     const dir: FileMeta = { ...fileMeta('d', '2026-06-01', []), kind: 'directory' }
     const noDate: FileMeta = { ...fileMeta('n.md', '', [listItem({ signifier: '-' })]), dated: '' }
     expect(buildEntryDayData({ 'd': dir, 'n.md': noDate })).toEqual({})
+  })
+
+  it('周/月 dated 文件（dated="")的无 due 条目不落到任何天', () => {
+    const weekly: FileMeta = {
+      ...fileMeta('2026-W22.md', '', [
+        listItem({ signifier: '-', visual: '本周事件' }),
+        listItem({ signifier: '~', visual: '本周想法', fields: { due: '2026-05-28' } }),
+      ]),
+      dated: '',
+    }
+    const map = buildEntryDayData({ '2026-W22.md': weekly })
+    // 无 due 的事件被排除，不产生空串键；带显式 due 的仍落到该天
+    expect(map['']).toBeUndefined()
+    expect(map['2026-05-28']).toHaveLength(1)
+  })
+})
+
+describe('buildTaskDayData', () => {
+  it('周/月 dated 文件（dated="")的无 due 任务不落到任何天', () => {
+    const weekly = fileMeta('2026-W22.md', '', [
+      listItem({ task: true, status: ' ', visual: '周任务' }),
+      listItem({ task: true, status: ' ', visual: '带截止', fields: { due: '2026-05-28' } }),
+    ])
+    weekly.dated = ''
+    const taskMap = { '2026-W22.md': weekly.lists }
+    const map = buildTaskDayData(taskMap, { '2026-W22.md': weekly })
+    expect(map['']).toBeUndefined()
+    expect(map['2026-05-28']).toHaveLength(1)
+  })
+
+  it('普通文件无 due 任务回退到文件 dated', () => {
+    const note = fileMeta('a.md', '2026-06-01', [listItem({ task: true, status: ' ' })])
+    const map = buildTaskDayData({ 'a.md': note.lists }, { 'a.md': note })
+    expect(map['2026-06-01']).toHaveLength(1)
   })
 })
 
