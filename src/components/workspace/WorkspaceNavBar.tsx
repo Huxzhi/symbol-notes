@@ -1,6 +1,7 @@
 import { For, Show } from 'solid-js'
 import { ChevronLeft, ChevronRight } from 'lucide-solid'
 import { workspaceActions, leafInstances } from '../../stores/workspaceStore'
+import { revealFolder } from '../../stores/revealStore'
 import { getView } from '../../lib/pluginRegistry'
 import { splitBreadcrumb } from './breadcrumb'
 import type { WorkspaceTabs, WorkspaceLeaf } from '../../stores/types'
@@ -44,8 +45,12 @@ export function WorkspaceNavBar(props: { node: WorkspaceTabs }) {
                     <>
                       <button
                         type="button"
-                        class="shrink-0 hover:text-(--text) hover:underline truncate max-w-32"
-                        title={seg.path}
+                        class="shrink-0 hover:text-(--text) hover:underline truncate max-w-32 cursor-pointer"
+                        title={`在文件面板中定位 ${seg.path}`}
+                        onClick={() => {
+                          workspaceActions.switchSidebarPanel('left', 'files')
+                          revealFolder(seg.path)
+                        }}
                       >
                         {seg.name}
                       </button>

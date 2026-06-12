@@ -1,5 +1,5 @@
 import { FolderOpen } from 'lucide-solid'
-import { createEffect, createMemo, createSignal, For, JSX, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, untrack, For, JSX, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 
 import { openVault, fileActions, vaultFs, vaultStore } from '../../vault'
@@ -11,7 +11,8 @@ import { showError, showToast } from '../../stores/toastStore'
 import { getFileViewForPath } from '../../lib/pluginRegistry'
 import type { FileMeta, ViewComponentProps } from '../../stores/types'
 import { activeFilePath } from '../../stores/workspaceStore'
-import { flattenTree, resolveDropTarget, isOtherFile, type FlatRow } from './treeUtils'
+import { flattenTree, resolveDropTarget, isOtherFile, folderChain, type FlatRow } from './treeUtils'
+import { revealTarget } from '../../stores/revealStore'
 
 export function toggleInArray(arr: string[], val: string): string[] {
   return arr.includes(val) ? arr.filter((p) => p !== val) : [...arr, val]
@@ -32,6 +33,7 @@ function FileRow(props: {
   row: FlatRow
   style: JSX.CSSProperties
   collapsedFolders: string[]
+  highlight: string | null
   onToggle: (path: string) => void
   dragSrc: () => string | null
   dragOver: () => string | null
@@ -89,6 +91,7 @@ function FileRow(props: {
         }
         ${props.dragSrc() === entry().path ? 'opacity-50' : ''}
         ${isDragTarget() ? 'outline outline-(--accent-2) -outline-offset-1 bg-(--bg-hover) border-(--accent-2)!' : ''}
+        ${props.highlight === entry().path ? 'bg-(--accent-bg)! ring-1 ring-(--accent) ring-inset transition-colors' : ''}
       `}
       onClick={() => {
         if (isRenaming()) return
@@ -180,6 +183,42 @@ export function FilesPanel(props: ViewComponentProps) {
       const path = (op as { path: string }).path
       const idx = flatRows().findIndex(r => r.entry.path === path)
       if (idx !== -1) virtualizer.scrollToIndex(idx, { align: 'auto' })
+    }
+  })
+
+  // Reveal a folder requested from elsewhere (e.g. the nav-bar breadcrumb):
+  // expand the folder + ancestors, then scroll to it and briefly highlight.
+  const [highlight, setHighlight] = createSignal<string | null>(null)
+  const [pendingReveal, setPendingReveal] = createSignal<string | null>(null)
+
+  createEffect(() => {
+    const t = revealTarget()
+    if (!t) return
+    // Only re-run when a new reveal is requested — not when the user toggles folders.
+    untrack(() => {
+      const chain = folderChain(t.path)
+      const cur = collapsedFolders()
+      const next = cur.filter((p) => !chain.includes(p))
+      if (next.length !== cur.length) {
+        workspaceActions.setLeafViewState(props.leafId, {
+          type: 'files',
+          state: { ...props.viewState, collapsedFolders: next },
+        })
+      }
+      setPendingReveal(t.path)
+      setHighlight(t.path)
+    })
+    setTimeout(() => setHighlight((h) => (h === t.path ? null : h)), 1000)
+  })
+
+  // Scroll once the (possibly newly-expanded) target row exists in the tree.
+  createEffect(() => {
+    const path = pendingReveal()
+    if (!path) return
+    const idx = flatRows().findIndex((r) => r.entry.path === path)
+    if (idx !== -1) {
+      virtualizer.scrollToIndex(idx, { align: 'center' })
+      setPendingReveal(null)
     }
   })
 
@@ -382,6 +421,7 @@ export function FilesPanel(props: ViewComponentProps) {
                   width: '100%',
                 }}
                 collapsedFolders={collapsedFolders()}
+                highlight={highlight()}
                 onToggle={handleToggle}
                 dragSrc={dragSrc}
                 dragOver={dragOver}
