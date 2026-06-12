@@ -133,6 +133,8 @@ export interface LeafRuntimeState {
   isDirty: boolean
   outLinks: OutLink[]
   headings: Heading[]
+  history?: string[]      // 内存中的文件历史（不持久化）；oldest→newest
+  historyIndex?: number   // 当前在 history 中的位置；空时缺省视为 -1
 }
 
 
