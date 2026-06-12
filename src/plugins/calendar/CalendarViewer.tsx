@@ -1,4 +1,4 @@
-import { createDeferred, createMemo, createSignal, For, Show, type JSX } from 'solid-js'
+import { createDeferred, createEffect, createSignal, For, Show, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -9,8 +9,8 @@ import {
   buildEntryDayData,
   buildCellItems,
   buildRangeRows,
-  toIsoDate,
-  parseISODate,
+  weekRowFilePath,
+  monthFilePath,
   FILTER_DEFAULTS,
   WEEKDAYS_LONG,
   type CalRow,
@@ -20,7 +20,8 @@ import {
   type FilterKey,
 } from './calendarUtils'
 import { CellItemButton } from './CalendarCell'
-import { WeekView } from './WeekView'
+import { PlanPreview } from './PlanPreview'
+import { PlanCellEditor } from './PlanCellEditor'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,8 +39,15 @@ function normalizeYM(year: number, month: number) {
   return { year: Math.floor(total / 12), month: ((total % 12) + 12) % 12 }
 }
 
-function estimateRowsHeight(rows: CalRow[]): number {
-  return rows.reduce((acc, r) => acc + (r.type === 'month-header' ? 32 : 140), 0)
+const HEADER_H = 40
+const WEEK_ROW_H = { month: 140, week: 420 } as const
+
+function rowHeight(row: CalRow, mode: 'week' | 'month'): number {
+  return row.type === 'month-header' ? HEADER_H : WEEK_ROW_H[mode]
+}
+
+function estimateRowsHeight(rows: CalRow[], mode: 'week' | 'month'): number {
+  return rows.reduce((acc, r) => acc + rowHeight(r, mode), 0)
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -64,16 +72,41 @@ function FilterChip(props: {
   )
 }
 
-function MonthHeader(props: { year: number; month: number }) {
+function MonthHeader(props: {
+  year: number
+  month: number
+  monthlyFolder: () => string
+  editingPath: () => string | null
+  setEditingPath: (p: string | null) => void
+}) {
+  const path = () => monthFilePath(props.monthlyFolder(), props.year, props.month)
   return (
-    <div class="px-4 py-1.5 text-[13px] font-semibold text-[var(--text)] bg-[var(--bg-surface)] border-b border-(--border)">
-      {props.year}年{props.month + 1}月
-    </div>
+    <Show
+      when={props.editingPath() === path()}
+      fallback={
+        <div class="flex items-stretch gap-3 px-4 bg-[var(--bg-surface)] border-b border-(--border)">
+          <span class="shrink-0 py-1.5 text-[13px] font-semibold text-[var(--text)] self-center">
+            {props.year}年{props.month + 1}月
+          </span>
+          <div class="flex-1 min-w-0 self-center">
+            <PlanPreview path={path()} label="月计划" compact onEdit={() => props.setEditingPath(path())} />
+          </div>
+        </div>
+      }
+    >
+      <div class="border-b border-(--border) bg-[var(--bg-surface)]" style={{ height: '320px' }}>
+        <PlanCellEditor path={path()} label={`${props.year}年${props.month + 1}月 · 月计划`} onClose={() => props.setEditingPath(null)} />
+      </div>
+    </Show>
   )
 }
 
 function WeekRowComp(props: {
   row: WeekRow
+  mode: () => 'week' | 'month'
+  weeklyFolder: () => string
+  editingPath: () => string | null
+  setEditingPath: (p: string | null) => void
   dayData: () => ReturnType<typeof buildDayData>
   taskDayData: () => Record<string, Task[]>
   entryDayData: () => Record<string, Task[]>
@@ -81,19 +114,23 @@ function WeekRowComp(props: {
   todayStr: string
   onOpenFile: (path: string) => void
 }) {
+  const planPath = () => weekRowFilePath(props.weeklyFolder(), props.row)
   return (
-    <div class="grid grid-cols-7 border-b border-(--border)">
+    <div
+      class="grid border-b border-(--border)"
+      style={{
+        'grid-template-columns': 'repeat(7, minmax(0, 1fr)) 1.6fr',
+        'min-height': `${WEEK_ROW_H[props.mode()]}px`,
+      }}
+    >
       <For each={props.row.cells}>
-        {(cell, i) => {
+        {(cell) => {
           if (cell === null) {
-            return (
-              <div
-                class={`h-[140px] bg-[var(--bg-surface)]${i() < 6 ? ' border-r border-(--border)' : ''}`}
-              />
-            )
+            return <div class="bg-[var(--bg-surface)] border-r border-(--border)" />
           }
           const { dayStr, day } = cell
           const isToday = dayStr === props.todayStr
+          const week = () => props.mode() === 'week'
 
           const cellData = () => {
             const all = buildCellItems(dayStr, props.filter(), {
@@ -101,22 +138,22 @@ function WeekRowComp(props: {
               taskDayData: props.taskDayData(),
               entryDayData: props.entryDayData(),
             })
-            if (all.length <= MAX_CELL_ITEMS) return { items: all, more: 0 }
+            if (week() || all.length <= MAX_CELL_ITEMS) return { items: all, more: 0 }
             return { items: all.slice(0, MAX_CELL_ITEMS - 1), more: all.length - (MAX_CELL_ITEMS - 1) }
           }
 
           return (
             <div
-              class={`p-1.5 flex flex-col h-[140px] overflow-hidden${i() < 6 ? ' border-r border-(--border)' : ''}${isToday ? ' bg-(--accent-bg)' : ' bg-[var(--bg-base)]'}`}
+              class={`p-1.5 flex flex-col min-h-0 overflow-hidden border-r border-(--border)${isToday ? ' bg-(--accent-bg)' : ' bg-[var(--bg-base)]'}`}
             >
               <div
                 class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none${isToday ? ' bg-(--accent) text-white' : ' text-[var(--text-3)]'}`}
               >
                 {day}
               </div>
-              <div class="flex flex-col gap-0.5 overflow-hidden">
+              <div class="flex flex-col gap-0.5 min-h-0 overflow-y-auto">
                 <For each={cellData().items}>
-                  {(item) => <CellItemButton item={item} onOpenFile={props.onOpenFile} />}
+                  {(item) => <CellItemButton item={item} onOpenFile={props.onOpenFile} wrap={week()} />}
                 </For>
                 <Show when={cellData().more > 0}>
                   <div class="shrink-0 text-[10px] text-[var(--text-4)] px-1.5 py-0.5 select-none">
@@ -128,6 +165,20 @@ function WeekRowComp(props: {
           )
         }}
       </For>
+
+      {/* 8th column: weekly plan */}
+      <div class="flex flex-col min-h-0 overflow-hidden bg-[var(--bg-surface)]">
+        <Show when={planPath()} fallback={<div class="flex-1" />}>
+          {(path) => (
+            <Show
+              when={props.editingPath() === path()}
+              fallback={<PlanPreview path={path()} label="周计划" onEdit={() => props.setEditingPath(path())} />}
+            >
+              <PlanCellEditor path={path()} label="周计划" onClose={() => props.setEditingPath(null)} />
+            </Show>
+          )}
+        </Show>
+      </div>
     </div>
   )
 }
@@ -138,28 +189,21 @@ export function CalendarViewer(props: CalendarViewerProps) {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
-  // View mode & anchored week — persisted via leaf viewState
+  // View mode (row density) — persisted via leaf viewState
   const initMode: 'week' | 'month' = props.viewState.mode === 'week' ? 'week' : 'month'
-  const initAnchor = typeof props.viewState.weekAnchor === 'string' ? props.viewState.weekAnchor : todayStr
   const [mode, setMode] = createSignal<'week' | 'month'>(initMode)
-  const [weekAnchor, setWeekAnchor] = createSignal(initAnchor)
+  const [editingPath, setEditingPath] = createSignal<string | null>(null)
 
-  function applyState(nextMode: 'week' | 'month', nextAnchor: string) {
+  function applyMode(nextMode: 'week' | 'month') {
     setMode(nextMode)
-    setWeekAnchor(nextAnchor)
     workspaceActions.setLeafViewState(props.leafId, {
       type: 'calendar',
-      state: { mode: nextMode, weekAnchor: nextAnchor },
+      state: { mode: nextMode },
     })
   }
 
-  function shiftWeek(days: number) {
-    const d = parseISODate(weekAnchor())
-    d.setDate(d.getDate() + days)
-    applyState('week', toIsoDate(d.getFullYear(), d.getMonth(), d.getDate()))
-  }
-
   const weeklyFolder = () => String(props.getConfig({ weeklyFolder: 'weekly' }).weeklyFolder)
+  const monthlyFolder = () => String(props.getConfig({ monthlyFolder: 'monthly' }).monthlyFolder)
 
   // Filter state — persisted via plugin config
   const filter = () => {
@@ -187,7 +231,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
   )
   const initialScrollOffset = initialRows
     .slice(0, Math.max(0, todayMonthIdx))
-    .reduce((acc, r) => acc + (r.type === 'month-header' ? 32 : 140), 0)
+    .reduce((acc, r) => acc + rowHeight(r, initMode), 0)
 
   // Virtual list
   let scrollEl!: HTMLDivElement
@@ -198,9 +242,18 @@ export function CalendarViewer(props: CalendarViewerProps) {
       return rows().length
     },
     getScrollElement: () => scrollEl,
-    estimateSize: (i) => (rows()[i]?.type === 'month-header' ? 32 : 140),
+    estimateSize: (i) => {
+      const r = rows()[i]
+      return r ? rowHeight(r, mode()) : WEEK_ROW_H.month
+    },
     overscan: 3,
     initialOffset: initialScrollOffset,
+  })
+
+  // Row heights depend on mode; reset measurements when it flips.
+  createEffect(() => {
+    mode()
+    virtualizer.measure()
   })
 
   // Infinite scroll actions
@@ -215,7 +268,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
     const start = normalizeYM(head.year, head.month - n)
     const newRows = buildRangeRows(start.year, start.month, n)
     head = normalizeYM(head.year, head.month - n)
-    const estimatedHeight = estimateRowsHeight(newRows)
+    const estimatedHeight = estimateRowsHeight(newRows, mode())
     setRows((prev) => [...newRows, ...prev])
     // Compensate scroll after reactive updates flush to prevent viewport jump
     queueMicrotask(() => {
@@ -266,11 +319,11 @@ export function CalendarViewer(props: CalendarViewerProps) {
         <div class="flex items-center rounded border border-(--border) overflow-hidden">
           <button
             class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'month' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
-            onClick={() => applyState('month', weekAnchor())}
+            onClick={() => applyMode('month')}
           >月</button>
           <button
             class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'week' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
-            onClick={() => applyState('week', weekAnchor())}
+            onClick={() => applyMode('week')}
           >周</button>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
@@ -325,26 +378,23 @@ export function CalendarViewer(props: CalendarViewerProps) {
         </div>
       </div>
 
-      {/* Month view — kept permanently mounted (toggled via display) so the
-          virtual list's scroll element never unmounts; the virtualizer binds it
-          once and its ResizeObserver repopulates rows when it becomes visible.
-          Unmounting it (via <Show>) leaves the virtualizer with a detached,
-          zero-height element and the grid renders blank. */}
-      <div
-        class="flex flex-col flex-1 min-h-0"
-        style={{ display: mode() === 'month' ? 'flex' : 'none' }}
-      >
+      {/* Unified week-row list — month/week modes differ only in row height. */}
+      <div class="flex flex-col flex-1 min-h-0">
       {/* Weekday header — fixed above scroll area */}
-      <div class="grid grid-cols-7 border-b border-(--border) bg-[var(--bg-surface)] shrink-0">
+      <div
+        class="grid border-b border-(--border) bg-[var(--bg-surface)] shrink-0"
+        style={{ 'grid-template-columns': 'repeat(7, minmax(0, 1fr)) 1.6fr' }}
+      >
         <For each={WEEKDAYS_LONG}>
           {(d, i) => (
             <div
-              class={`py-2 text-center text-[11px] select-none${i() < 6 ? ' border-r border-(--border)' : ''}${i() >= 5 ? ' text-(--accent)' : ' text-[var(--text-3)]'}`}
+              class={`py-2 text-center text-[11px] select-none border-r border-(--border)${i() >= 5 ? ' text-(--accent)' : ' text-[var(--text-3)]'}`}
             >
               {d}
             </div>
           )}
         </For>
+        <div class="py-2 text-center text-[11px] select-none text-(--text-3)">周计划</div>
       </div>
 
       {/* Virtual scroll container */}
@@ -377,10 +427,17 @@ export function CalendarViewer(props: CalendarViewerProps) {
                     <MonthHeader
                       year={(row() as MonthHeaderRow).year}
                       month={(row() as MonthHeaderRow).month}
+                      monthlyFolder={monthlyFolder}
+                      editingPath={editingPath}
+                      setEditingPath={setEditingPath}
                     />
                   ) : (
                     <WeekRowComp
                       row={row() as WeekRow}
+                      mode={mode}
+                      weeklyFolder={weeklyFolder}
+                      editingPath={editingPath}
+                      setEditingPath={setEditingPath}
                       dayData={dayData}
                       taskDayData={taskDayData}
                       entryDayData={entryDayData}
@@ -396,19 +453,6 @@ export function CalendarViewer(props: CalendarViewerProps) {
         </div>
       </div>
       </div>
-
-      <Show when={mode() === 'week'}>
-        <WeekView
-          weekAnchor={weekAnchor}
-          filter={filter}
-          weeklyFolder={weeklyFolder}
-          todayStr={todayStr}
-          onOpenFile={workspaceActions.openFile}
-          onPrevWeek={() => shiftWeek(-7)}
-          onNextWeek={() => shiftWeek(7)}
-          onToday={() => applyState('week', todayStr)}
-        />
-      </Show>
     </div>
   )
 }

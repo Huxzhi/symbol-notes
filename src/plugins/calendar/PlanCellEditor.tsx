@@ -12,7 +12,7 @@ import { hideFrontmatterExtension } from '../../lib/cm6/hideFrontmatterExtension
 import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import { readFile, fileActions, vaultStore } from '../../vault'
 
-export function WeeklyNoteEditor(props: { path: string; label: string }) {
+export function PlanCellEditor(props: { path: string; label: string; onClose: () => void }) {
   let editorHost!: HTMLDivElement
   let cmView: EditorView | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -35,21 +35,25 @@ export function WeeklyNoteEditor(props: { path: string; label: string }) {
     await fileActions.saveFile(props.path, cmView.state.doc.toString())
   }
 
+  function flushSave() {
+    if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
+    void doSave()
+  }
+
   function scheduleSave() {
     if (saveTimer !== null) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => {
-      saveTimer = null
-      void doSave()
-    }, 500)
+    saveTimer = setTimeout(() => { saveTimer = null; void doSave() }, 500)
+  }
+
+  function closeNow() {
+    flushSave()
+    props.onClose()
   }
 
   createEffect(() => {
-    const exists = fileExists()       // 跟踪 props.path 与该周记是否存在
+    const exists = fileExists()
     const text = content()
-    // 文件存在但仍在读取 → 保留当前编辑器,等加载完成(避免切周时闪烁)
     if (exists && content.loading) return
-    // 其余情况一律先销毁旧编辑器:切到「没有周记」的周时,这一步保证
-    // 不把上一周的反思内容残留在屏上(根因——原来 text===undefined 直接 return)。
     if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
     cmView?.destroy()
     cmView = null
@@ -71,31 +75,46 @@ export function WeeklyNoteEditor(props: { path: string; label: string }) {
           keydown(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
               e.preventDefault()
-              if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null }
-              void doSave()
+              flushSave()
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              closeNow()
             }
           },
         }),
       ],
     })
     cmView = new EditorView({ state, parent: editorHost })
+    cmView.focus()
   })
 
+  // Blur-to-close: when focus leaves the editor host entirely, save & close.
+  function onFocusOut(e: FocusEvent) {
+    const next = e.relatedTarget as Node | null
+    if (next && editorHost.contains(next)) return
+    closeNow()
+  }
+
   onCleanup(() => {
-    if (saveTimer !== null) clearTimeout(saveTimer)
+    flushSave()
     cmView?.destroy()
     cmView = null
   })
 
   return (
     <div class="flex flex-col h-full min-h-0 overflow-hidden">
-      <div class="px-3 py-1.5 shrink-0 border-b border-(--border) text-[10px] text-(--accent) font-bold tracking-widest uppercase">
-        {props.label}
+      <div class="px-3 py-1.5 shrink-0 border-b border-(--border) flex items-center justify-between">
+        <span class="text-[10px] text-(--accent) font-bold tracking-widest uppercase">{props.label}</span>
+        <button
+          class="text-[11px] text-(--text-4) hover:text-(--text-2) px-1"
+          title="收起（保存）"
+          onClick={closeNow}
+        >✕</button>
       </div>
       <div class="flex-1 min-h-0 relative">
         <Show when={!content.loading && !fileExists()}>
           <div class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-(--text-4)">
-            <span class="text-[11px] italic">本周还没有周记</span>
+            <span class="text-[11px] italic">还没有这个计划</span>
             <button
               class="text-[11px] px-2 py-1 rounded border border-(--border) hover:border-(--accent) hover:text-(--accent) transition-colors"
               onClick={() => void fileActions.createFile(props.path)}
@@ -104,7 +123,7 @@ export function WeeklyNoteEditor(props: { path: string; label: string }) {
             </button>
           </div>
         </Show>
-        <div ref={editorHost} class="h-full overflow-auto" />
+        <div ref={editorHost} class="h-full overflow-auto" onFocusOut={onFocusOut} />
       </div>
     </div>
   )
