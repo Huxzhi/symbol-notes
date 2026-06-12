@@ -206,8 +206,16 @@ export function CalendarViewer(props: CalendarViewerProps) {
       state: { mode: nextMode },
     })
     virtualizer.measure() // recompute positions with the new row heights
+    // Switching to week view jumps to today's week; month view keeps the position.
+    let target = topIndex
+    if (nextMode === 'week') {
+      const idx = rows().findIndex(
+        (r) => r.type === 'week' && r.cells.some((c) => c?.dayStr === todayStr),
+      )
+      if (idx >= 0) target = idx
+    }
     requestAnimationFrame(() => {
-      virtualizer.scrollToIndex(topIndex, { align: 'start' })
+      virtualizer.scrollToIndex(target, { align: 'start' })
       updateTopLabel()
     })
   }
