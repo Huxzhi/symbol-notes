@@ -48,7 +48,7 @@ export function WorkspaceNavBar(props: { node: WorkspaceTabs }) {
                         class="shrink-0 hover:text-(--text) hover:underline truncate max-w-32 cursor-pointer"
                         title={`在文件面板中定位 ${seg.path}`}
                         onClick={() => {
-                          workspaceActions.switchSidebarPanel('left', 'files')
+                          workspaceActions.ensureSidebarPanel('left', 'files')
                           revealFolder(seg.path)
                         }}
                       >
