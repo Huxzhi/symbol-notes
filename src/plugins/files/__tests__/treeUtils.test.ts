@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { flattenTree, resolveDropTarget } from '../treeUtils'
+import { flattenTree, resolveDropTarget, folderChain } from '../treeUtils'
 import type { FileMeta } from '../../../stores/types'
 
 function m(
@@ -82,5 +82,19 @@ describe('resolveDropTarget', () => {
   it('returns null for a root-level file', () => {
     const file = m({ name: 'a.md', path: 'a.md', kind: 'file', parent: null })
     expect(resolveDropTarget(file)).toBeNull()
+  })
+})
+
+describe('folderChain', () => {
+  it('returns the folder and all ancestors, root→target', () => {
+    expect(folderChain('a/b/c')).toEqual(['a', 'a/b', 'a/b/c'])
+  })
+
+  it('returns a single segment for a top-level folder', () => {
+    expect(folderChain('a')).toEqual(['a'])
+  })
+
+  it('returns empty for an empty path', () => {
+    expect(folderChain('')).toEqual([])
   })
 })

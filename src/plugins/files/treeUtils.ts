@@ -11,6 +11,17 @@ export function isOtherFile(name: string): boolean {
   return !name.endsWith(MD_EXT)
 }
 
+/** 某文件夹路径的累计链：'a/b/c' → ['a','a/b','a/b/c']（根→目标）。 */
+export function folderChain(path: string): string[] {
+  const out: string[] = []
+  let acc = ''
+  for (const p of path.split('/').filter(Boolean)) {
+    acc = acc ? `${acc}/${p}` : p
+    out.push(acc)
+  }
+  return out
+}
+
 function childrenOf(
   parentPath: string | null,
   files: Record<string, FileMeta>,
