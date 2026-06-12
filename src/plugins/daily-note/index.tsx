@@ -2,9 +2,9 @@ import { For } from 'solid-js'
 import { BookOpen } from 'lucide-solid'
 import type { SettingsTabProps } from '../../lib/pluginRegistry'
 import { definePlugin } from '../../lib/pluginRegistry'
-import { closeModal, showModal } from '../../stores/modalStore'
-import { listTemplates, resolveTemplate } from '../../lib/templates'
+import { listTemplates } from '../../lib/templates'
 import { todayPath } from './formatDate'
+import { openDailyNote } from './openDailyNote'
 
 const DEFAULTS = {
   folder: 'journal',
@@ -118,62 +118,11 @@ export const DailyNotePlugin = definePlugin({
   description: '快速打开或新建今天的日记文件',
   defaultEnabled: true,
   setup(ctx) {
-    async function openToday() {
-      const { folder, dateFormat, autoCreate } =
-        ctx.settings.getConfig(DEFAULTS)
-      const path = todayPath(folder as string, dateFormat as string)
-
-      if (ctx.vault.files()[path]) {
-        ctx.workspace.openFile(path)
-        return
-      }
-
-      const { template } = ctx.settings.getConfig(DEFAULTS)
-
-      const createWithTemplate = async () => {
-        const created = await ctx.vault.createFile(path)
-        if (!created) return
-        const tpl = template as string
-        if (tpl) {
-          try {
-            const raw = await ctx.vault.readFile(tpl)
-            const fileName = path.split('/').pop()!.replace(/\.md$/, '')
-            const { text } = resolveTemplate(raw, { title: fileName })
-            await ctx.vault.saveFile(created, text)
-          } catch {
-            // 模板读取失败：保持空文件
-          }
-        }
-        ctx.workspace.openFile(created)
-      }
-
-      if (autoCreate) {
-        await createWithTemplate()
-        return
-      }
-
-      showModal({
-        title: '创建今日日记',
-        message: `创建 ${path}？`,
-        buttons: [
-          { label: '取消', variant: 'ghost', onClick: closeModal },
-          {
-            label: '创建',
-            variant: 'primary',
-            onClick: () => {
-              closeModal()
-              void createWithTemplate()
-            },
-          },
-        ],
-      })
-    }
-
     ctx.ribbon({
       id: 'daily-note',
       title: '今日日记',
       getIcon: () => <BookOpen size={18} />,
-      onClick: () => void openToday(),
+      onClick: () => void openDailyNote(new Date()),
       isActive: () => {
         const { folder, dateFormat } = ctx.settings.getConfig(DEFAULTS)
         const path = todayPath(folder as string, dateFormat as string)
