@@ -203,6 +203,20 @@ export function weekRowFilePath(folder: string, row: WeekRow): string | null {
   return weekFilePath(folder, parseISODate(first.dayStr))
 }
 
+/** 顶部定位标签：`YYYY年M月 · Www`。月表头按当月 1 日取 ISO 周；周行按首个非空日。 */
+export function calRowLabel(row: CalRow): string {
+  let date: Date
+  if (row.type === 'month-header') {
+    date = new Date(row.year, row.month, 1)
+  } else {
+    const first = row.cells.find((c) => c !== null)
+    if (!first) return ''
+    date = new Date(first.year, first.month, first.day)
+  }
+  const { week } = getISOWeek(date)
+  return `${date.getFullYear()}年${date.getMonth() + 1}月 · W${String(week).padStart(2, '0')}`
+}
+
 export function parseISODate(s: string): Date {
   const [y, m, d] = s.split('-').map(Number)
   return new Date(y, (m ?? 1) - 1, d ?? 1)

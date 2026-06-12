@@ -13,6 +13,7 @@ import {
   getMonthString,
   monthFilePath,
   weekRowFilePath,
+  calRowLabel,
 } from '../calendarUtils'
 import type { MonthHeaderRow, WeekRow } from '../calendarUtils'
 import type { FileMeta, ListItem } from '../../../stores/types'
@@ -250,5 +251,29 @@ describe('weekRowFilePath', () => {
 
   it('returns null for an all-null row', () => {
     expect(weekRowFilePath('weekly', { type: 'week', cells: [null, null, null, null, null, null, null] })).toBeNull()
+  })
+})
+
+describe('calRowLabel', () => {
+  it('labels a month-header row as 年月 · ISO week of the 1st', () => {
+    const header: MonthHeaderRow = { type: 'month-header', year: 2026, month: 5 } // June 2026
+    // June 1 2026 is Monday, ISO week 23
+    expect(calRowLabel(header)).toBe('2026年6月 · W23')
+  })
+
+  it('labels a week row from its first non-null day', () => {
+    const row = buildMonthRows(2026, 5).slice(1)[1] as WeekRow // 2nd week of June 2026 (Jun 8–14)
+    expect(calRowLabel(row)).toBe('2026年6月 · W24')
+  })
+
+  it('uses the first real day when the row starts with null padding', () => {
+    const firstWeek = buildMonthRows(2026, 6).slice(1)[0] as WeekRow // July 2026 starts Wed
+    expect(firstWeek.cells[0]).toBeNull()
+    // July 1 2026 is Wednesday, ISO week 27
+    expect(calRowLabel(firstWeek)).toBe('2026年7月 · W27')
+  })
+
+  it('returns empty string for an all-null row', () => {
+    expect(calRowLabel({ type: 'week', cells: [null, null, null, null, null, null, null] })).toBe('')
   })
 })
