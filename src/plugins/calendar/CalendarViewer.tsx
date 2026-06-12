@@ -1,4 +1,4 @@
-import { createDeferred, createMemo, createSignal, For, Show, type JSX } from 'solid-js'
+import { createDeferred, createEffect, createSignal, For, Show, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -9,8 +9,6 @@ import {
   buildEntryDayData,
   buildCellItems,
   buildRangeRows,
-  toIsoDate,
-  parseISODate,
   weekRowFilePath,
   monthFilePath,
   FILTER_DEFAULTS,
@@ -22,7 +20,6 @@ import {
   type FilterKey,
 } from './calendarUtils'
 import { CellItemButton } from './CalendarCell'
-import { WeekView } from './WeekView'
 import { PlanPreview } from './PlanPreview'
 import { PlanCellEditor } from './PlanCellEditor'
 
@@ -192,26 +189,17 @@ export function CalendarViewer(props: CalendarViewerProps) {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
-  // View mode & anchored week — persisted via leaf viewState
+  // View mode (row density) — persisted via leaf viewState
   const initMode: 'week' | 'month' = props.viewState.mode === 'week' ? 'week' : 'month'
-  const initAnchor = typeof props.viewState.weekAnchor === 'string' ? props.viewState.weekAnchor : todayStr
   const [mode, setMode] = createSignal<'week' | 'month'>(initMode)
-  const [weekAnchor, setWeekAnchor] = createSignal(initAnchor)
   const [editingPath, setEditingPath] = createSignal<string | null>(null)
 
-  function applyState(nextMode: 'week' | 'month', nextAnchor: string) {
+  function applyMode(nextMode: 'week' | 'month') {
     setMode(nextMode)
-    setWeekAnchor(nextAnchor)
     workspaceActions.setLeafViewState(props.leafId, {
       type: 'calendar',
-      state: { mode: nextMode, weekAnchor: nextAnchor },
+      state: { mode: nextMode },
     })
-  }
-
-  function shiftWeek(days: number) {
-    const d = parseISODate(weekAnchor())
-    d.setDate(d.getDate() + days)
-    applyState('week', toIsoDate(d.getFullYear(), d.getMonth(), d.getDate()))
   }
 
   const weeklyFolder = () => String(props.getConfig({ weeklyFolder: 'weekly' }).weeklyFolder)
@@ -260,6 +248,12 @@ export function CalendarViewer(props: CalendarViewerProps) {
     },
     overscan: 3,
     initialOffset: initialScrollOffset,
+  })
+
+  // Row heights depend on mode; reset measurements when it flips.
+  createEffect(() => {
+    mode()
+    virtualizer.measure()
   })
 
   // Infinite scroll actions
@@ -325,11 +319,11 @@ export function CalendarViewer(props: CalendarViewerProps) {
         <div class="flex items-center rounded border border-(--border) overflow-hidden">
           <button
             class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'month' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
-            onClick={() => applyState('month', weekAnchor())}
+            onClick={() => applyMode('month')}
           >月</button>
           <button
             class={`px-2 py-0.5 text-[11px] transition-colors${mode() === 'week' ? ' bg-(--accent) text-white' : ' text-(--text-3) hover:bg-(--bg-hover)'}`}
-            onClick={() => applyState('week', weekAnchor())}
+            onClick={() => applyMode('week')}
           >周</button>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
@@ -384,15 +378,8 @@ export function CalendarViewer(props: CalendarViewerProps) {
         </div>
       </div>
 
-      {/* Month view — kept permanently mounted (toggled via display) so the
-          virtual list's scroll element never unmounts; the virtualizer binds it
-          once and its ResizeObserver repopulates rows when it becomes visible.
-          Unmounting it (via <Show>) leaves the virtualizer with a detached,
-          zero-height element and the grid renders blank. */}
-      <div
-        class="flex flex-col flex-1 min-h-0"
-        style={{ display: mode() === 'month' ? 'flex' : 'none' }}
-      >
+      {/* Unified week-row list — month/week modes differ only in row height. */}
+      <div class="flex flex-col flex-1 min-h-0">
       {/* Weekday header — fixed above scroll area */}
       <div
         class="grid border-b border-(--border) bg-[var(--bg-surface)] shrink-0"
@@ -466,19 +453,6 @@ export function CalendarViewer(props: CalendarViewerProps) {
         </div>
       </div>
       </div>
-
-      <Show when={mode() === 'week'}>
-        <WeekView
-          weekAnchor={weekAnchor}
-          filter={filter}
-          weeklyFolder={weeklyFolder}
-          todayStr={todayStr}
-          onOpenFile={workspaceActions.openFile}
-          onPrevWeek={() => shiftWeek(-7)}
-          onNextWeek={() => shiftWeek(7)}
-          onToday={() => applyState('week', todayStr)}
-        />
-      </Show>
     </div>
   )
 }
