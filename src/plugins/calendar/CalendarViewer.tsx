@@ -23,6 +23,7 @@ import {
 import { CellItemButton } from './CalendarCell'
 import { PlanPreview } from './PlanPreview'
 import { PlanCellEditor } from './PlanCellEditor'
+import { openDailyNote } from '../daily-note/openDailyNote'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -147,11 +148,17 @@ function WeekRowComp(props: {
             <div
               class={`p-1.5 flex flex-col min-h-0 overflow-hidden border-r border-(--border)${isToday ? ' bg-(--accent-bg)' : ' bg-[var(--bg-base)]'}`}
             >
-              <div
-                class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none${isToday ? ' bg-(--accent) text-white' : ' text-[var(--text-3)]'}`}
+              <button
+                class="shrink-0 w-full flex items-center mb-1 rounded hover:bg-(--bg-hover) cursor-pointer transition-colors"
+                title={`打开 ${dayStr} 日记`}
+                onClick={() => void openDailyNote(new Date(cell.year, cell.month, cell.day))}
               >
-                {day}
-              </div>
+                <span
+                  class={`w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold select-none${isToday ? ' bg-(--accent) text-white' : ' text-[var(--text-3)]'}`}
+                >
+                  {day}
+                </span>
+              </button>
               <div class="flex flex-col gap-0.5 min-h-0 overflow-y-auto">
                 <For each={cellData().items}>
                   {(item) => <CellItemButton item={item} onOpenFile={props.onOpenFile} wrap={week()} />}
