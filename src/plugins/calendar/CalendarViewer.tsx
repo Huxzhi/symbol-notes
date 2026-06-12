@@ -149,11 +149,15 @@ function WeekRowComp(props: {
               class={`p-1.5 flex flex-col min-h-0 overflow-hidden border-r border-(--border)${isToday ? ' bg-(--accent-bg)' : ' bg-[var(--bg-base)]'}`}
             >
               <button
-                class={`shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold mb-1 select-none cursor-pointer transition-colors${isToday ? ' bg-(--accent) text-white hover:opacity-80' : ' text-[var(--text-3)] hover:bg-(--bg-hover) hover:text-(--text)'}`}
+                class="shrink-0 w-full flex items-center mb-1 rounded hover:bg-(--bg-hover) cursor-pointer transition-colors"
                 title={`打开 ${dayStr} 日记`}
                 onClick={() => void openDailyNote(new Date(cell.year, cell.month, cell.day))}
               >
-                {day}
+                <span
+                  class={`w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-semibold select-none${isToday ? ' bg-(--accent) text-white' : ' text-[var(--text-3)]'}`}
+                >
+                  {day}
+                </span>
               </button>
               <div class="flex flex-col gap-0.5 min-h-0 overflow-y-auto">
                 <For each={cellData().items}>
