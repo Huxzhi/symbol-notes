@@ -172,9 +172,9 @@ function WeekRowComp(props: {
           {(path) => (
             <Show
               when={props.editingPath() === path()}
-              fallback={<PlanPreview path={path()} label="周计划" onEdit={() => props.setEditingPath(path())} />}
+              fallback={<PlanPreview path={path()} onEdit={() => props.setEditingPath(path())} />}
             >
-              <PlanCellEditor path={path()} label="周计划" onClose={() => props.setEditingPath(null)} />
+              <PlanCellEditor path={path()} onClose={() => props.setEditingPath(null)} />
             </Show>
           )}
         </Show>

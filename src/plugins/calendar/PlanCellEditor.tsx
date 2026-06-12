@@ -12,7 +12,7 @@ import { hideFrontmatterExtension } from '../../lib/cm6/hideFrontmatterExtension
 import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import { readFile, fileActions, vaultStore } from '../../vault'
 
-export function PlanCellEditor(props: { path: string; label: string; onClose: () => void }) {
+export function PlanCellEditor(props: { path: string; label?: string; onClose: () => void }) {
   let editorHost!: HTMLDivElement
   let cmView: EditorView | null = null
   let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -104,7 +104,7 @@ export function PlanCellEditor(props: { path: string; label: string; onClose: ()
   return (
     <div class="flex flex-col h-full min-h-0 overflow-hidden">
       <div class="px-3 py-1.5 shrink-0 border-b border-(--border) flex items-center justify-between">
-        <span class="text-[10px] text-(--accent) font-bold tracking-widest uppercase">{props.label}</span>
+        <span class="text-[10px] text-(--accent) font-bold tracking-widest uppercase">{props.label ?? ''}</span>
         <button
           class="text-[11px] text-(--text-4) hover:text-(--text-2) px-1"
           title="收起（保存）"

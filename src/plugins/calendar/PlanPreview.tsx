@@ -5,7 +5,8 @@ const MAX_PREVIEW_ITEMS = 6
 
 export function PlanPreview(props: {
   path: string
-  label: string
+  /** optional caption; omit when an external column header already names the cell */
+  label?: string
   /** compact: single-line label+excerpt for the month header; default = column card */
   compact?: boolean
   onEdit: () => void
@@ -19,11 +20,13 @@ export function PlanPreview(props: {
       class={`flex min-h-0 cursor-text${props.compact ? ' items-center gap-2 overflow-hidden' : ' flex-col h-full overflow-hidden'}`}
       onClick={() => exists() && props.onEdit()}
     >
-      <div
-        class={`shrink-0 text-[10px] text-(--accent) font-bold tracking-widest uppercase select-none${props.compact ? '' : ' px-3 py-1.5 border-b border-(--border)'}`}
-      >
-        {props.label}
-      </div>
+      <Show when={props.label}>
+        <div
+          class={`shrink-0 text-[10px] text-(--accent) font-bold tracking-widest uppercase select-none${props.compact ? '' : ' px-3 py-1.5 border-b border-(--border)'}`}
+        >
+          {props.label}
+        </div>
+      </Show>
 
       <Show
         when={exists()}
