@@ -6,6 +6,7 @@ import { dragState, setDragState, isDraggingMainTab } from '../../lib/tabDragSta
 import type { WorkspaceLeaf, WorkspaceTabs } from '../../stores/types'
 import { leafInstances } from '../../stores/workspaceStore'
 import { WorkspaceLeafView } from './WorkspaceLeafView'
+import { WorkspaceNavBar } from './WorkspaceNavBar'
 
 function getTabLabel(leaf: WorkspaceLeaf): string {
   const def = getView(leaf.viewState.type)
@@ -218,6 +219,10 @@ export function WorkspaceTabsView(props: {
           </button>
         )}
       </div>
+      {/* Per-tab navigation bar — main area only */}
+      <Show when={props.area === 'main' && props.node.activeLeafId}>
+        <WorkspaceNavBar node={props.node} />
+      </Show>
       {/* Leaf area */}
       <div class="flex-1 relative overflow-hidden">
         <For each={props.node.children}>

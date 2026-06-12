@@ -2,6 +2,7 @@ import { createRoot, createEffect } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { loadFromStorage, saveToStorage } from '../lib/localStorage'
 import { getFileViewForPath, getView } from '../lib/pluginRegistry'
+import { pushHistory } from './leafHistory'
 import {
   mapNode,
   patchLeafViewState,
@@ -25,6 +26,23 @@ import type {
 
 const [leafInstances, setLeafInstances] = createStore<Record<string, LeafRuntimeState>>({})
 export { leafInstances, setLeafInstances }
+
+// 确保某 leaf 的运行时项存在（保留编辑器写入的 cmView/isDirty 等）。
+function ensureLeafInstance(s: Record<string, LeafRuntimeState>, leafId: string): LeafRuntimeState {
+  if (!s[leafId]) s[leafId] = { cmView: null, isDirty: false, outLinks: [], headings: [] }
+  return s[leafId]
+}
+
+// 记录一次「在该 leaf 内打开了新文件」的导航（newFile 非字符串则跳过）。
+function recordNav(leafId: string, prevFile: string | undefined, newFile: unknown): void {
+  if (typeof newFile !== 'string') return
+  setLeafInstances(produce((s) => {
+    const inst = ensureLeafInstance(s, leafId)
+    const res = pushHistory(inst.history ?? [], inst.historyIndex ?? -1, newFile, prevFile)
+    inst.history = res.history
+    inst.historyIndex = res.index
+  }))
+}
 
 export const ROOT_TABS_ID = 'root-tabs'
 export const DEFAULT_LAYOUT_ID = 'default'
@@ -197,6 +215,14 @@ export const workspaceActions = {
       }),
     )
     setLayout('activeLeafId', leafId)
+    const file = viewState.state.file
+    if (typeof file === 'string') {
+      setLeafInstances(produce((s) => {
+        const inst = ensureLeafInstance(s, leafId)
+        inst.history = [file]
+        inst.historyIndex = 0
+      }))
+    }
     return leafId
   },
 
@@ -271,6 +297,27 @@ export const workspaceActions = {
     }
   },
 
+  navigateBack(leafId: string): void {
+    const inst = leafInstances[leafId]
+    if (!inst?.history || (inst.historyIndex ?? -1) <= 0) return
+    const idx = inst.historyIndex! - 1
+    const file = inst.history[idx]
+    setLeafInstances(leafId, 'historyIndex', idx)
+    const def = getFileViewForPath(file)
+    workspaceActions.setLeafViewState(leafId, { type: def?.type ?? 'markdown', state: { file } })
+  },
+
+  navigateForward(leafId: string): void {
+    const inst = leafInstances[leafId]
+    if (!inst?.history) return
+    if ((inst.historyIndex ?? -1) >= inst.history.length - 1) return
+    const idx = inst.historyIndex! + 1
+    const file = inst.history[idx]
+    setLeafInstances(leafId, 'historyIndex', idx)
+    const def = getFileViewForPath(file)
+    workspaceActions.setLeafViewState(leafId, { type: def?.type ?? 'markdown', state: { file } })
+  },
+
   setLeafViewState(leafId: string, viewState: ViewState): void {
     setRoot(produce((root: WorkspaceRoot) => {
       patchLeafViewState([root.main], leafId, viewState) ||
@@ -329,7 +376,9 @@ export const workspaceActions = {
         const activeLeafId = layout.activeLeafId
         const activeLeaf = activeLeafId ? findLeafInTree(activeRoot().main, activeLeafId) : null
         if (activeLeaf && !activeLeaf.pinned && activeLeaf.viewState.type !== 'calendar') {
+          const prevFile = activeLeaf.viewState.state.file as string | undefined
           workspaceActions.setLeafViewState(activeLeafId!, viewState)
+          recordNav(activeLeafId!, prevFile, viewState.state.file)
           return
         }
       }
@@ -396,6 +445,12 @@ export const workspaceActions = {
       }
       return walk(root)
     })
+    setLeafInstances(produce((s) => {
+      for (const id in s) {
+        const h = s[id].history
+        if (h) s[id].history = h.map((p) => (p === oldPath ? newPath : p))
+      }
+    }))
   },
 
   toggleSidebar(side: 'left' | 'right'): void {
