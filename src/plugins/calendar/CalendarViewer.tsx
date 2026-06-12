@@ -1,4 +1,4 @@
-import { createDeferred, createEffect, createSignal, For, Show, type JSX } from 'solid-js'
+import { createDeferred, createSignal, onMount, For, Show, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -11,6 +11,7 @@ import {
   buildRangeRows,
   weekRowFilePath,
   monthFilePath,
+  calRowLabel,
   FILTER_DEFAULTS,
   WEEKDAYS_LONG,
   type CalRow,
@@ -193,13 +194,30 @@ export function CalendarViewer(props: CalendarViewerProps) {
   const initMode: 'week' | 'month' = props.viewState.mode === 'week' ? 'week' : 'month'
   const [mode, setMode] = createSignal<'week' | 'month'>(initMode)
   const [editingPath, setEditingPath] = createSignal<string | null>(null)
+  const [topLabel, setTopLabel] = createSignal('')
 
   function applyMode(nextMode: 'week' | 'month') {
+    // Capture the row at the top so it stays anchored across the height change.
+    const items = virtualizer.getVirtualItems()
+    const topIndex = items.length ? items[0].index : 0
     setMode(nextMode)
     workspaceActions.setLeafViewState(props.leafId, {
       type: 'calendar',
       state: { mode: nextMode },
     })
+    virtualizer.measure() // recompute positions with the new row heights
+    requestAnimationFrame(() => {
+      virtualizer.scrollToIndex(topIndex, { align: 'start' })
+      updateTopLabel()
+    })
+  }
+
+  // Current top-of-viewport position label (年月 · ISO 周), updated on scroll.
+  function updateTopLabel() {
+    const first = virtualizer.getVirtualItems()[0]
+    if (!first) return
+    const row = rows()[first.index]
+    if (row) setTopLabel(calRowLabel(row))
   }
 
   const weeklyFolder = () => String(props.getConfig({ weeklyFolder: 'weekly' }).weeklyFolder)
@@ -250,11 +268,8 @@ export function CalendarViewer(props: CalendarViewerProps) {
     initialOffset: initialScrollOffset,
   })
 
-  // Row heights depend on mode; reset measurements when it flips.
-  createEffect(() => {
-    mode()
-    virtualizer.measure()
-  })
+  // Initialize the position label once the virtual list has populated.
+  onMount(() => requestAnimationFrame(updateTopLabel))
 
   // Infinite scroll actions
   const appendMonths = (n: number) => {
@@ -277,6 +292,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
   }
 
   const handleScroll = () => {
+    updateTopLabel()
     if (pendingLoad) return
     const items = virtualizer.getVirtualItems()
     if (items.length === 0) return
@@ -326,6 +342,7 @@ export function CalendarViewer(props: CalendarViewerProps) {
             onClick={() => applyMode('week')}
           >周</button>
         </div>
+        <span class="text-[12px] font-medium text-(--text-2) min-w-[128px] tabular-nums select-none">{topLabel()}</span>
         <div class="flex items-center gap-3 flex-wrap">
           <FilterChip
             label="日记"
