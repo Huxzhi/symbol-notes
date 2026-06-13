@@ -266,7 +266,7 @@ export interface PluginContext {
     activeLeafId(): string | null
     activeFilePath(): string | null
     activeSidebarType(side: 'left' | 'right'): string | null
-    switchSidebarPanel(side: 'left' | 'right', type: string): void
+    switchSidebarPanel(side: 'left' | 'right', type: string, allowClose?: boolean): void
     /** Out-links parsed from the active editor. Reactive. Empty when no editor is open. */
     activeOutLinks(): OutLink[]
     /** Headings parsed from the active editor. Reactive. Empty when no editor is open. */
@@ -359,8 +359,8 @@ function loadPlugin(def: PluginDef): () => void {
         activeLeafId: () => activeLayout().activeLeafId,
         activeFilePath: () => activeFilePath(),
         activeSidebarType: (side) => activeSidebarType(side),
-        switchSidebarPanel: (side, type) =>
-          workspaceActions.switchSidebarPanel(side, type),
+        switchSidebarPanel: (side, type, allowClose) =>
+          workspaceActions.switchSidebarPanel(side, type, allowClose),
         activeOutLinks: () => {
           const id = activeLayout().activeLeafId
           return id ? (leafInstances[id]?.outLinks ?? []) : []

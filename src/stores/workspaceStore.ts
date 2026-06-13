@@ -472,11 +472,13 @@ export const workspaceActions = {
     )
   },
 
-  switchSidebarPanel(side: 'left' | 'right', type: string): void {
+  // allowClose=true（默认）：面板已激活且侧栏已打开时再次调用会折叠（ribbon 切换行为）。
+  // allowClose=false：只「确保打开并激活」，绝不折叠（用于定位/揭示场景）。
+  switchSidebarPanel(side: 'left' | 'right', type: string, allowClose = true): void {
     const sidebar = activeRoot()[side]
     const isOpen = !sidebar.collapsed
     const currentType = activeSidebarType(side)
-    if (currentType === type && isOpen) {
+    if (allowClose && currentType === type && isOpen) {
       workspaceActions.toggleSidebar(side)
       return
     }
@@ -488,19 +490,6 @@ export const workspaceActions = {
       }
     }
     if (!isOpen) workspaceActions.toggleSidebar(side)
-  },
-
-  // 像 switchSidebarPanel，但只「确保打开并激活」，绝不在已打开时折叠（用于定位/揭示场景）。
-  ensureSidebarPanel(side: 'left' | 'right', type: string): void {
-    const sidebar = activeRoot()[side]
-    for (const node of sidebar.children) {
-      if (node.type === 'tabs') {
-        const tabs = node as WorkspaceTabs
-        const leaf = tabs.children.find(l => l.viewState.type === type)
-        if (leaf) { workspaceActions.activateSidebarLeaf(side, leaf.id); break }
-      }
-    }
-    if (sidebar.collapsed) workspaceActions.toggleSidebar(side)
   },
 
   openSidebarPanel(area: 'left' | 'right', type: string, state: Record<string, unknown> = {}): void {
