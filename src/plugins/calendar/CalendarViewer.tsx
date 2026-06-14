@@ -1,12 +1,9 @@
-import { createDeferred, createSignal, onMount, For, Show, type JSX } from 'solid-js'
+import { createSignal, onMount, For, Show, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { vaultStore } from '../../vault'
 import { workspaceActions } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {
-  buildDayData,
-  buildTaskDayData,
-  buildEntryDayData,
   buildCellItems,
   buildRangeRows,
   weekRowFilePath,
@@ -17,7 +14,6 @@ import {
   type CalRow,
   type MonthHeaderRow,
   type WeekRow,
-  type Task,
   type FilterKey,
 } from './calendarUtils'
 import { CellItemButton } from './CalendarCell'
@@ -109,9 +105,6 @@ function WeekRowComp(props: {
   weeklyFolder: () => string
   editingPath: () => string | null
   setEditingPath: (p: string | null) => void
-  dayData: () => ReturnType<typeof buildDayData>
-  taskDayData: () => Record<string, Task[]>
-  entryDayData: () => Record<string, Task[]>
   filter: () => typeof FILTER_DEFAULTS
   todayStr: string
   onOpenFile: (path: string) => void
@@ -135,11 +128,8 @@ function WeekRowComp(props: {
           const week = () => props.mode() === 'week'
 
           const cellData = () => {
-            const all = buildCellItems(dayStr, props.filter(), {
-              dayData: props.dayData(),
-              taskDayData: props.taskDayData(),
-              entryDayData: props.entryDayData(),
-            })
+            // 只订阅这一天的日期桶 → 只有受影响日期的格子重渲染
+            const all = buildCellItems(props.filter(), vaultStore.calendarByDate[dayStr])
             if (week() || all.length <= MAX_CELL_ITEMS) return { items: all, more: 0 }
             return { items: all.slice(0, MAX_CELL_ITEMS - 1), more: all.length - (MAX_CELL_ITEMS - 1) }
           }
@@ -245,11 +235,6 @@ export function CalendarViewer(props: CalendarViewerProps) {
   }
   const toggleFilter = (key: FilterKey) =>
     props.setConfig({ filter: { ...filter(), [key]: !filter()[key] } })
-
-  // Vault data — deferred so rapid per-file vault updates don't cause frame drops
-  const dayData = createDeferred(() => buildDayData(vaultStore.files))
-  const taskDayData = createDeferred(() => buildTaskDayData(vaultStore.taskMap, vaultStore.files))
-  const entryDayData = createDeferred(() => buildEntryDayData(vaultStore.files))
 
   // Row list — mutable head/tail month tracking (not reactive, just boundary markers)
   let head = normalizeYM(now.getFullYear(), now.getMonth() - 3)
@@ -470,9 +455,6 @@ export function CalendarViewer(props: CalendarViewerProps) {
                       weeklyFolder={weeklyFolder}
                       editingPath={editingPath}
                       setEditingPath={setEditingPath}
-                      dayData={dayData}
-                      taskDayData={taskDayData}
-                      entryDayData={entryDayData}
                       filter={filter}
                       todayStr={todayStr}
                       onOpenFile={workspaceActions.openFile}

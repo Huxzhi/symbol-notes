@@ -1,4 +1,4 @@
-import type { ListItem, FileMeta } from '../../stores/types'
+import type { ListItem, FileMeta, DateBucket } from '../../stores/types'
 
 export type Task = ListItem & { path: string }
 
@@ -251,23 +251,18 @@ export const ENTRY_STYLE: Record<'event' | 'mood' | 'idea', { hue: string; sig: 
 
 type DayData = ReturnType<typeof buildDayData>
 
-/** 某天的全部条目（不截断）。月视图自行 slice，周视图列内滚动。 */
-export function buildCellItems(
-  dayStr: string,
-  f: FilterState,
-  data: { dayData: DayData; taskDayData: Record<string, Task[]>; entryDayData: Record<string, Task[]> },
-): CellItem[] {
-  const d = data.dayData
-  const td = data.taskDayData
-  const entries = data.entryDayData[dayStr] ?? []
+/** 某天的全部条目（不截断）。月视图自行 slice，周视图列内滚动。
+ *  从 vaultStore.calendarByDate[dayStr] 这一日期桶投影，cell 只订阅该日期。 */
+export function buildCellItems(f: FilterState, b: DateBucket | undefined): CellItem[] {
+  if (!b) return []
   return [
-    ...(f.dated ? (d.dated[dayStr] ?? []).map((path): CellItem => ({ kind: 'dated', path })) : []),
-    ...(f.created ? (d.created[dayStr] ?? []).map((path): CellItem => ({ kind: 'created', path })) : []),
-    ...(f.updated ? (d.updated[dayStr] ?? []).map((path): CellItem => ({ kind: 'updated', path })) : []),
-    ...(f.pending ? (td[dayStr] ?? []).filter(t => !t.checked).map((task): CellItem => ({ kind: 'pending', task })) : []),
-    ...(f.done ? (td[dayStr] ?? []).filter(t => t.checked).map((task): CellItem => ({ kind: 'done', task })) : []),
-    ...(f.event ? entries.filter(e => e.signifier === '-').map((entry): CellItem => ({ kind: 'event', entry })) : []),
-    ...(f.mood ? entries.filter(e => e.signifier === '=').map((entry): CellItem => ({ kind: 'mood', entry })) : []),
-    ...(f.idea ? entries.filter(e => e.signifier === '~').map((entry): CellItem => ({ kind: 'idea', entry })) : []),
+    ...(f.dated ? b.dated.map((path): CellItem => ({ kind: 'dated', path })) : []),
+    ...(f.created ? b.created.map((path): CellItem => ({ kind: 'created', path })) : []),
+    ...(f.updated ? b.updated.map((path): CellItem => ({ kind: 'updated', path })) : []),
+    ...(f.pending ? b.tasks.filter(t => !t.checked).map((task): CellItem => ({ kind: 'pending', task })) : []),
+    ...(f.done ? b.tasks.filter(t => t.checked).map((task): CellItem => ({ kind: 'done', task })) : []),
+    ...(f.event ? b.entries.filter(e => e.signifier === '-').map((entry): CellItem => ({ kind: 'event', entry })) : []),
+    ...(f.mood ? b.entries.filter(e => e.signifier === '=').map((entry): CellItem => ({ kind: 'mood', entry })) : []),
+    ...(f.idea ? b.entries.filter(e => e.signifier === '~').map((entry): CellItem => ({ kind: 'idea', entry })) : []),
   ]
 }

@@ -53,6 +53,7 @@ import {
 } from './scan'
 import { applyFileTags, buildTags, removeFileTags } from './tags'
 import { applyFileTasks, buildTasks, removeFileTasks } from './tasks'
+import { applyFileCalendar, buildCalendar, removeFileCalendar } from './calendarIndex'
 
 // ── Vault connection signal ───────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ const [vaultStore, setVaultStore] = createStore<VaultState>({
   unresolvedMap: {},
   tagMap: {},
   taskMap: {},
+  calendarByDate: {},
 })
 
 export { setVaultStore, vaultStore }
@@ -205,6 +207,7 @@ export async function scanAndIndex(): Promise<void> {
     buildBacklinks(mdFiles)
     buildTags(mdFiles)
     buildTasks(mdFiles)
+    buildCalendar(vaultStore.files)
     pruneFileStatCache(activePaths).catch(() => {})
     pruneCache(activeHashes).catch(() => {})
 
@@ -274,6 +277,7 @@ export async function reindexFile(
   applyFileBacklinks(path, prev?.outLinks ?? [], fields.outLinks)
   applyFileTags(path, prev?.tags ?? [], fields.tags)
   applyFileTasks(path, fields.lists)
+  applyFileCalendar(path, prev, vaultStore.files[path])
 
   if (persistStat) {
     const entry = vaultStore.files[path]
@@ -293,6 +297,7 @@ export function removeVaultEntry(path: string): void {
   removeFileBacklinks(path, file)
   removeFileTags(path, file.tags)
   removeFileTasks(path)
+  removeFileCalendar(path, file)
   setVaultStore('files', path, undefined as unknown as FileMeta)
   invalidateStemIndex()
 }
@@ -413,6 +418,7 @@ export const fileActions = {
       lists: [],
     }
     setVaultStore('files', path, entry)
+    applyFileCalendar(path, undefined, entry)
     invalidateStemIndex()
     resolveNewFile(path)
     return path
@@ -603,6 +609,7 @@ export const fileActions = {
     await deleteEntry(srcPath, { recursive: true })
     invalidatePrefix(srcPath)
     for (const entry of fileEntries) await deleteFileStatEntry(entry.path)
+    for (const entry of fileEntries) removeFileCalendar(entry.path, entry)
     setVaultStore(
       'files',
       produce((m: Record<string, FileMeta>) => {

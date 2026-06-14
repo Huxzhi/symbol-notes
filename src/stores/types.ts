@@ -99,12 +99,26 @@ export interface FileMeta {
   lists: ListItem[]      // 全部列表项；task===true 为任务子集
 }
 
+/** 列表项 + 所属文件路径（日历/任务跨文件展示用）。 */
+export type Task = ListItem & { path: string }
+
+/** 某一天聚合的日历条目：dated/created/updated 存文件路径，tasks/entries 存带 path 的列表项。 */
+export interface DateBucket {
+  dated: string[]
+  created: string[]
+  updated: string[]
+  tasks: Task[]
+  entries: Task[]
+}
+
 export interface VaultState {
   files: Record<string, FileMeta>
   backlinkMap: Record<string, string[]>
   unresolvedMap: Record<string, string[]>
   tagMap: Record<string, string[]>
   taskMap: Record<string, ListItem[]>
+  /** 按日期(YYYY-MM-DD)增量维护的日历聚合，单文件改动只动受影响日期。 */
+  calendarByDate: Record<string, DateBucket>
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
