@@ -80,6 +80,17 @@ export interface ListItem {
 //   Phase 1 (FS scan): name/path/kind/parent/size/mtime/hash
 //   Phase 2 (content index): frontmatter/outLinks/tags/aliases/created/updated/tasks
 
+/** 结构树节点（stat 信息）。fileTree 是结构的唯一真实来源，扫描时构建。 */
+export interface TreeNode {
+  name: string
+  path: string
+  kind: 'file' | 'directory'
+  parent: string | null
+  size: number
+  mtime: number
+  children?: TreeNode[]   // 仅 directory
+}
+
 export interface FileMeta {
   name: string
   path: string
