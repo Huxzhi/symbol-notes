@@ -37,7 +37,7 @@ function childrenOf(
 export function flattenTree(
   parentPath: string | null,
   depth: number,
-  collapsed: string[],
+  expanded: string[],
   files: Record<string, FileMeta>,
   showOtherFiles: boolean,
 ): FlatRow[] {
@@ -45,8 +45,8 @@ export function flattenTree(
   for (const entry of childrenOf(parentPath, files)) {
     if (entry.kind === 'file' && isOtherFile(entry.name) && !showOtherFiles) continue
     rows.push({ entry, depth })
-    if (entry.kind === 'directory' && !collapsed.includes(entry.path)) {
-      rows.push(...flattenTree(entry.path, depth + 1, collapsed, files, showOtherFiles))
+    if (entry.kind === 'directory' && expanded.includes(entry.path)) {
+      rows.push(...flattenTree(entry.path, depth + 1, expanded, files, showOtherFiles))
     }
   }
   return rows

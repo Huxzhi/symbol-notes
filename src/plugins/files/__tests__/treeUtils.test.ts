@@ -23,7 +23,7 @@ const files: Record<string, FileMeta> = {
 
 describe('flattenTree', () => {
   it('puts directories before files, children interleaved after parent', () => {
-    const rows = flattenTree(null, 0, [], files, true)
+    const rows = flattenTree(null, 0, ['dir1'], files, true)
     // dir1 first (directory), then its child, then root-level files alphabetically
     expect(rows[0].entry.path).toBe('dir1')
     expect(rows[1].entry.path).toBe('dir1/c.md')
@@ -33,7 +33,7 @@ describe('flattenTree', () => {
   })
 
   it('includes children of expanded folders with depth + 1', () => {
-    const rows = flattenTree(null, 0, [], files, true)
+    const rows = flattenTree(null, 0, ['dir1'], files, true)
     const dir = rows.find(r => r.entry.path === 'dir1')!
     const child = rows.find(r => r.entry.path === 'dir1/c.md')!
     expect(dir.depth).toBe(0)
@@ -41,14 +41,14 @@ describe('flattenTree', () => {
   })
 
   it('child immediately follows parent in output order', () => {
-    const rows = flattenTree(null, 0, [], files, true)
+    const rows = flattenTree(null, 0, ['dir1'], files, true)
     const dirIdx = rows.findIndex(r => r.entry.path === 'dir1')
     const childIdx = rows.findIndex(r => r.entry.path === 'dir1/c.md')
     expect(childIdx).toBe(dirIdx + 1)
   })
 
-  it('excludes children of collapsed folders', () => {
-    const rows = flattenTree(null, 0, ['dir1'], files, true)
+  it('collapses folders by default (only expanded folders reveal children)', () => {
+    const rows = flattenTree(null, 0, [], files, true)
     expect(rows.find(r => r.entry.path === 'dir1/c.md')).toBeUndefined()
     expect(rows.find(r => r.entry.path === 'dir1')).toBeDefined()
   })

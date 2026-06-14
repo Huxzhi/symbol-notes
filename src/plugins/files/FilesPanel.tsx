@@ -32,7 +32,7 @@ function canOpen(path: string): boolean {
 function FileRow(props: {
   row: FlatRow
   style: JSX.CSSProperties
-  collapsedFolders: string[]
+  expandedFolders: string[]
   highlight: string | null
   onToggle: (path: string) => void
   dragSrc: () => string | null
@@ -47,7 +47,7 @@ function FileRow(props: {
   const isActive = () => activeFilePath() === entry().path
   const isOther = () => entry().kind === 'file' && isOtherFile(entry().name)
   const isCollapsed = () =>
-    entry().kind === 'directory' && props.collapsedFolders.includes(entry().path)
+    entry().kind === 'directory' && !props.expandedFolders.includes(entry().path)
   const isRenaming = () =>
     fileOp()?.type === 'rename' &&
     (fileOp() as { path: string }).path === entry().path
@@ -148,21 +148,21 @@ function FileRow(props: {
 }
 
 export function FilesPanel(props: ViewComponentProps) {
-  const collapsedFolders = () =>
-    (props.viewState.collapsedFolders as string[] | undefined) ?? []
+  const expandedFolders = () =>
+    (props.viewState.expandedFolders as string[] | undefined) ?? []
 
   const handleToggle = (path: string) => {
     workspaceActions.setLeafViewState(props.leafId, {
       type: 'files',
       state: {
         ...props.viewState,
-        collapsedFolders: toggleInArray(collapsedFolders(), path),
+        expandedFolders: toggleInArray(expandedFolders(), path),
       },
     })
   }
 
   const flatRows = createMemo(() =>
-    flattenTree(null, 0, collapsedFolders(), vaultStore.files, settingsStore.showOtherFiles)
+    flattenTree(null, 0, expandedFolders(), vaultStore.files, settingsStore.showOtherFiles)
   )
 
   let scrollEl!: HTMLDivElement
@@ -197,12 +197,12 @@ export function FilesPanel(props: ViewComponentProps) {
     // Only re-run when a new reveal is requested — not when the user toggles folders.
     untrack(() => {
       const chain = folderChain(t.path)
-      const cur = collapsedFolders()
-      const next = cur.filter((p) => !chain.includes(p))
+      const cur = expandedFolders()
+      const next = [...new Set([...cur, ...chain])]
       if (next.length !== cur.length) {
         workspaceActions.setLeafViewState(props.leafId, {
           type: 'files',
-          state: { ...props.viewState, collapsedFolders: next },
+          state: { ...props.viewState, expandedFolders: next },
         })
       }
       setPendingReveal(t.path)
@@ -420,7 +420,7 @@ export function FilesPanel(props: ViewComponentProps) {
                   height: `${ROW_HEIGHT}px`,
                   width: '100%',
                 }}
-                collapsedFolders={collapsedFolders()}
+                expandedFolders={expandedFolders()}
                 highlight={highlight()}
                 onToggle={handleToggle}
                 dragSrc={dragSrc}
