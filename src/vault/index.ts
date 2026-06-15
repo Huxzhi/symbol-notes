@@ -55,7 +55,7 @@ import { applyFileTags, buildTags, removeFileTags } from './tags'
 import { applyFileTasks, buildTasks, removeFileTasks } from './tasks'
 import { applyFileCalendar, buildCalendar, removeFileCalendar } from './calendarIndex'
 import {
-  buildTree, setFileTree, bumpStruct,
+  setFileTree, bumpStruct,
   insertNode, removeNode, renameNode, moveNode,
 } from './fileTree'
 
@@ -140,7 +140,7 @@ export async function scanAndIndex(): Promise<void> {
   beginLoadProgress(session)
 
   try {
-    const [{ files, activePaths }, idbStats] = await Promise.all([
+    const [{ files, activePaths, tree }, idbStats] = await Promise.all([
       buildScan(incDetected),
       loadAllFileStats(),
     ])
@@ -165,7 +165,7 @@ export async function scanAndIndex(): Promise<void> {
 
     // 阶段 1：仅 stat 的 FileMeta 入 store，撤遮挡，露出工作区/文件树
     setVaultStore('files', files)
-    setFileTree(buildTree(Object.values(files)))
+    setFileTree(tree)
     endScanOverlay(session)
 
     // 阶段 2：后台解析（不写 store），右上角 toast 进度
@@ -423,7 +423,7 @@ export const fileActions = {
       lists: [],
     }
     setVaultStore('files', path, entry)
-    insertNode({ name: finalName, path, kind: 'file', parent, size: 0, mtime: 0 })
+    insertNode({ name: finalName, path, kind: 'file', parent })
     bumpStruct()
     applyFileCalendar(path, undefined, entry)
     invalidateStemIndex()
@@ -456,7 +456,7 @@ export const fileActions = {
       lists: [],
     }
     setVaultStore('files', name, entry)
-    insertNode({ name: dirName, path: name, kind: 'directory', parent, size: 0, mtime: 0, children: [] })
+    insertNode({ name: dirName, path: name, kind: 'directory', parent, children: [] })
     bumpStruct()
     invalidateStemIndex()
   },

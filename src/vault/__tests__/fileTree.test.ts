@@ -1,30 +1,35 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
-  buildTree, setFileTree, nodeAt, flatten, fileByPath,
+  buildTreeFromScan, setFileTree, nodeAt, flatten, fileByPath,
   insertNode, removeNode, renameNode, moveNode,
 } from '../fileTree'
 import type { TreeNode } from '../../stores/types'
+import type { ScanEntry } from '../fs/types'
 
-function stat(path: string, kind: 'file' | 'directory'): {
-  name: string; path: string; kind: 'file' | 'directory'; parent: string | null; size: number; mtime: number
-} {
+function file(path: string): ScanEntry {
   const name = path.split('/').pop()!
   const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : null
-  return { name, path, kind, parent, size: 0, mtime: 0 }
+  return { name, path, kind: 'file', parent, size: 0, mtime: 0 }
+}
+function dir(path: string, children: ScanEntry[]): ScanEntry {
+  const name = path.split('/').pop()!
+  const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : null
+  return { name, path, kind: 'directory', parent, size: 0, mtime: 0, children }
 }
 
-// a top-level note, a folder with a child note + an image, and a nested folder
-const ENTRIES = [
-  stat('b.md', 'file'),
-  stat('a.md', 'file'),
-  stat('dir', 'directory'),
-  stat('dir/c.md', 'file'),
-  stat('dir/img.png', 'file'),
-  stat('dir/sub', 'directory'),
-  stat('dir/sub/d.md', 'file'),
+// nested (as the scan walk produces it): top-level notes + a folder with a
+// child note + image + a nested folder.
+const ROOTS: ScanEntry[] = [
+  file('b.md'),
+  file('a.md'),
+  dir('dir', [
+    file('dir/c.md'),
+    file('dir/img.png'),
+    dir('dir/sub', [file('dir/sub/d.md')]),
+  ]),
 ]
 
-beforeEach(() => setFileTree(buildTree(ENTRIES)))
+beforeEach(() => setFileTree(buildTreeFromScan(ROOTS)))
 
 describe('buildTree + nodeAt', () => {
   it('attaches children to parents and resolves by path', () => {
@@ -63,7 +68,7 @@ describe('flatten', () => {
 
 describe('mutations', () => {
   it('insertNode keeps sort order', () => {
-    insertNode({ name: 'aa.md', path: 'dir/aa.md', kind: 'file', parent: 'dir', size: 0, mtime: 0 })
+    insertNode({ name: 'aa.md', path: 'dir/aa.md', kind: 'file', parent: 'dir' })
     expect(nodeAt('dir')!.children!.map((c) => c.name)).toEqual(['sub', 'aa.md', 'c.md', 'img.png'])
   })
 

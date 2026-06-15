@@ -2,8 +2,9 @@
 // isIndexing / scanAndIndex / Phase2 索引构建 在 index.ts
 import { parseFrontmatter } from '../lib/parseFrontmatter'
 import { createMarkdownParser } from '../lib/parseMarkdown'
-import type { FileMeta } from '../stores/types'
+import type { FileMeta, TreeNode } from '../stores/types'
 import { setVaultStore, vaultStore } from './index'
+import { buildTreeFromScan, setFileTree } from './fileTree'
 import {
   getCachedMeta,
   getManyMeta,
@@ -11,7 +12,7 @@ import {
   setCachedMeta,
   setFileStatEntry,
 } from './indexStorage'
-import { scanTree, readFile } from './io'
+import { scanTree, readFile, type ScanEntry } from './io'
 
 // ── Content parsing helpers ───────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ const CHANGED_YIELD_EVERY = 10
 export interface ScanResult {
   files: Record<string, FileMeta>
   activePaths: Set<string>
+  tree: TreeNode
 }
 
 const EMPTY_CONTENT: Pick<
@@ -126,42 +128,34 @@ const EMPTY_CONTENT: Pick<
 }
 
 export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
-  const result: ScanResult = { files: {}, activePaths: new Set() }
+  const files: Record<string, FileMeta> = {}
+  const activePaths = new Set<string>()
   const epoch = new Date(0).toISOString().slice(0, 10)
-  const entries = await scanTree(32, onDetected)
-  for (const entry of entries) {
-    const { name, path, kind, parent, size, mtime } = entry
-    if (kind === 'directory') {
-      result.files[path] = {
-        name,
-        path,
-        kind: 'directory',
-        parent,
-        size: 0,
-        mtime: 0,
-        hash: '',
-        ...EMPTY_CONTENT,
-        created: epoch,
-        dated: extractDateFromName(name) ?? epoch,
+  const roots = await scanTree(32, onDetected)
+  // 顺着嵌套结果一遍：扁平化成 files（合并 store 仍需要）+ 收集活跃路径。
+  const walk = (entries: ScanEntry[]): void => {
+    for (const entry of entries) {
+      const { name, path, kind, parent, size, mtime } = entry
+      if (kind === 'directory') {
+        files[path] = {
+          name, path, kind: 'directory', parent,
+          size: 0, mtime: 0, hash: '', ...EMPTY_CONTENT,
+          created: epoch, dated: extractDateFromName(name) ?? epoch,
+        }
+        walk(entry.children ?? [])
+      } else {
+        const mtimeStr = new Date(mtime).toISOString().slice(0, 10)
+        files[path] = {
+          name, path, kind: 'file', parent,
+          size, mtime, hash: '', ...EMPTY_CONTENT,
+          created: mtimeStr, dated: extractDateFromName(name) ?? mtimeStr,
+        }
+        activePaths.add(path)
       }
-    } else {
-      const mtimeStr = new Date(mtime).toISOString().slice(0, 10)
-      result.files[path] = {
-        name,
-        path,
-        kind: 'file',
-        parent,
-        size,
-        mtime,
-        hash: '',
-        ...EMPTY_CONTENT,
-        created: mtimeStr,
-        dated: extractDateFromName(name) ?? mtimeStr,
-      }
-      result.activePaths.add(path)
     }
   }
-  return result
+  walk(roots)
+  return { files, activePaths, tree: buildTreeFromScan(roots) }
 }
 
 // ── Phase 1: 内容解析，填充 FileMeta hash/frontmatter/outLinks/tags/tasks ────
@@ -262,6 +256,7 @@ export async function parseAll(
 // ── Quick rescan (no parsing) ─────────────────────────────────────────────────
 
 export async function rescanTree(): Promise<void> {
-  const { files } = await buildScan()
+  const { files, tree } = await buildScan()
   setVaultStore('files', files)
+  setFileTree(tree)
 }

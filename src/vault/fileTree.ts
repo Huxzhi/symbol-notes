@@ -1,12 +1,13 @@
 import { createSignal } from 'solid-js'
 import type { TreeNode } from '../stores/types'
+import type { ScanEntry } from './fs/types'
 
 // 结构树：普通对象（非响应式，省 proxy 开销）+ 一个粗粒度版本信号。
 // 任何结构变更（增删/改名/移动）末尾调 bumpStruct()，面板的 flatten memo 读
 // structVer() 重算。节点对象引用稳定 → re-flatten 只更新真正变化的行。
 
 function emptyRoot(): TreeNode {
-  return { name: '', path: '', kind: 'directory', parent: null, size: 0, mtime: 0, children: [] }
+  return { name: '', path: '', kind: 'directory', parent: null, children: [] }
 }
 
 let _root: TreeNode = emptyRoot()
@@ -34,40 +35,20 @@ function compareNodes(a: TreeNode, b: TreeNode): number {
   return a.name.localeCompare(b.name)
 }
 
-interface StatLike {
-  name: string
-  path: string
-  kind: 'file' | 'directory'
-  parent: string | null
-  size: number
-  mtime: number
-}
-
-/** 从扁平 stat 列表构建整棵树（顺序无关）。 */
-export function buildTree(entries: Iterable<StatLike>): TreeNode {
+/** 从扫描的嵌套结果直接构建树（顺着递归层级映射，无需查父；丢弃 stat）。 */
+export function buildTreeFromScan(roots: ScanEntry[]): TreeNode {
   const root = emptyRoot()
-  const byPath = new Map<string, TreeNode>([['', root]])
-  const nodes: TreeNode[] = []
-  for (const e of entries) {
-    const node: TreeNode = {
-      name: e.name, path: e.path, kind: e.kind, parent: e.parent,
-      size: e.size, mtime: e.mtime,
-      ...(e.kind === 'directory' ? { children: [] as TreeNode[] } : {}),
-    }
-    byPath.set(e.path, node)
-    nodes.push(node)
-  }
-  for (const node of nodes) {
-    const parent = (node.parent != null ? byPath.get(node.parent) : root) ?? root
-    ;(parent.children ??= []).push(node)
-  }
-  const sortRec = (n: TreeNode) => {
-    if (n.children) {
-      n.children.sort(compareNodes)
-      n.children.forEach(sortRec)
-    }
-  }
-  sortRec(root)
+  const map = (entries: ScanEntry[]): TreeNode[] =>
+    entries
+      .map((e): TreeNode => ({
+        name: e.name,
+        path: e.path,
+        kind: e.kind,
+        parent: e.parent,
+        ...(e.kind === 'directory' ? { children: map(e.children ?? []) } : {}),
+      }))
+      .sort(compareNodes)
+  root.children = map(roots)
   return root
 }
 

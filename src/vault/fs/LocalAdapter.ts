@@ -1,5 +1,5 @@
 import { get, set } from 'idb-keyval'
-import type { DirEntry, FileSystemAdapter } from './types'
+import type { DirEntry, ScanEntry, FileSystemAdapter } from './types'
 import { mapWithConcurrency } from './concurrency'
 
 declare global {
@@ -102,27 +102,36 @@ export class LocalAdapter implements FileSystemAdapter {
     }
   }
 
-  async scanTree(concurrency = 32, onStat?: () => void): Promise<DirEntry[]> {
-    const dirs: DirEntry[] = []
-    const fileStubs: { name: string; path: string; parent: string | null; handle: FileSystemFileHandle }[] = []
-    const walk = async (parentPath: string | null, dir: FileSystemDirectoryHandle): Promise<void> => {
+  async scanTree(concurrency = 32, onStat?: () => void): Promise<ScanEntry[]> {
+    // walk 递归直接产出层级（结构便宜，当场就有）；文件 stat 攒起来 walk 后并发补。
+    const fileStubs: { node: ScanEntry; handle: FileSystemFileHandle }[] = []
+    const walk = async (
+      parentPath: string | null,
+      siblings: ScanEntry[],
+      dir: FileSystemDirectoryHandle,
+    ): Promise<void> => {
       for await (const [name, entry] of dir.entries()) {
         if (name.startsWith('.')) continue
         const path = parentPath ? `${parentPath}/${name}` : name
         if (entry.kind === 'directory') {
-          dirs.push({ name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0 })
-          await walk(path, entry as FileSystemDirectoryHandle)
+          const node: ScanEntry = { name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0, children: [] }
+          siblings.push(node)
+          await walk(path, node.children!, entry as FileSystemDirectoryHandle)
         } else {
-          fileStubs.push({ name, path, parent: parentPath, handle: entry as FileSystemFileHandle })
+          const node: ScanEntry = { name, path, kind: 'file', parent: parentPath, size: 0, mtime: 0 }
+          siblings.push(node)
+          fileStubs.push({ node, handle: entry as FileSystemFileHandle })
         }
       }
     }
-    await walk(null, this.rootHandle)
-    const files = await mapWithConcurrency(fileStubs, concurrency, async (s): Promise<DirEntry> => {
-      const f = await s.handle.getFile()
+    const roots: ScanEntry[] = []
+    await walk(null, roots, this.rootHandle)
+    await mapWithConcurrency(fileStubs, concurrency, async ({ node, handle }) => {
+      const f = await handle.getFile()
       onStat?.()
-      return { name: s.name, path: s.path, kind: 'file', parent: s.parent, size: f.size, mtime: f.lastModified }
+      node.size = f.size
+      node.mtime = f.lastModified
     })
-    return [...dirs, ...files]
+    return roots
   }
 }
