@@ -52,6 +52,8 @@ export function flattenTree(
   return rows
 }
 
-export function resolveDropTarget(entry: FileMeta): string | null {
+export function resolveDropTarget(
+  entry: { kind: 'file' | 'directory'; path: string; parent: string | null },
+): string | null {
   return entry.kind === 'directory' ? entry.path : entry.parent
 }

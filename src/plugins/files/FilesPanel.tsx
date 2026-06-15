@@ -9,9 +9,10 @@ import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
 import { settingsStore } from '../../stores/settingsStore'
 import { showError, showToast } from '../../stores/toastStore'
 import { getFileViewForPath } from '../../lib/pluginRegistry'
-import type { FileMeta, ViewComponentProps } from '../../stores/types'
+import type { FileMeta, TreeNode, ViewComponentProps } from '../../stores/types'
 import { activeFilePath } from '../../stores/workspaceStore'
-import { flattenTree, resolveDropTarget, isOtherFile, folderChain, type FlatRow } from './treeUtils'
+import { resolveDropTarget, isOtherFile, folderChain } from './treeUtils'
+import { flatten as flattenTree, structVer, type FlatRow } from '../../vault/fileTree'
 import { revealTarget } from '../../stores/revealStore'
 
 export function toggleInArray(arr: string[], val: string): string[] {
@@ -37,11 +38,11 @@ function FileRow(props: {
   onToggle: (path: string) => void
   dragSrc: () => string | null
   dragOver: () => string | null
-  onDragStart: (e: DragEvent, entry: FileMeta) => void
+  onDragStart: (e: DragEvent, entry: TreeNode) => void
   onDragEnd: () => void
-  onRowDragOver: (e: DragEvent, entry: FileMeta) => void
+  onRowDragOver: (e: DragEvent, entry: TreeNode) => void
   onRowDragLeave: (e: DragEvent) => void
-  onRowDrop: (e: DragEvent, entry: FileMeta) => void
+  onRowDrop: (e: DragEvent, entry: TreeNode) => void
 }) {
   const entry = () => props.row.entry
   const isActive = () => activeFilePath() === entry().path
@@ -161,9 +162,10 @@ export function FilesPanel(props: ViewComponentProps) {
     })
   }
 
-  const flatRows = createMemo(() =>
-    flattenTree(null, 0, expandedFolders(), vaultStore.files, settingsStore.showOtherFiles)
-  )
+  const flatRows = createMemo(() => {
+    structVer()
+    return flattenTree(expandedFolders(), settingsStore.showOtherFiles)
+  })
 
   let scrollEl!: HTMLDivElement
 
@@ -222,7 +224,7 @@ export function FilesPanel(props: ViewComponentProps) {
     }
   })
 
-  const handleDragStart = (e: DragEvent, entry: FileMeta) => {
+  const handleDragStart = (e: DragEvent, entry: TreeNode) => {
     setDragSrc(entry.path)
     e.dataTransfer!.setData('application/x-symbol-notes-file', entry.path)
     e.dataTransfer!.setData('text/plain', computeWikiLink(entry.name, entry.kind))
@@ -248,7 +250,7 @@ export function FilesPanel(props: ViewComponentProps) {
 
   let dragLeaveTimer: ReturnType<typeof setTimeout> | null = null
 
-  const handleRowDragOver = (e: DragEvent, entry: FileMeta) => {
+  const handleRowDragOver = (e: DragEvent, entry: TreeNode) => {
     e.stopPropagation()
     const src = dragSrc()
     if (!src) return
@@ -265,7 +267,7 @@ export function FilesPanel(props: ViewComponentProps) {
     dragLeaveTimer = setTimeout(() => setDragOver(null), 0)
   }
 
-  const handleRowDrop = async (e: DragEvent, entry: FileMeta) => {
+  const handleRowDrop = async (e: DragEvent, entry: TreeNode) => {
     e.preventDefault()
     e.stopPropagation()
     const src = dragSrc()

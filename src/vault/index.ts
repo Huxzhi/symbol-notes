@@ -54,6 +54,10 @@ import {
 import { applyFileTags, buildTags, removeFileTags } from './tags'
 import { applyFileTasks, buildTasks, removeFileTasks } from './tasks'
 import { applyFileCalendar, buildCalendar, removeFileCalendar } from './calendarIndex'
+import {
+  buildTree, setFileTree, bumpStruct,
+  insertNode, removeNode, renameNode, moveNode,
+} from './fileTree'
 
 // ── Vault connection signal ───────────────────────────────────────────────────
 
@@ -161,6 +165,7 @@ export async function scanAndIndex(): Promise<void> {
 
     // 阶段 1：仅 stat 的 FileMeta 入 store，撤遮挡，露出工作区/文件树
     setVaultStore('files', files)
+    setFileTree(buildTree(Object.values(files)))
     endScanOverlay(session)
 
     // 阶段 2：后台解析（不写 store），右上角 toast 进度
@@ -418,6 +423,8 @@ export const fileActions = {
       lists: [],
     }
     setVaultStore('files', path, entry)
+    insertNode({ name: finalName, path, kind: 'file', parent, size: 0, mtime: 0 })
+    bumpStruct()
     applyFileCalendar(path, undefined, entry)
     invalidateStemIndex()
     resolveNewFile(path)
@@ -449,6 +456,8 @@ export const fileActions = {
       lists: [],
     }
     setVaultStore('files', name, entry)
+    insertNode({ name: dirName, path: name, kind: 'directory', parent, size: 0, mtime: 0, children: [] })
+    bumpStruct()
     invalidateStemIndex()
   },
 
@@ -492,6 +501,8 @@ export const fileActions = {
       lists: [],
     }
     setVaultStore('files', newPath, entry)
+    renameNode(oldPath, finalName)
+    bumpStruct()
     invalidateStemIndex()
     const { workspaceActions } = await import('../stores/workspaceStore')
     workspaceActions.renameLeafPath(oldPath, newPath)
@@ -510,6 +521,8 @@ export const fileActions = {
         delete m[path]
       }),
     )
+    removeNode(path)
+    bumpStruct()
     invalidateStemIndex()
   },
 
@@ -532,6 +545,8 @@ export const fileActions = {
         for (const entry of toRemove) delete m[entry.path]
       }),
     )
+    removeNode(path)
+    bumpStruct()
     invalidateStemIndex()
   },
 
@@ -572,6 +587,8 @@ export const fileActions = {
       lists: [],
     }
     setVaultStore('files', newPath, entry)
+    moveNode(srcPath, destDirPath)
+    bumpStruct()
     invalidateStemIndex()
     const { workspaceActions } = await import('../stores/workspaceStore')
     workspaceActions.renameLeafPath(srcPath, newPath)
@@ -628,6 +645,8 @@ export const fileActions = {
         hash: '',
       })
     }
+    moveNode(srcPath, destDirPath)
+    bumpStruct()
     invalidateStemIndex()
     const { workspaceActions } = await import('../stores/workspaceStore')
     for (const entry of fileEntries) {
