@@ -1,6 +1,7 @@
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { settingsActions, settingsStore } from "../stores/settingsStore";
+import { vaultConfigMeta, vaultConfigActions, vaultFs } from "../vault";
 import { getRegisteredPlugins } from "../lib/pluginRegistry";
 import { getSettingsTabs } from "../lib/pluginRegistry";
 import {
@@ -13,6 +14,7 @@ import {
 const BUILTIN_SECTIONS = [
   { id: "appearance", label: "外观" },
   { id: "files", label: "文件" },
+  { id: "vault", label: "Vault 配置" },
   { id: "shortcuts", label: "快捷键" },
   { id: "plugins", label: "插件" },
 ];
@@ -61,6 +63,20 @@ export function Settings(props: { onClose(): void }) {
   const [draftShowOtherFiles, setDraftShowOtherFiles] = createSignal(
     settingsStore.showOtherFiles,
   );
+  const [draftConfigPath, setDraftConfigPath] = createSignal(
+    vaultConfigMeta().path,
+  );
+  const configStatusLabel = () => {
+    if (!vaultFs()) return "未打开 vault";
+    switch (vaultConfigMeta().status) {
+      case "active":
+        return "已启用";
+      case "declined":
+        return "已拒绝（仅内存，不落盘）";
+      default:
+        return "未启用";
+    }
+  };
 
   // 取消回滚：进入设置时快照已提交的主题态
   const themeSnapshot = {
@@ -405,6 +421,52 @@ export function Settings(props: { onClose(): void }) {
                     </div>
                   </div>
                 </label>
+              </Match>
+
+              <Match when={section() === "vault"}>
+                <div class="text-[10px] t-3 mb-3 uppercase tracking-widest">
+                  Vault 配置文件夹
+                </div>
+                <div class="text-[12px] t-base mb-2">
+                  状态：<span class="t-2">{configStatusLabel()}</span>
+                </div>
+                <div class="text-[11px] t-3 mb-4 leading-relaxed">
+                  布局与设置保存在 vault 顶层的隐藏文件夹中（默认{" "}
+                  <code class="bg-(--bg-hover) px-1 rounded text-[10px]">
+                    .symbol-notes
+                  </code>
+                  ）。点开头的文件夹不会出现在文件树中。
+                </div>
+
+                <div class="text-[10px] t-3 mb-1.5 uppercase tracking-widest">
+                  相对路径
+                </div>
+                <div class="flex items-center gap-2 mb-4">
+                  <input
+                    class="flex-1 bg-(--bg-base) border border-(--border) rounded px-2 py-1 text-[12px] t-base font-mono outline-none focus:border-(--accent)"
+                    value={draftConfigPath()}
+                    disabled={!vaultFs()}
+                    onInput={(e) => setDraftConfigPath(e.currentTarget.value)}
+                  />
+                  <button
+                    class="px-3 py-1 text-[12px] rounded bg-(--accent) text-white cursor-pointer hover:bg-(--accent-2) transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={!vaultFs() || !draftConfigPath().trim()}
+                    onClick={() =>
+                      void vaultConfigActions.setPath(draftConfigPath().trim())
+                    }
+                  >
+                    应用路径
+                  </button>
+                </div>
+
+                <Show when={vaultFs() && vaultConfigMeta().status !== "active"}>
+                  <button
+                    class="px-3 py-1.5 text-[12px] rounded border border-(--border) t-2 cursor-pointer hover:border-(--accent) hover:text-(--accent) transition-colors"
+                    onClick={() => void vaultConfigActions.enable()}
+                  >
+                    启用配置文件夹
+                  </button>
+                </Show>
               </Match>
 
               <Match when={section() === "shortcuts"}>
