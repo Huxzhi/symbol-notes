@@ -1,6 +1,6 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
-import { loadFromStorage, saveToStorage } from '../lib/localStorage'
+import * as vaultConfig from '../vault/vaultConfig'
 import type { SettingsState, ThemeId, CustomTheme, ThemeMode } from './types'
 
 const defaults: SettingsState = {
@@ -12,13 +12,16 @@ const defaults: SettingsState = {
   pluginStates: {},
 }
 
-const [settingsStore, setSettingsStore] = createStore<SettingsState>({
-  ...defaults,
-  ...loadFromStorage<Partial<SettingsState>>('sn-settings', defaults, (v) => typeof v === 'object' && v !== null),
-})
+const [settingsStore, setSettingsStore] = createStore<SettingsState>({ ...defaults })
+
+/** 由 vaultConfig 读到磁盘配置后注入（与默认值合并，容忍缺字段）。 */
+export function hydrateSettings(payload: Partial<SettingsState>): void {
+  setSettingsStore({ ...defaults, ...payload })
+}
 
 createRoot(() => {
-  createEffect(() => saveToStorage('sn-settings', { ...settingsStore }))
+  // 仅在配置文件夹激活时落盘；否则仅内存（vaultConfig.saveSettings 内部已 gate）。
+  createEffect(() => vaultConfig.saveSettings({ ...settingsStore }))
 })
 
 export const settingsActions = {

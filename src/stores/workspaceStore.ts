@@ -1,6 +1,6 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
-import { loadFromStorage, saveToStorage } from '../lib/localStorage'
+import * as vaultConfig from '../vault/vaultConfig'
 import { getFileViewForPath, getView } from '../lib/pluginRegistry'
 import { pushHistory } from './leafHistory'
 import {
@@ -90,24 +90,23 @@ const defaultWorkspace: WorkspaceState = {
   activeLayoutId: DEFAULT_LAYOUT_ID,
 }
 
-const savedWs = loadFromStorage<WorkspaceState>(
-  'sn-workspace',
-  defaultWorkspace,
-  (v) =>
-    typeof v === 'object' && v !== null &&
-    typeof (v as Record<string, unknown>).layouts === 'object' &&
-    !Array.isArray((v as Record<string, unknown>).layouts) &&
-    typeof (v as Record<string, unknown>).activeLayoutId === 'string',
-)
-
 const [workspaceStore, setWorkspaceStore] = createStore<WorkspaceState>({
-  layouts: savedWs.layouts,
-  activeLayoutId: savedWs.activeLayoutId,
+  layouts: defaultWorkspace.layouts,
+  activeLayoutId: defaultWorkspace.activeLayoutId,
 })
 
+/** 由 vaultConfig 读到磁盘 workspace 后注入（覆盖式）。 */
+export function hydrateWorkspace(payload: WorkspaceState): void {
+  setWorkspaceStore({
+    layouts: payload.layouts,
+    activeLayoutId: payload.activeLayoutId,
+  })
+}
+
 createRoot(() => {
+  // 仅在配置文件夹激活时落盘；否则仅内存。
   createEffect(() =>
-    saveToStorage('sn-workspace', {
+    vaultConfig.saveWorkspace({
       layouts: workspaceStore.layouts,
       activeLayoutId: workspaceStore.activeLayoutId,
     }),
