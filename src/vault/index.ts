@@ -58,6 +58,8 @@ import {
   setFileTree, bumpStruct,
   insertNode, removeNode, renameNode, moveNode,
 } from './fileTree'
+import * as vaultConfig from './vaultConfig'
+import { showModal, closeModal } from '../stores/modalStore'
 
 // ── Vault connection signal ───────────────────────────────────────────────────
 
@@ -109,9 +111,12 @@ export async function openVault(): Promise<void> {
   const adapter = await LocalAdapter.open()
   initFileIO(adapter)
   setVaultFs(adapter)
+  vaultConfig.setAdapter(adapter)
+  await vaultConfig.resetMeta() // 新 vault → unknown + 默认路径
   const { workspaceActions } = await import('../stores/workspaceStore')
   workspaceActions.clearAllLeaves()
   await scanAndIndex()
+  await connectVaultConfig()
 }
 
 export async function restoreVault(): Promise<void> {
@@ -119,7 +124,87 @@ export async function restoreVault(): Promise<void> {
   if (!adapter) return
   initFileIO(adapter)
   setVaultFs(adapter)
+  vaultConfig.setAdapter(adapter)
+  await vaultConfig.loadMeta()
   await scanAndIndex()
+  await connectVaultConfig()
+}
+
+// ── Vault 配置编排 ─────────────────────────────────────────────────────────────
+
+/** 读两份配置注入 store；任一缺失则跳过那份（保持默认）。 */
+async function hydrateVaultConfig(): Promise<void> {
+  const { workspace, settings } = await vaultConfig.readConfigFiles()
+  if (!workspace && !settings) return
+  const { hydrateWorkspace } = await import('../stores/workspaceStore')
+  const { hydrateSettings } = await import('../stores/settingsStore')
+  if (workspace) hydrateWorkspace(workspace)
+  if (settings) hydrateSettings(settings)
+}
+
+/** 取当前 store 状态作为创建配置文件夹的种子。 */
+async function snapshotStores(): Promise<{
+  ws: import('../stores/types').WorkspaceState
+  settings: import('../stores/types').SettingsState
+}> {
+  const { workspaceStore } = await import('../stores/workspaceStore')
+  const { settingsStore } = await import('../stores/settingsStore')
+  return {
+    ws: {
+      layouts: workspaceStore.layouts,
+      activeLayoutId: workspaceStore.activeLayoutId,
+    },
+    settings: { ...settingsStore },
+  }
+}
+
+/** 用当前 store 状态创建配置文件夹。 */
+async function createVaultConfigFromStores(): Promise<void> {
+  const { ws, settings } = await snapshotStores()
+  await vaultConfig.createConfigFolder(ws, settings)
+}
+
+/** 弹窗询问是否创建配置文件夹。 */
+function promptCreateVaultConfig(): void {
+  showModal({
+    title: '配置文件夹',
+    message: `在此 vault 顶层创建 ${vaultConfig.configPath()}/ 用于保存布局与设置？`,
+    buttons: [
+      {
+        label: '不创建',
+        variant: 'ghost',
+        onClick: () => {
+          closeModal()
+          void vaultConfig.decline()
+        },
+      },
+      {
+        label: '创建',
+        variant: 'primary',
+        onClick: () => {
+          closeModal()
+          void createVaultConfigFromStores()
+        },
+      },
+    ],
+  })
+}
+
+/** 扫描后接入配置：active→读盘；declined→不动；unknown→探测，存在则读盘否则提示。 */
+async function connectVaultConfig(): Promise<void> {
+  const status = vaultConfig.metaStatus()
+  if (status === 'declined') return
+  if (status === 'active') {
+    await hydrateVaultConfig()
+    return
+  }
+  // unknown
+  if (await vaultConfig.configFolderExists()) {
+    await vaultConfig.markActive()
+    await hydrateVaultConfig()
+    return
+  }
+  promptCreateVaultConfig()
 }
 
 // ── Orchestration ─────────────────────────────────────────────────────────────
@@ -684,3 +769,18 @@ export {
 // For non-vault consumers (pluginRegistry, EditorViewer, tests)
 export { buildLinkMaps, buildStemIndex, buildAliasIndex, resolveLink } from './backlinks'
 export { extractDateFromName } from './scan'
+
+// Vault 配置（供设置页）
+export { vaultConfigMeta } from './vaultConfig'
+
+export const vaultConfigActions = {
+  /** 设置页「启用配置文件夹」：用当前 store 状态创建。 */
+  async enable(): Promise<void> {
+    await createVaultConfigFromStores()
+  },
+  /** 设置页改相对路径：迁移并写到新路径。 */
+  async setPath(path: string): Promise<void> {
+    const { ws, settings } = await snapshotStores()
+    await vaultConfig.migratePath(path, ws, settings)
+  },
+}
