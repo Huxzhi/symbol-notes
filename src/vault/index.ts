@@ -146,10 +146,11 @@ async function hydrateVaultConfig(): Promise<void> {
   if (settings) hydrateSettings(settings)
 }
 
-/** 取当前 store 状态作为创建配置文件夹的种子。 */
+/** 取当前 store 状态作为创建配置文件夹的种子（主题/非主题分开）。 */
 async function snapshotStores(): Promise<{
   ws: import('../stores/types').WorkspaceState
-  settings: import('../stores/types').SettingsState
+  settings: import('../stores/types').VaultSettings
+  theme: import('../stores/types').ThemeSettings
 }> {
   const { workspaceStore } = await import('../stores/workspaceStore')
   const { settingsStore } = await import('../stores/settingsStore')
@@ -158,14 +159,23 @@ async function snapshotStores(): Promise<{
       layouts: workspaceStore.layouts,
       activeLayoutId: workspaceStore.activeLayoutId,
     },
-    settings: { ...settingsStore },
+    settings: {
+      pluginStates: settingsStore.pluginStates,
+      autoTimestamps: settingsStore.autoTimestamps,
+      showOtherFiles: settingsStore.showOtherFiles,
+    },
+    theme: {
+      theme: settingsStore.theme,
+      customThemes: settingsStore.customThemes,
+      customCSS: settingsStore.customCSS,
+    },
   }
 }
 
 /** 用当前 store 状态创建配置文件夹。 */
 async function createVaultConfigFromStores(): Promise<void> {
-  const { ws, settings } = await snapshotStores()
-  await vaultConfig.createConfigFolder(ws, settings)
+  const { ws, settings, theme } = await snapshotStores()
+  await vaultConfig.createConfigFolder(ws, settings, theme)
 }
 
 /** 弹窗询问是否创建配置文件夹。 */
@@ -811,7 +821,7 @@ export const vaultConfigActions = {
   },
   /** 设置页改相对路径：迁移并写到新路径。 */
   async setPath(path: string): Promise<void> {
-    const { ws, settings } = await snapshotStores()
-    await vaultConfig.migratePath(path, ws, settings)
+    const { ws, settings, theme } = await snapshotStores()
+    await vaultConfig.migratePath(path, ws, settings, theme)
   },
 }
