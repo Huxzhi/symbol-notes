@@ -60,6 +60,7 @@ import {
 } from './fileTree'
 import * as vaultConfig from './vaultConfig'
 import { showModal, closeModal } from '../stores/modalStore'
+import { setThemeHydrated } from '../lib/themeCache'
 
 // ── Vault connection signal ───────────────────────────────────────────────────
 
@@ -115,8 +116,10 @@ export async function openVault(): Promise<void> {
   await vaultConfig.resetMeta() // 新 vault → unknown + 默认路径
   const { workspaceActions } = await import('../stores/workspaceStore')
   workspaceActions.clearAllLeaves()
-  await scanAndIndex()
-  await connectVaultConfig()
+  const mid = await scanPhase1()
+  if (!mid) return
+  await connectVaultConfig(mid.session) // 读配置 + hydrate，并按状态揭开遮罩
+  await parseAndIndex(mid)
 }
 
 export async function restoreVault(): Promise<void> {
@@ -126,8 +129,10 @@ export async function restoreVault(): Promise<void> {
   setVaultFs(adapter)
   vaultConfig.setAdapter(adapter)
   await vaultConfig.loadMeta()
-  await scanAndIndex()
-  await connectVaultConfig()
+  const mid = await scanPhase1()
+  if (!mid) return
+  await connectVaultConfig(mid.session)
+  await parseAndIndex(mid)
 }
 
 // ── Vault 配置编排 ─────────────────────────────────────────────────────────────
@@ -190,20 +195,33 @@ function promptCreateVaultConfig(): void {
   })
 }
 
-/** 扫描后接入配置：active→读盘；declined→不动；unknown→探测，存在则读盘否则提示。 */
-async function connectVaultConfig(): Promise<void> {
+/** 扫描后接入配置并决定揭开遮罩的时机：
+ *  active / unknown+exists → 先 hydrate 再 reveal；
+ *  declined / unknown 无配置 → 先 reveal 再走原逻辑（不卡在弹窗前）。
+ *  每条路径末尾置 themeHydrated（settings 已反映真实/默认值）。 */
+async function connectVaultConfig(session: Session): Promise<void> {
   const status = vaultConfig.metaStatus()
-  if (status === 'declined') return
+  if (status === 'declined') {
+    endScanOverlay(session)
+    setThemeHydrated(true)
+    return
+  }
   if (status === 'active') {
     await hydrateVaultConfig()
+    endScanOverlay(session)
+    setThemeHydrated(true)
     return
   }
   // unknown
   if (await vaultConfig.configFolderExists()) {
     await vaultConfig.markActive()
     await hydrateVaultConfig()
+    endScanOverlay(session)
+    setThemeHydrated(true)
     return
   }
+  endScanOverlay(session)
+  setThemeHydrated(true)
   promptCreateVaultConfig()
 }
 
