@@ -1,7 +1,7 @@
 import { PenLine } from 'lucide-solid'
 import { definePlugin } from '../../lib/pluginRegistry'
 import type { SettingsTabProps } from '../../lib/pluginRegistry'
-import { loadFromStorage, saveToStorage } from '../../lib/localStorage'
+import { setPluginConfig } from '../../lib/pluginData'
 import { EMPTY_EXCALIDRAW_MD } from './excalidrawFormat'
 import { ExcalidrawViewer } from './ExcalidrawViewer'
 
@@ -94,10 +94,7 @@ function ExcalidrawSettings(props: SettingsTabProps) {
 // are persisted as global defaults for the next file opened.
 
 export function updateExcalidrawPluginConfig(patch: Partial<ExcalidrawPluginConfig>): void {
-  const current = loadFromStorage<Record<string, unknown>>(
-    'sn-plugin-excalidraw', {}, (v) => typeof v === 'object' && v !== null,
-  ) ?? {}
-  saveToStorage('sn-plugin-excalidraw', { ...current, ...patch })
+  setPluginConfig('excalidraw', patch as Record<string, unknown>)
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────

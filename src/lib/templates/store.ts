@@ -1,28 +1,20 @@
-import { createSignal } from 'solid-js'
-import { loadFromStorage, saveToStorage } from '../localStorage'
+import { getPluginConfig, setPluginConfig } from '../pluginData'
 import { vaultStore } from '../../vault'
 import type { FileMeta } from '../../stores/types'
-
-const KEY = 'sn-templates'
 
 export interface TemplateEntry {
   name: string
   path: string
 }
 
-const initial = loadFromStorage<{ folder: string }>(
-  KEY,
-  { folder: 'templates' },
-  (v) => typeof v === 'object' && v !== null,
-)
-
-const [templatesFolder, setTemplatesFolderSignal] = createSignal(initial.folder)
-
-export { templatesFolder }
+/** 模板文件夹：存 plugins/templates/data.json 的 folder 字段（缺省 'templates'）。 */
+export function templatesFolder(): string {
+  const v = getPluginConfig('templates').folder
+  return typeof v === 'string' ? v : 'templates'
+}
 
 export function setTemplatesFolder(folder: string): void {
-  setTemplatesFolderSignal(folder)
-  saveToStorage(KEY, { folder })
+  setPluginConfig('templates', { folder })
 }
 
 export function filterTemplateFiles(

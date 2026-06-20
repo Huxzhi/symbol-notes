@@ -1,4 +1,4 @@
-import { loadFromStorage } from '../../lib/localStorage'
+import { getPluginConfig } from '../../lib/pluginData'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { vaultStore, fileActions, readFile } from '../../vault'
 import { resolveTemplate } from '../../lib/templates'
@@ -14,12 +14,7 @@ const DEFAULTS = {
 
 /** 读取「今日日记」插件的持久化配置（与插件内 createStore 同一 localStorage 键）。 */
 function dailyConfig() {
-  const saved = loadFromStorage<Record<string, unknown>>(
-    'sn-plugin-daily-note',
-    {},
-    (v) => typeof v === 'object' && v !== null,
-  )
-  return { ...DEFAULTS, ...(saved ?? {}) }
+  return { ...DEFAULTS, ...getPluginConfig('daily-note') }
 }
 
 /** 某天日记的目标路径（按日记插件的文件夹 + 日期格式）。 */

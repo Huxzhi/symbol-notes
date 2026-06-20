@@ -1,5 +1,5 @@
 import { createEffect, on, onCleanup, onMount, createMemo } from 'solid-js'
-import { loadFromStorage } from '../../lib/localStorage'
+import { getPluginConfig as getPluginData } from '../../lib/pluginData'
 import { fileActions, vaultFs } from '../../vault'
 import { setLeafInstances } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
@@ -14,9 +14,7 @@ import { EXCALIDRAW_DEFAULTS, type ExcalidrawPluginConfig, updateExcalidrawPlugi
 function getPluginConfig(): ExcalidrawPluginConfig {
   return {
     ...EXCALIDRAW_DEFAULTS,
-    ...(loadFromStorage<Record<string, unknown>>(
-      'sn-plugin-excalidraw', {}, (v) => typeof v === 'object' && v !== null,
-    ) ?? {}),
+    ...getPluginData('excalidraw'),
   } as ExcalidrawPluginConfig
 }
 
