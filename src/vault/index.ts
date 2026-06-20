@@ -60,7 +60,6 @@ import {
 } from './fileTree'
 import * as vaultConfig from './vaultConfig'
 import { showModal, closeModal } from '../stores/modalStore'
-import { setThemeHydrated } from '../lib/themeCache'
 
 // ── Vault connection signal ───────────────────────────────────────────────────
 
@@ -197,19 +196,16 @@ function promptCreateVaultConfig(): void {
 
 /** 扫描后接入配置并决定揭开遮罩的时机：
  *  active / unknown+exists → 先 hydrate 再 reveal；
- *  declined / unknown 无配置 → 先 reveal 再走原逻辑（不卡在弹窗前）。
- *  每条路径末尾置 themeHydrated（settings 已反映真实/默认值）。 */
+ *  declined / unknown 无配置 → 先 reveal 再走原逻辑（不卡在弹窗前）。 */
 async function connectVaultConfig(session: Session): Promise<void> {
   const status = vaultConfig.metaStatus()
   if (status === 'declined') {
     endScanOverlay(session)
-    setThemeHydrated(true)
     return
   }
   if (status === 'active') {
     await hydrateVaultConfig()
     endScanOverlay(session)
-    setThemeHydrated(true)
     return
   }
   // unknown
@@ -217,11 +213,9 @@ async function connectVaultConfig(session: Session): Promise<void> {
     await vaultConfig.markActive()
     await hydrateVaultConfig()
     endScanOverlay(session)
-    setThemeHydrated(true)
     return
   }
   endScanOverlay(session)
-  setThemeHydrated(true)
   promptCreateVaultConfig()
 }
 
