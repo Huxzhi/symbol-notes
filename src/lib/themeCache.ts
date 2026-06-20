@@ -1,51 +1,56 @@
-// 职责：把当前生效的 ThemeSpec 镜像到 IndexedDB，并在启动时读回，
-// 使首帧（含 loading 遮罩）即正确着色。themeHydrated 闸门见 App 的应用 effect。
+// 职责：把 loading 遮罩用到的几个 CSS 颜色快照到 IndexedDB，供启动首帧给遮罩着色，
+// 避免「主题还没从 .symbol-notes/theme.json 读出来」时遮罩闪烁。不是主题的真实来源。
 import { createSignal } from 'solid-js'
-import { get, set } from 'idb-keyval'
-import type { ThemeSpec } from './theme'
+import { get, set, del } from 'idb-keyval'
 
-const CACHE_KEY = 'sn-theme-cache'
+const CACHE_KEY = 'sn-mask-colors'
 
-/** ThemeSpec 形状校验（缓存可能被外部写脏，读回时必须校验）。 */
-export function isThemeSpec(v: unknown): v is ThemeSpec {
-  if (typeof v !== 'object' || v === null) return false
-  const o = v as Record<string, unknown>
-  if (o.kind === 'preset') return typeof o.id === 'string'
-  if (o.kind === 'custom') {
-    return (
-      (o.mode === 'light' || o.mode === 'dark') &&
-      typeof o.vars === 'object' &&
-      o.vars !== null &&
-      !Array.isArray(o.vars)
-    )
-  }
-  return false
+/** LoadingOverlay 实际用到的 CSS 变量。 */
+export const MASK_VARS = [
+  '--bg-elevated',
+  '--border-2',
+  '--text',
+  '--bg-active',
+  '--accent',
+  '--text-2',
+] as const
+
+// 清掉上一个功能遗留的「整份主题」缓存键（幂等、吞错）。
+void Promise.resolve(del('sn-theme-cache')).catch(() => {})
+
+/** 读取 <html> 上当前生效的 6 个遮罩变量值。仅浏览器可用。 */
+export function snapshotMaskColors(): Record<string, string> {
+  const cs = getComputedStyle(document.documentElement)
+  const out: Record<string, string> = {}
+  for (const v of MASK_VARS) out[v] = cs.getPropertyValue(v).trim()
+  return out
 }
 
-/** 启动路径：读回缓存主题；缺失或形状非法返回 null。 */
-export async function getCachedTheme(): Promise<ThemeSpec | null> {
+/** 启动路径：读回遮罩颜色；缺失或非对象返回 null。 */
+export async function getMaskColors(): Promise<Record<string, string> | null> {
   try {
     const v = await get<unknown>(CACHE_KEY)
-    return isThemeSpec(v) ? v : null
+    if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      return v as Record<string, string>
+    }
+    return null
   } catch {
     return null
   }
 }
 
-/** 主题变化时镜像到 IDB（调用方 fire-and-forget）。 */
-export async function writeCachedTheme(spec: ThemeSpec): Promise<void> {
+/** 主题变化后镜像遮罩颜色到 IDB（fire-and-forget）。 */
+export async function writeMaskColors(colors: Record<string, string>): Promise<void> {
   try {
-    await set(CACHE_KEY, spec)
+    await set(CACHE_KEY, colors)
   } catch {
     /* 缓存写失败不影响主流程 */
   }
 }
 
-// themeHydrated：vault 配置流程是否已完成（settings 已反映真实/默认值）。
-// 在它为 true 之前，App 的应用 effect 不接管，由 index.tsx 应用的缓存主题兜底，
-// 避免默认 settings 把缓存主题回灌成深色。
-const [_hydrated, _setHydrated] = createSignal(false)
-export const themeHydrated = _hydrated
-export function setThemeHydrated(v: boolean): void {
-  _setHydrated(v)
+// 启动前由 index.tsx 从 IDB 播种，供 LoadingOverlay 内联取色。
+const [_colors, _setColors] = createSignal<Record<string, string>>({})
+export const maskColors = _colors
+export function setMaskColors(c: Record<string, string>): void {
+  _setColors(c)
 }

@@ -2,53 +2,46 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockGet = vi.fn()
 const mockSet = vi.fn()
+const mockDel = vi.fn()
 
 vi.mock('idb-keyval', () => ({
   get: mockGet,
   set: mockSet,
+  del: mockDel,
 }))
 
-const { getCachedTheme, writeCachedTheme, isThemeSpec } = await import('../themeCache')
+const { getMaskColors, writeMaskColors, MASK_VARS } = await import('../themeCache')
 
-describe('themeCache', () => {
+describe('themeCache mask colors', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('isThemeSpec 接受合法 preset', () => {
-    expect(isThemeSpec({ kind: 'preset', id: 'nord' })).toBe(true)
+  it('MASK_VARS 含 6 个遮罩变量', () => {
+    expect(MASK_VARS).toContain('--bg-elevated')
+    expect(MASK_VARS).toContain('--accent')
+    expect(MASK_VARS.length).toBe(6)
   })
 
-  it('isThemeSpec 接受合法 custom', () => {
-    expect(isThemeSpec({ kind: 'custom', mode: 'light', vars: { '--bg-base': '#fff' } })).toBe(true)
-  })
-
-  it('isThemeSpec 拒绝非法值', () => {
-    expect(isThemeSpec(null)).toBe(false)
-    expect(isThemeSpec({ kind: 'preset' })).toBe(false)
-    expect(isThemeSpec({ kind: 'custom', mode: 'sunset', vars: {} })).toBe(false)
-    expect(isThemeSpec({ kind: 'other', id: 'x' })).toBe(false)
-  })
-
-  it('getCachedTheme 返回 null 当 IDB 为空', async () => {
+  it('getMaskColors 返回 null 当 IDB 为空', async () => {
     mockGet.mockResolvedValueOnce(undefined)
-    expect(await getCachedTheme()).toBeNull()
+    expect(await getMaskColors()).toBeNull()
   })
 
-  it('getCachedTheme 返回 null 当缓存形状非法', async () => {
-    mockGet.mockResolvedValueOnce({ kind: 'custom', mode: 'nope' })
-    expect(await getCachedTheme()).toBeNull()
+  it('getMaskColors 返回 null 当非对象', async () => {
+    mockGet.mockResolvedValueOnce('nope')
+    expect(await getMaskColors()).toBeNull()
   })
 
-  it('getCachedTheme 返回合法缓存', async () => {
-    const spec = { kind: 'preset', id: 'light' }
-    mockGet.mockResolvedValueOnce(spec)
-    expect(await getCachedTheme()).toEqual(spec)
+  it('getMaskColors 返回合法对象', async () => {
+    const colors = { '--accent': '#6c63ff' }
+    mockGet.mockResolvedValueOnce(colors)
+    expect(await getMaskColors()).toEqual(colors)
   })
 
-  it('writeCachedTheme 写入 idb-keyval', async () => {
-    const spec = { kind: 'preset', id: 'dark' } as const
-    await writeCachedTheme(spec)
-    expect(mockSet).toHaveBeenCalledWith('sn-theme-cache', spec)
+  it('writeMaskColors 写入 sn-mask-colors', async () => {
+    const colors = { '--text': '#fff' }
+    await writeMaskColors(colors)
+    expect(mockSet).toHaveBeenCalledWith('sn-mask-colors', colors)
   })
 })

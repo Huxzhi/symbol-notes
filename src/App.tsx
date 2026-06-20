@@ -33,7 +33,7 @@ import { restoreVault } from './vault'
 import { settingsStore } from './stores/settingsStore'
 import { activeRoot } from './stores/workspaceStore'
 import { applyTheme, resolveTheme } from './lib/theme'
-import { themeHydrated, writeCachedTheme } from './lib/themeCache'
+import { snapshotMaskColors, writeMaskColors } from './lib/themeCache'
 
 const customStyleEl = document.createElement('style')
 document.head.appendChild(customStyleEl)
@@ -69,11 +69,8 @@ startPlugins()
 
 export default function App() {
   createEffect(() => {
-    // hydrate 完成前不接管：由 index.tsx 应用的缓存主题兜底（防默认值回灌）。
-    if (!themeHydrated()) return
-    const spec = resolveTheme(settingsStore.theme, settingsStore.customThemes)
-    applyTheme(spec)
-    void writeCachedTheme(spec) // 镜像最近一次生效主题，供下次启动
+    applyTheme(resolveTheme(settingsStore.theme, settingsStore.customThemes))
+    void writeMaskColors(snapshotMaskColors()) // 刷新遮罩缓存供下次启动
   })
 
   createEffect(() => {

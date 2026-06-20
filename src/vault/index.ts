@@ -60,7 +60,6 @@ import {
 } from './fileTree'
 import * as vaultConfig from './vaultConfig'
 import { showModal, closeModal } from '../stores/modalStore'
-import { setThemeHydrated } from '../lib/themeCache'
 
 // ── Vault connection signal ───────────────────────────────────────────────────
 
@@ -137,20 +136,34 @@ export async function restoreVault(): Promise<void> {
 
 // ── Vault 配置编排 ─────────────────────────────────────────────────────────────
 
-/** 读两份配置注入 store；任一缺失则跳过那份（保持默认）。 */
+/** 读 workspace/settings/theme 注入 store；再并行 hydrate 各插件 data.json。 */
 async function hydrateVaultConfig(): Promise<void> {
-  const { workspace, settings } = await vaultConfig.readConfigFiles()
-  if (!workspace && !settings) return
+  const { workspace, settings, theme } = await vaultConfig.readConfigFiles()
   const { hydrateWorkspace } = await import('../stores/workspaceStore')
-  const { hydrateSettings } = await import('../stores/settingsStore')
+  const { hydrateSettings, hydrateTheme } = await import('../stores/settingsStore')
   if (workspace) hydrateWorkspace(workspace)
   if (settings) hydrateSettings(settings)
+  if (theme) hydrateTheme(theme)
+  await hydrateAllPluginData()
 }
 
-/** 取当前 store 状态作为创建配置文件夹的种子。 */
+/** 对所有已注册插件并行读 data.json 并注入内存 store（含未启用插件）。 */
+async function hydrateAllPluginData(): Promise<void> {
+  const { getRegisteredPlugins } = await import('../lib/pluginRegistry')
+  const { hydratePluginData } = await import('../lib/pluginData')
+  await Promise.all(
+    getRegisteredPlugins().map(async (p) => {
+      const data = await vaultConfig.readPluginData(p.id)
+      if (data) hydratePluginData(p.id, data)
+    }),
+  )
+}
+
+/** 取当前 store 状态作为创建配置文件夹的种子（主题/非主题分开）。 */
 async function snapshotStores(): Promise<{
   ws: import('../stores/types').WorkspaceState
-  settings: import('../stores/types').SettingsState
+  settings: import('../stores/types').VaultSettings
+  theme: import('../stores/types').ThemeSettings
 }> {
   const { workspaceStore } = await import('../stores/workspaceStore')
   const { settingsStore } = await import('../stores/settingsStore')
@@ -159,14 +172,36 @@ async function snapshotStores(): Promise<{
       layouts: workspaceStore.layouts,
       activeLayoutId: workspaceStore.activeLayoutId,
     },
-    settings: { ...settingsStore },
+    settings: {
+      pluginStates: settingsStore.pluginStates,
+      autoTimestamps: settingsStore.autoTimestamps,
+      showOtherFiles: settingsStore.showOtherFiles,
+    },
+    theme: {
+      theme: settingsStore.theme,
+      customThemes: settingsStore.customThemes,
+      customCSS: settingsStore.customCSS,
+    },
   }
+}
+
+/** 收集各已注册插件当前内存配置（非空者）作为创建配置文件夹的种子。 */
+async function snapshotPluginData(): Promise<Record<string, Record<string, unknown>>> {
+  const { getRegisteredPlugins } = await import('../lib/pluginRegistry')
+  const { getPluginConfig } = await import('../lib/pluginData')
+  const out: Record<string, Record<string, unknown>> = {}
+  for (const p of getRegisteredPlugins()) {
+    const cfg = getPluginConfig(p.id)
+    if (Object.keys(cfg).length > 0) out[p.id] = cfg
+  }
+  return out
 }
 
 /** 用当前 store 状态创建配置文件夹。 */
 async function createVaultConfigFromStores(): Promise<void> {
-  const { ws, settings } = await snapshotStores()
-  await vaultConfig.createConfigFolder(ws, settings)
+  const { ws, settings, theme } = await snapshotStores()
+  const pluginData = await snapshotPluginData()
+  await vaultConfig.createConfigFolder(ws, settings, theme, pluginData)
 }
 
 /** 弹窗询问是否创建配置文件夹。 */
@@ -197,19 +232,16 @@ function promptCreateVaultConfig(): void {
 
 /** 扫描后接入配置并决定揭开遮罩的时机：
  *  active / unknown+exists → 先 hydrate 再 reveal；
- *  declined / unknown 无配置 → 先 reveal 再走原逻辑（不卡在弹窗前）。
- *  每条路径末尾置 themeHydrated（settings 已反映真实/默认值）。 */
+ *  declined / unknown 无配置 → 先 reveal 再走原逻辑（不卡在弹窗前）。 */
 async function connectVaultConfig(session: Session): Promise<void> {
   const status = vaultConfig.metaStatus()
   if (status === 'declined') {
     endScanOverlay(session)
-    setThemeHydrated(true)
     return
   }
   if (status === 'active') {
     await hydrateVaultConfig()
     endScanOverlay(session)
-    setThemeHydrated(true)
     return
   }
   // unknown
@@ -217,11 +249,9 @@ async function connectVaultConfig(session: Session): Promise<void> {
     await vaultConfig.markActive()
     await hydrateVaultConfig()
     endScanOverlay(session)
-    setThemeHydrated(true)
     return
   }
   endScanOverlay(session)
-  setThemeHydrated(true)
   promptCreateVaultConfig()
 }
 
@@ -817,7 +847,8 @@ export const vaultConfigActions = {
   },
   /** 设置页改相对路径：迁移并写到新路径。 */
   async setPath(path: string): Promise<void> {
-    const { ws, settings } = await snapshotStores()
-    await vaultConfig.migratePath(path, ws, settings)
+    const { ws, settings, theme } = await snapshotStores()
+    const pluginData = await snapshotPluginData()
+    await vaultConfig.migratePath(path, ws, settings, theme, pluginData)
   },
 }

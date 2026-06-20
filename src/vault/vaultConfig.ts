@@ -4,13 +4,15 @@
 import { createSignal } from 'solid-js'
 import { get, set } from 'idb-keyval'
 import type { FileSystemAdapter } from './fs/types'
-import type { SettingsState, WorkspaceState } from '../stores/types'
+import type { ThemeSettings, VaultSettings, WorkspaceState } from '../stores/types'
 
 export const DEFAULT_CONFIG_PATH = '.symbol-notes'
 
 const META_KEY = 'sn-vault-config-meta'
 const WORKSPACE_FILE = 'workspace.json'
 const SETTINGS_FILE = 'settings.json'
+const THEME_FILE = 'theme.json'
+const PLUGINS_DIR = 'plugins'
 const SAVE_DEBOUNCE_MS = 800
 
 export type VaultConfigStatus = 'active' | 'declined' | 'unknown'
@@ -61,10 +63,17 @@ export function validateWorkspace(v: unknown): v is WorkspaceState {
   )
 }
 
-/** settings.json 宽松解析：是非数组对象即返回（按字段与默认值合并由 store 负责）。 */
-export function parseSettings(v: unknown): Partial<SettingsState> | null {
+function lenientObject<T>(v: unknown): Partial<T> | null {
   if (typeof v !== 'object' || v === null || Array.isArray(v)) return null
-  return v as Partial<SettingsState>
+  return v as Partial<T>
+}
+/** settings.json 宽松解析（非主题字段）。 */
+export function parseVaultSettings(v: unknown): Partial<VaultSettings> | null {
+  return lenientObject<VaultSettings>(v)
+}
+/** theme.json 宽松解析。 */
+export function parseTheme(v: unknown): Partial<ThemeSettings> | null {
+  return lenientObject<ThemeSettings>(v)
 }
 
 // ── meta 持久化与状态迁移 ──────────────────────────────────────────────────────
@@ -116,43 +125,66 @@ export async function configFolderExists(): Promise<boolean> {
   }
 }
 
-/** 读两份配置；缺失或解析失败的那份返回 null（不抛）。 */
+/** 读三份配置；缺失或解析失败的那份返回 null（不抛）。 */
 export async function readConfigFiles(): Promise<{
   workspace: WorkspaceState | null
-  settings: Partial<SettingsState> | null
+  settings: Partial<VaultSettings> | null
+  theme: Partial<ThemeSettings> | null
 }> {
-  if (!_adapter) return { workspace: null, settings: null }
+  if (!_adapter) return { workspace: null, settings: null, theme: null }
   const path = meta().path
   let workspace: WorkspaceState | null = null
-  let settings: Partial<SettingsState> | null = null
+  let settings: Partial<VaultSettings> | null = null
+  let theme: Partial<ThemeSettings> | null = null
   try {
-    const raw = await _adapter.readText(joinConfigPath(path, WORKSPACE_FILE))
-    const parsed = JSON.parse(raw) as unknown
+    const parsed = JSON.parse(await _adapter.readText(joinConfigPath(path, WORKSPACE_FILE))) as unknown
     if (validateWorkspace(parsed)) workspace = parsed
   } catch {
     /* 缺失/损坏 → null */
   }
   try {
-    const raw = await _adapter.readText(joinConfigPath(path, SETTINGS_FILE))
-    settings = parseSettings(JSON.parse(raw) as unknown)
+    settings = parseVaultSettings(JSON.parse(await _adapter.readText(joinConfigPath(path, SETTINGS_FILE))) as unknown)
   } catch {
     /* 缺失/损坏 → null */
   }
-  return { workspace, settings }
+  try {
+    theme = parseTheme(JSON.parse(await _adapter.readText(joinConfigPath(path, THEME_FILE))) as unknown)
+  } catch {
+    /* 缺失/损坏 → null */
+  }
+  return { workspace, settings, theme }
 }
 
 // ── 创建 / 迁移 / 防抖保存 ─────────────────────────────────────────────────────
 
+function pickVault(s: VaultSettings): VaultSettings {
+  return {
+    pluginStates: s.pluginStates,
+    autoTimestamps: s.autoTimestamps,
+    showOtherFiles: s.showOtherFiles,
+  }
+}
+
 /** 创建配置文件夹并写入种子内容（当前 store 状态），置 active。 */
 export async function createConfigFolder(
   ws: WorkspaceState,
-  settings: SettingsState,
+  settings: VaultSettings,
+  theme: ThemeSettings,
+  pluginData?: Record<string, Record<string, unknown>>,
 ): Promise<void> {
   if (!_adapter) return
   const path = meta().path
   await _adapter.createDirectory(path)
   await _adapter.writeText(joinConfigPath(path, WORKSPACE_FILE), JSON.stringify(ws, null, 2))
-  await _adapter.writeText(joinConfigPath(path, SETTINGS_FILE), JSON.stringify(settings, null, 2))
+  await _adapter.writeText(joinConfigPath(path, SETTINGS_FILE), JSON.stringify(pickVault(settings), null, 2))
+  await _adapter.writeText(joinConfigPath(path, THEME_FILE), JSON.stringify(theme, null, 2))
+  if (pluginData) {
+    for (const [id, data] of Object.entries(pluginData)) {
+      if (!data || Object.keys(data).length === 0) continue
+      await _adapter.createDirectory(joinConfigPath(path, `${PLUGINS_DIR}/${id}`))
+      await _adapter.writeText(pluginDataPath(id), JSON.stringify(data, null, 2))
+    }
+  }
   setMeta((m) => ({ ...m, status: 'active' }))
   await persistMeta()
 }
@@ -161,10 +193,12 @@ export async function createConfigFolder(
 export async function migratePath(
   newPath: string,
   ws: WorkspaceState,
-  settings: SettingsState,
+  settings: VaultSettings,
+  theme: ThemeSettings,
+  pluginData?: Record<string, Record<string, unknown>>,
 ): Promise<void> {
   setMeta((m) => ({ ...m, path: newPath }))
-  await createConfigFolder(ws, settings)
+  await createConfigFolder(ws, settings, theme, pluginData)
 }
 
 let wsTimer: ReturnType<typeof setTimeout> | null = null
@@ -181,13 +215,59 @@ export function saveWorkspace(ws: WorkspaceState): void {
   }, SAVE_DEBOUNCE_MS)
 }
 
-export function saveSettings(s: SettingsState): void {
+export function saveSettings(s: VaultSettings): void {
   if (!isConfigActive()) return
   if (settingsTimer) clearTimeout(settingsTimer)
   settingsTimer = setTimeout(() => {
     void _adapter?.writeText(
       joinConfigPath(meta().path, SETTINGS_FILE),
-      JSON.stringify(s, null, 2),
+      JSON.stringify(pickVault(s), null, 2),
     )
   }, SAVE_DEBOUNCE_MS)
+}
+
+let themeTimer: ReturnType<typeof setTimeout> | null = null
+export function saveTheme(t: ThemeSettings): void {
+  if (!isConfigActive()) return
+  if (themeTimer) clearTimeout(themeTimer)
+  themeTimer = setTimeout(() => {
+    void _adapter?.writeText(
+      joinConfigPath(meta().path, THEME_FILE),
+      JSON.stringify(t, null, 2),
+    )
+  }, SAVE_DEBOUNCE_MS)
+}
+
+/** 某插件数据文件的 vault 内路径。 */
+export function pluginDataPath(id: string): string {
+  return joinConfigPath(meta().path, `${PLUGINS_DIR}/${id}/data.json`)
+}
+
+export async function readPluginData(id: string): Promise<Record<string, unknown> | null> {
+  if (!_adapter) return null
+  try {
+    const v = JSON.parse(await _adapter.readText(pluginDataPath(id))) as unknown
+    if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      return v as Record<string, unknown>
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+const pluginTimers = new Map<string, ReturnType<typeof setTimeout>>()
+export function savePluginData(id: string, data: Record<string, unknown>): void {
+  if (!isConfigActive()) return
+  const prev = pluginTimers.get(id)
+  if (prev) clearTimeout(prev)
+  pluginTimers.set(
+    id,
+    setTimeout(() => {
+      void (async () => {
+        await _adapter?.createDirectory(joinConfigPath(meta().path, `${PLUGINS_DIR}/${id}`))
+        await _adapter?.writeText(pluginDataPath(id), JSON.stringify(data, null, 2))
+      })()
+    }, SAVE_DEBOUNCE_MS),
+  )
 }

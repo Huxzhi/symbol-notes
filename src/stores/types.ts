@@ -142,6 +142,11 @@ export interface SettingsState {
   pluginStates: Record<string, boolean>
 }
 
+/** 主题三件套：落 .symbol-notes/theme.json（随 vault）。 */
+export type ThemeSettings = Pick<SettingsState, 'theme' | 'customThemes' | 'customCSS'>
+/** 非主题配置：落 .symbol-notes/settings.json。 */
+export type VaultSettings = Pick<SettingsState, 'pluginStates' | 'autoTimestamps' | 'showOtherFiles'>
+
 // ── Workspace ─────────────────────────────────────────────────────────────────
 
 export interface WorkspaceState {

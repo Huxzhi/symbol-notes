@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   joinConfigPath,
   validateWorkspace,
-  parseSettings,
+  parseVaultSettings,
+  parseTheme,
+  pluginDataPath,
   DEFAULT_CONFIG_PATH,
 } from '../vaultConfig'
 
@@ -33,15 +35,32 @@ describe('validateWorkspace', () => {
   })
 })
 
-describe('parseSettings', () => {
+describe('parseVaultSettings', () => {
   it('返回对象本身', () => {
-    expect(parseSettings({ theme: 'dark' })).toEqual({ theme: 'dark' })
+    expect(parseVaultSettings({ autoTimestamps: false })).toEqual({ autoTimestamps: false })
   })
   it('数组时返回 null', () => {
-    expect(parseSettings([])).toBeNull()
+    expect(parseVaultSettings([])).toBeNull()
   })
   it('null 时返回 null', () => {
-    expect(parseSettings(null)).toBeNull()
+    expect(parseVaultSettings(null)).toBeNull()
+  })
+})
+
+describe('parseTheme', () => {
+  it('非数组对象返回自身', () => {
+    expect(parseTheme({ theme: 'nord' })).toEqual({ theme: 'nord' })
+  })
+  it('数组/非对象返回 null', () => {
+    expect(parseTheme([])).toBeNull()
+    expect(parseTheme('x')).toBeNull()
+    expect(parseTheme(null)).toBeNull()
+  })
+})
+
+describe('pluginDataPath', () => {
+  it('拼成 plugins/<id>/data.json（默认 .symbol-notes）', () => {
+    expect(pluginDataPath('daily-note')).toBe('.symbol-notes/plugins/daily-note/data.json')
   })
 })
 
