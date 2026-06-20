@@ -214,45 +214,56 @@ interface Session {
 }
 let currentSession: Session | null = null
 
-/** 打开 vault 后全量扫描：Phase1 填充 FileMeta → Phase2 重建三个索引 */
-export async function scanAndIndex(): Promise<void> {
+export interface ScanMid {
+  session: Session
+  mdUnchanged: string[]
+  mdChanged: string[]
+  activePaths: Set<string>
+}
+
+/** Phase1（reveal 前，串行）：扫描 → 填仅含 stat 的 FileMeta → 建树。不撤遮罩。 */
+export async function scanPhase1(): Promise<ScanMid | null> {
   if (currentSession) currentSession.cancelled = true
   const session: Session = { cancelled: false }
   currentSession = session
 
-  if (!isReady()) return
+  if (!isReady()) return null
   setIsIndexing(true)
   beginLoadProgress(session)
 
-  try {
-    const [{ files, activePaths, tree }, idbStats] = await Promise.all([
-      buildScan(incDetected),
-      loadAllFileStats(),
-    ])
+  const [{ files, activePaths, tree }, idbStats] = await Promise.all([
+    buildScan(incDetected),
+    loadAllFileStats(),
+  ])
 
-    if (session.cancelled) return
+  if (session.cancelled) return null
 
-    const MAX_PARSE_BYTES = 20 * 1024 * 1024
-    const mdUnchanged: string[] = []
-    const mdChanged: string[] = []
+  const MAX_PARSE_BYTES = 20 * 1024 * 1024
+  const mdUnchanged: string[] = []
+  const mdChanged: string[] = []
 
-    for (const [path, file] of Object.entries(files)) {
-      if (file.kind !== 'file' || !path.endsWith('.md')) continue
-      if (file.size > MAX_PARSE_BYTES) continue
-      const stat = idbStats.get(path)
-      if (stat && stat.size === file.size && stat.mtime === file.mtime) {
-        files[path] = { ...file, hash: stat.hash }
-        mdUnchanged.push(path)
-      } else {
-        mdChanged.push(path)
-      }
+  for (const [path, file] of Object.entries(files)) {
+    if (file.kind !== 'file' || !path.endsWith('.md')) continue
+    if (file.size > MAX_PARSE_BYTES) continue
+    const stat = idbStats.get(path)
+    if (stat && stat.size === file.size && stat.mtime === file.mtime) {
+      files[path] = { ...file, hash: stat.hash }
+      mdUnchanged.push(path)
+    } else {
+      mdChanged.push(path)
     }
+  }
 
-    // 阶段 1：仅 stat 的 FileMeta 入 store，撤遮挡，露出工作区/文件树
-    setVaultStore('files', files)
-    setFileTree(tree)
-    endScanOverlay(session)
+  // 阶段 1：仅 stat 的 FileMeta 入 store + 建树（撤遮挡交给调用方，在 hydrate 后）
+  setVaultStore('files', files)
+  setFileTree(tree)
+  return { session, mdUnchanged, mdChanged, activePaths }
+}
 
+/** Phase2/3（reveal 后，后台）：解析 → 合并完整 FileMeta → 建跨文件索引。 */
+export async function parseAndIndex(mid: ScanMid): Promise<void> {
+  const { session, mdUnchanged, mdChanged, activePaths } = mid
+  try {
     // 阶段 2：后台解析（不写 store），右上角 toast 进度
     const total = mdUnchanged.length + mdChanged.length
     const toastId =
@@ -311,6 +322,14 @@ export async function scanAndIndex(): Promise<void> {
       endLoadProgress(session)
     }
   }
+}
+
+/** Back-compat 包装：扫描后立即撤遮罩再后台解析（无配置编排）。 */
+export async function scanAndIndex(): Promise<void> {
+  const mid = await scanPhase1()
+  if (!mid) return
+  endScanOverlay(mid.session)
+  await parseAndIndex(mid)
 }
 
 type ContentFields = Pick<
