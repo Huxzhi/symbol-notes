@@ -5,7 +5,7 @@ import { setPluginConfig } from '../../lib/pluginData'
 import { EMPTY_EXCALIDRAW_MD } from './excalidrawFormat'
 import { ExcalidrawViewer } from './ExcalidrawViewer'
 
-// ── Plugin config defaults (key: sn-plugin-excalidraw in localStorage) ────────
+// ── Plugin config defaults (持久化于 .symbol-notes/plugins/excalidraw/data.json) ──
 
 export const EXCALIDRAW_DEFAULTS = {
   defaultTheme: 'dark' as 'dark' | 'light',
