@@ -136,14 +136,27 @@ export async function restoreVault(): Promise<void> {
 
 // ── Vault 配置编排 ─────────────────────────────────────────────────────────────
 
-/** 读两份配置注入 store；任一缺失则跳过那份（保持默认）。 */
+/** 读 workspace/settings/theme 注入 store；再并行 hydrate 各插件 data.json。 */
 async function hydrateVaultConfig(): Promise<void> {
-  const { workspace, settings } = await vaultConfig.readConfigFiles()
-  if (!workspace && !settings) return
+  const { workspace, settings, theme } = await vaultConfig.readConfigFiles()
   const { hydrateWorkspace } = await import('../stores/workspaceStore')
-  const { hydrateSettings } = await import('../stores/settingsStore')
+  const { hydrateSettings, hydrateTheme } = await import('../stores/settingsStore')
   if (workspace) hydrateWorkspace(workspace)
   if (settings) hydrateSettings(settings)
+  if (theme) hydrateTheme(theme)
+  await hydrateAllPluginData()
+}
+
+/** 对所有已注册插件并行读 data.json 并注入内存 store（含未启用插件）。 */
+async function hydrateAllPluginData(): Promise<void> {
+  const { getRegisteredPlugins } = await import('../lib/pluginRegistry')
+  const { hydratePluginData } = await import('../lib/pluginData')
+  await Promise.all(
+    getRegisteredPlugins().map(async (p) => {
+      const data = await vaultConfig.readPluginData(p.id)
+      if (data) hydratePluginData(p.id, data)
+    }),
+  )
 }
 
 /** 取当前 store 状态作为创建配置文件夹的种子（主题/非主题分开）。 */
@@ -172,10 +185,23 @@ async function snapshotStores(): Promise<{
   }
 }
 
+/** 收集各已注册插件当前内存配置（非空者）作为创建配置文件夹的种子。 */
+async function snapshotPluginData(): Promise<Record<string, Record<string, unknown>>> {
+  const { getRegisteredPlugins } = await import('../lib/pluginRegistry')
+  const { getPluginConfig } = await import('../lib/pluginData')
+  const out: Record<string, Record<string, unknown>> = {}
+  for (const p of getRegisteredPlugins()) {
+    const cfg = getPluginConfig(p.id)
+    if (Object.keys(cfg).length > 0) out[p.id] = cfg
+  }
+  return out
+}
+
 /** 用当前 store 状态创建配置文件夹。 */
 async function createVaultConfigFromStores(): Promise<void> {
   const { ws, settings, theme } = await snapshotStores()
-  await vaultConfig.createConfigFolder(ws, settings, theme)
+  const pluginData = await snapshotPluginData()
+  await vaultConfig.createConfigFolder(ws, settings, theme, pluginData)
 }
 
 /** 弹窗询问是否创建配置文件夹。 */
@@ -822,6 +848,7 @@ export const vaultConfigActions = {
   /** 设置页改相对路径：迁移并写到新路径。 */
   async setPath(path: string): Promise<void> {
     const { ws, settings, theme } = await snapshotStores()
-    await vaultConfig.migratePath(path, ws, settings, theme)
+    const pluginData = await snapshotPluginData()
+    await vaultConfig.migratePath(path, ws, settings, theme, pluginData)
   },
 }
