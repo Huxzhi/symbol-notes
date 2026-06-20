@@ -1,7 +1,8 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import * as vaultConfig from '../vault/vaultConfig'
-import type { SettingsState, ThemeId, CustomTheme, ThemeMode } from './types'
+import { applyTheme, resolveTheme } from '../lib/theme'
+import type { SettingsState, ThemeId, CustomTheme, ThemeMode, ThemeSettings, VaultSettings } from './types'
 
 const defaults: SettingsState = {
   theme: 'dark',
@@ -14,14 +15,42 @@ const defaults: SettingsState = {
 
 const [settingsStore, setSettingsStore] = createStore<SettingsState>({ ...defaults })
 
-/** 由 vaultConfig 读到磁盘配置后注入（与默认值合并，容忍缺字段）。 */
-export function hydrateSettings(payload: Partial<SettingsState>): void {
-  setSettingsStore({ ...defaults, ...payload })
+/** 注入非主题配置（settings.json → store，与默认值合并）。 */
+export function hydrateSettings(payload: Partial<VaultSettings>): void {
+  setSettingsStore({
+    pluginStates: payload.pluginStates ?? defaults.pluginStates,
+    autoTimestamps: payload.autoTimestamps ?? defaults.autoTimestamps,
+    showOtherFiles: payload.showOtherFiles ?? defaults.showOtherFiles,
+  })
+}
+
+/** 注入主题配置（theme.json → store），随后同步应用主题（避免揭遮罩前的微任务竞态）。 */
+export function hydrateTheme(payload: Partial<ThemeSettings>): void {
+  setSettingsStore({
+    theme: payload.theme ?? defaults.theme,
+    customThemes: payload.customThemes ?? defaults.customThemes,
+    customCSS: payload.customCSS ?? defaults.customCSS,
+  })
+  applyTheme(resolveTheme(settingsStore.theme, settingsStore.customThemes))
 }
 
 createRoot(() => {
-  // 仅在配置文件夹激活时落盘；否则仅内存（vaultConfig.saveSettings 内部已 gate）。
-  createEffect(() => vaultConfig.saveSettings({ ...settingsStore }))
+  // 非主题 → settings.json（vaultConfig.saveSettings 内 gate isConfigActive + 防抖）
+  createEffect(() =>
+    vaultConfig.saveSettings({
+      pluginStates: settingsStore.pluginStates,
+      autoTimestamps: settingsStore.autoTimestamps,
+      showOtherFiles: settingsStore.showOtherFiles,
+    }),
+  )
+  // 主题 → theme.json
+  createEffect(() =>
+    vaultConfig.saveTheme({
+      theme: settingsStore.theme,
+      customThemes: settingsStore.customThemes,
+      customCSS: settingsStore.customCSS,
+    }),
+  )
 })
 
 export const settingsActions = {
