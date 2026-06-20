@@ -21,7 +21,7 @@ import {
 } from '../vault'
 import type { Heading } from './cm6/headingsField'
 import type { OutLink } from './cm6/outLinksField'
-import { loadFromStorage, saveToStorage } from './localStorage'
+import { getPluginConfig, setPluginConfig } from './pluginData'
 export type { ViewComponentProps }
 
 export type { Heading, OutLink }
@@ -308,16 +308,6 @@ export function getRegisteredPlugins(): PluginDef[] {
 
 function loadPlugin(def: PluginDef): () => void {
   return createRoot((dispose) => {
-    const saved = loadFromStorage<Record<string, unknown>>(
-      `sn-plugin-${def.id}`,
-      {},
-      (v) => typeof v === 'object' && v !== null,
-    )
-    const [config, setConfig] = createStore<Record<string, unknown>>(
-      saved ?? {},
-    )
-    createEffect(() => saveToStorage(`sn-plugin-${def.id}`, { ...config }))
-
     const ctx: PluginContext = {
       view(v) {
         registerView(v)
@@ -395,10 +385,10 @@ function loadPlugin(def: PluginDef): () => void {
           onCleanup(() => unregisterSettingsTab(def.id))
         },
         getConfig<T extends Record<string, unknown>>(defaults: T): T {
-          return { ...defaults, ...config } as T
+          return { ...defaults, ...getPluginConfig(def.id) } as T
         },
         setConfig(patch) {
-          setConfig((prev) => ({ ...prev, ...patch }))
+          setPluginConfig(def.id, patch)
         },
       },
     }
