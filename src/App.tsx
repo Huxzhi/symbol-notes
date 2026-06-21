@@ -28,6 +28,7 @@ import { SearchPlugin } from './plugins/search'
 import { TagsPlugin } from './plugins/tags'
 import { TemplatesPlugin } from './plugins/templates'
 import { TemplatePicker } from './plugins/templates/TemplatePicker'
+import { TimelinePlugin } from './plugins/timeline'
 import { LoadingOverlay } from './components/LoadingOverlay'
 import { restoreVault } from './vault'
 import { settingsStore } from './stores/settingsStore'
@@ -65,6 +66,7 @@ registerPlugin(CalendarPlugin)
 registerPlugin(DailyNotePlugin)
 registerPlugin(ExcalidrawPlugin)
 registerPlugin(TemplatesPlugin)
+registerPlugin(TimelinePlugin)
 startPlugins()
 
 export default function App() {
