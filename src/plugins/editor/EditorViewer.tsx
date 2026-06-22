@@ -129,7 +129,9 @@ export function EditorViewer(props: ViewComponentProps) {
           .field(outLinksField)
           .filter((l) => l.type === 'wiki')
           .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
-        const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
+        const inlineTags = [
+          ...new Set(view.state.field(inlineTagsField).map((m) => m.tag)),
+        ]
         const lists = view.state.field(listsField)
         void reindexFile(p, view.state.doc.toString(), {
           outLinks,
@@ -259,7 +261,9 @@ export function EditorViewer(props: ViewComponentProps) {
       .field(outLinksField)
       .filter((l) => l.type === 'wiki')
       .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
-    const inlineTags = view.state.field(inlineTagsField).map((m) => m.tag)
+    const inlineTags = [
+      ...new Set(view.state.field(inlineTagsField).map((m) => m.tag)),
+    ]
     const lists = view.state.field(listsField)
     await fileActions.saveFile(p, content, { outLinks, inlineTags, lists })
     localDirty = false

@@ -34,8 +34,9 @@ function scanTags(state: EditorState): TagMatch[] {
 
   const bodyText = state.doc.sliceString(bodyStart, state.doc.length)
   const matches: TagMatch[] = []
-  const seen = new Set<string>()
 
+  // 注意：不去重——每个出现位置都要装饰。去重（用于建索引）由消费方负责。
+  // 否则同一标签在列表里重复出现时，只有第一处会高亮，看起来像「列表中不生效」。
   TAG_RE.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = TAG_RE.exec(bodyText)) !== null) {
@@ -43,10 +44,7 @@ function scanTags(state: EditorState): TagMatch[] {
     const absTo = bodyStart + m.index + m[0].length
     const inCode = codeRanges.some(([f, t]) => absFrom >= f && absFrom < t)
     if (inCode) continue
-    if (!seen.has(m[1])) {
-      seen.add(m[1])
-      matches.push({ tag: m[1], from: absFrom, to: absTo })
-    }
+    matches.push({ tag: m[1], from: absFrom, to: absTo })
   }
 
   return matches
