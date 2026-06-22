@@ -191,8 +191,13 @@ export const darkTheme = EditorView.theme(
     '.cm-add-frontmatter-btn': {
       marginBottom: '8px',
     },
+    // `, .cm-hashtag *` + !important：列表内容被 lezer 整体打上 tags.list
+    // 高亮（color: var(--text)），其 span 会嵌套在标签 mark 内，需覆盖之。
+    // 与 .cm-wikilink 同一处理。
+    '.cm-hashtag, .cm-hashtag *': {
+      color: 'var(--accent) !important',
+    },
     '.cm-hashtag': {
-      color: 'var(--accent)',
       cursor: 'pointer',
     },
     '.cm-list-bullet': {
