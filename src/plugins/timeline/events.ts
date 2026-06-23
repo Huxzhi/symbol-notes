@@ -1,5 +1,18 @@
 import type { FileMeta } from '../../stores/types'
-import type { Neighborhood } from './selection'
+import type { Edge, Neighborhood } from './selection'
+
+/** path → 触及它的所有边（用于按上下文归列）。 */
+export function edgesByNote(edges: Edge[]): Map<string, Edge[]> {
+  const m = new Map<string, Edge[]>()
+  for (const e of edges) {
+    for (const p of [e.from, e.to]) {
+      const arr = m.get(p) ?? []
+      arr.push(e)
+      m.set(p, arr)
+    }
+  }
+  return m
+}
 
 export interface TimelineEvent {
   path: string
