@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { buildSelection } from '../selection'
+import type { WikiLinkInfo } from '../../../stores/types'
+
+const link = (target: string): WikiLinkInfo => ({
+  target, headingPath: [], lineTags: [], from: 0, to: 0,
+})
 
 const files = {
-  'a.md': { outLinks: ['b', 'missing'] },
-  'b.md': { outLinks: [] },
-  'c.md': { outLinks: ['a'] },
+  'a.md': { outLinks: [link('b'), link('missing')] },
+  'b.md': { outLinks: [] as WikiLinkInfo[] },
+  'c.md': { outLinks: [link('a')] },
 }
 // resolve：把 wiki 目标按 stem 解析到 .md；'missing' 解析不到
 const resolve = (t: string) => (`${t}.md` in files ? `${t}.md` : null)

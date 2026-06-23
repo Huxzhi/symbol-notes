@@ -36,8 +36,8 @@ export function buildSelection(
     edges.push({ from, to })
   }
 
-  for (const target of files[focus].outLinks) {
-    const r = resolve(target)
+  for (const l of files[focus].outLinks) {
+    const r = resolve(l.target)
     if (r && r in files) {
       paths.add(r)
       addEdge(focus, r)

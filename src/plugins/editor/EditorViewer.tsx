@@ -23,6 +23,7 @@ import { inlineTagDecoField, inlineTagsField } from '../../lib/cm6/inlineTagsFie
 import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
 import { listsField } from '../../lib/cm6/listsField'
+import { parseFromState } from '../../lib/parseMarkdown'
 import { editorCompletion } from '../../lib/cm6/editorCompletion'
 import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import {
@@ -125,19 +126,7 @@ export function EditorViewer(props: ViewComponentProps) {
       reindexTimer = null
       const p = filePath()
       if (p && view) {
-        const outLinks = view.state
-          .field(outLinksField)
-          .filter((l) => l.type === 'wiki')
-          .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
-        const inlineTags = [
-          ...new Set(view.state.field(inlineTagsField).map((m) => m.tag)),
-        ]
-        const lists = view.state.field(listsField)
-        void reindexFile(p, view.state.doc.toString(), {
-          outLinks,
-          inlineTags,
-          lists,
-        })
+        void reindexFile(p, view.state.doc.toString(), parseFromState(view.state))
       }
     }, 800)
     if (props.isActive) {
@@ -257,15 +246,7 @@ export function EditorViewer(props: ViewComponentProps) {
         content = newContent
       }
     }
-    const outLinks = view.state
-      .field(outLinksField)
-      .filter((l) => l.type === 'wiki')
-      .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
-    const inlineTags = [
-      ...new Set(view.state.field(inlineTagsField).map((m) => m.tag)),
-    ]
-    const lists = view.state.field(listsField)
-    await fileActions.saveFile(p, content, { outLinks, inlineTags, lists })
+    await fileActions.saveFile(p, content, parseFromState(view.state))
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
   }

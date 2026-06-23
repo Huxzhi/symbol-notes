@@ -52,14 +52,14 @@ export function resolveLink(
 }
 
 export function buildLinkMaps(
-  files: Record<string, { outLinks: string[] }>,
+  files: Record<string, { outLinks: { target: string }[] }>,
 ): { backlinkMap: Record<string, string[]>; unresolvedMap: Record<string, string[]> } {
   const stemIndex = buildStemIndex(files)
   const aliasIndex = buildAliasIndex(files as Record<string, { aliases?: string[] }>)
   const backlinkMap: Record<string, string[]> = {}
   const unresolvedMap: Record<string, string[]> = {}
   for (const [src, meta] of Object.entries(files)) {
-    for (const target of meta.outLinks) {
+    for (const target of new Set(meta.outLinks.map(l => l.target))) {
       const resolved = resolveLink(target, stemIndex, files, aliasIndex)
       if (resolved) {
         ;(backlinkMap[resolved] ??= []).push(src)
@@ -113,7 +113,7 @@ export function removeFileBacklinks(path: string, file: FileMeta): void {
   }
   const stemIndex = getStemIndex()
   const aliasIndex = getAliasIndex()
-  for (const t of file.outLinks) {
+  for (const t of new Set(file.outLinks.map(l => l.target))) {
     const r = resolveLink(t, stemIndex, vaultStore.files, aliasIndex)
     if (r) setVaultStore('backlinkMap', r, (l: string[]) => l?.filter(p => p !== path) ?? [])
     else setVaultStore('unresolvedMap', t, (l: string[]) => l?.filter(p => p !== path) ?? [])
