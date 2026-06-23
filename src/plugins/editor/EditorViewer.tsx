@@ -33,7 +33,8 @@ import {
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/cm6/wikiLinkParser'
 import { extractDateFromName, resolveLink } from '../../vault'
-import { workspaceActions, setLeafInstances } from '../../stores/workspaceStore'
+import { workspaceActions, setLeafInstances, leafInstances } from '../../stores/workspaceStore'
+import { findWikiLink, findHeading } from '../../lib/linkLocate'
 import { syntaxTree } from '@codemirror/language'
 import { settingsStore } from '../../stores/settingsStore'
 import type { ViewComponentProps } from '../../stores/types'
@@ -288,8 +289,32 @@ export function EditorViewer(props: ViewComponentProps) {
           isDirty: false,
         })
       }
+      consumeReveal()
     },
   ))
+
+  // 把 openFileAt 挂上的 pendingReveal 在活文档里现找位置并选中（一次性）。
+  function consumeReveal(): void {
+    if (!view) return
+    const reveal = workspaceActions.takePendingReveal(props.leafId)
+    if (!reveal) return
+    const doc = view.state.doc.toString()
+    const pos =
+      reveal.kind === 'heading'
+        ? findHeading(doc, reveal.text)
+        : findWikiLink(doc, reveal.targetStem, reveal.headingPath)
+    if (pos) {
+      view.dispatch({
+        selection: { anchor: pos.from, head: pos.to },
+        effects: EditorView.scrollIntoView(pos.from, { y: 'center' }),
+      })
+    }
+  }
+
+  // 文件已打开（view 已存在）时再次 openFileAt：响应 pendingReveal 变化消费一次。
+  createEffect(() => {
+    if (leafInstances[props.leafId]?.pendingReveal && view) consumeReveal()
+  })
 
   onCleanup(() => {
     if (reindexTimer !== null) clearTimeout(reindexTimer)

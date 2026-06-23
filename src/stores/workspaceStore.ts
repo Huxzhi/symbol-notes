@@ -22,6 +22,7 @@ import type {
   WorkspaceState,
   WorkspaceTabs,
   LeafRuntimeState,
+  RevealRequest,
 } from './types'
 
 const [leafInstances, setLeafInstances] = createStore<Record<string, LeafRuntimeState>>({})
@@ -421,6 +422,20 @@ export const workspaceActions = {
     }
 
     workspaceActions.openLeaf(viewState, options)
+  },
+
+  /** 打开文件并附带一次性定位请求；编辑器挂载/激活后消费。 */
+  openFileAt(path: string, reveal: RevealRequest): void {
+    workspaceActions.openFile(path)
+    const leaf = findLeafWithFile(activeRoot().main, path)
+    if (leaf) setLeafInstances(produce((s) => { ensureLeafInstance(s, leaf.id).pendingReveal = reveal }))
+  },
+
+  /** 取出并清空某 leaf 的 pendingReveal（消费语义：取后即清）。 */
+  takePendingReveal(leafId: string): RevealRequest | null {
+    const r = leafInstances[leafId]?.pendingReveal ?? null
+    if (r) setLeafInstances(produce((s) => { if (s[leafId]) s[leafId].pendingReveal = null }))
+    return r
   },
 
   clearAllLeaves(): void {

@@ -168,6 +168,11 @@ export interface WorkspaceState {
 
 // ── Runtime store (non-serializable + ephemeral UI) ───────────────────────────
 
+/** 打开文件后在编辑器里精确定位的请求（一次性消费）。 */
+export type RevealRequest =
+  | { kind: 'wikilink'; targetStem: string; headingPath?: string[] } // 在源文档里找 [[focus]]
+  | { kind: 'heading'; text: string }                               // 在目标文档里找 ## 标题
+
 export interface LeafRuntimeState {
   cmView: EditorView | null
   isDirty: boolean
@@ -175,6 +180,7 @@ export interface LeafRuntimeState {
   headings: Heading[]
   history?: string[]      // 内存中的文件历史（不持久化）；oldest→newest
   historyIndex?: number   // 当前在 history 中的位置；空时缺省视为 -1
+  pendingReveal?: RevealRequest | null  // 编辑器挂载/激活后消费一次
 }
 
 
