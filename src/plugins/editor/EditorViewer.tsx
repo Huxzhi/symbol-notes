@@ -24,6 +24,7 @@ import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
 import { listsField } from '../../lib/cm6/listsField'
 import { parseFromState } from '../../lib/parseMarkdown'
+import { splitWikiTarget } from '../../lib/cm6/wikiTarget'
 import { editorCompletion } from '../../lib/cm6/editorCompletion'
 import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import {
@@ -175,14 +176,15 @@ export function EditorViewer(props: ViewComponentProps) {
 
     if (!targetText) return false
 
-    const clean = (targetText as string).split('#')[0].trim()
-    const withExt = clean.endsWith('.md') ? clean : `${clean}.md`
+    const { base, anchor } = splitWikiTarget((targetText as string).trim())
+    const withExt = base.endsWith('.md') ? base : `${base}.md`
     const stemIndex = getStemIndex()
     const resolved = resolveLink(withExt, stemIndex, vaultStore.files, getAliasIndex())
     if (!resolved) return false
 
     e.preventDefault()
-    workspaceActions.openFile(resolved)
+    if (anchor) workspaceActions.openFileAt(resolved, { kind: 'heading', text: anchor })
+    else workspaceActions.openFile(resolved)
     return true
   }
 

@@ -59,7 +59,19 @@ export const LinksPlugin = definePlugin({
             {(path) => (
               <div
                 class="text-(--link-2) py-0.5 flex items-center gap-1 cursor-pointer hover:bg-(--bg-2) rounded px-1 -mx-1"
-                onClick={() => ctx.workspace.openFile(path)}
+                onClick={() => {
+                  const focusPath = ctx.workspace.activeFilePath()
+                  if (!focusPath) { ctx.workspace.openFile(path); return }
+                  const focusStem = focusPath.split('/').pop()!.replace(/\.md$/, '')
+                  const hit = ctx.vault
+                    .files()[path]
+                    ?.outLinks.find((l) => ctx.vault.resolveLink(l.target) === focusPath)
+                  ctx.workspace.openFileAt(path, {
+                    kind: 'wikilink',
+                    targetStem: focusStem,
+                    headingPath: hit?.headingPath,
+                  })
+                }}
               >
                 <span class="text-(--accent) text-[10px]">↙</span>
                 <span class="truncate">
