@@ -23,6 +23,8 @@ import { inlineTagDecoField, inlineTagsField } from '../../lib/cm6/inlineTagsFie
 import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { outLinksField } from '../../lib/cm6/outLinksField'
 import { listsField } from '../../lib/cm6/listsField'
+import { parseFromState } from '../../lib/parseMarkdown'
+import { splitWikiTarget } from '../../lib/cm6/wikiTarget'
 import { editorCompletion } from '../../lib/cm6/editorCompletion'
 import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import {
@@ -32,7 +34,8 @@ import {
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/cm6/wikiLinkParser'
 import { extractDateFromName, resolveLink } from '../../vault'
-import { workspaceActions, setLeafInstances } from '../../stores/workspaceStore'
+import { workspaceActions, setLeafInstances, leafInstances } from '../../stores/workspaceStore'
+import { findWikiLink, findHeading } from '../../lib/linkLocate'
 import { syntaxTree } from '@codemirror/language'
 import { settingsStore } from '../../stores/settingsStore'
 import type { ViewComponentProps } from '../../stores/types'
@@ -125,19 +128,7 @@ export function EditorViewer(props: ViewComponentProps) {
       reindexTimer = null
       const p = filePath()
       if (p && view) {
-        const outLinks = view.state
-          .field(outLinksField)
-          .filter((l) => l.type === 'wiki')
-          .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
-        const inlineTags = [
-          ...new Set(view.state.field(inlineTagsField).map((m) => m.tag)),
-        ]
-        const lists = view.state.field(listsField)
-        void reindexFile(p, view.state.doc.toString(), {
-          outLinks,
-          inlineTags,
-          lists,
-        })
+        void reindexFile(p, view.state.doc.toString(), parseFromState(view.state))
       }
     }, 800)
     if (props.isActive) {
@@ -185,14 +176,15 @@ export function EditorViewer(props: ViewComponentProps) {
 
     if (!targetText) return false
 
-    const clean = (targetText as string).split('#')[0].trim()
-    const withExt = clean.endsWith('.md') ? clean : `${clean}.md`
+    const { base, anchor } = splitWikiTarget((targetText as string).trim())
+    const withExt = base.endsWith('.md') ? base : `${base}.md`
     const stemIndex = getStemIndex()
     const resolved = resolveLink(withExt, stemIndex, vaultStore.files, getAliasIndex())
     if (!resolved) return false
 
     e.preventDefault()
-    workspaceActions.openFile(resolved)
+    if (anchor) workspaceActions.openFileAt(resolved, { kind: 'heading', text: anchor })
+    else workspaceActions.openFile(resolved)
     return true
   }
 
@@ -257,15 +249,7 @@ export function EditorViewer(props: ViewComponentProps) {
         content = newContent
       }
     }
-    const outLinks = view.state
-      .field(outLinksField)
-      .filter((l) => l.type === 'wiki')
-      .map((l) => (l.target.endsWith('.md') ? l.target : `${l.target}.md`))
-    const inlineTags = [
-      ...new Set(view.state.field(inlineTagsField).map((m) => m.tag)),
-    ]
-    const lists = view.state.field(listsField)
-    await fileActions.saveFile(p, content, { outLinks, inlineTags, lists })
+    await fileActions.saveFile(p, content, parseFromState(view.state))
     localDirty = false
     if (props.isActive) setLeafRuntime({ isDirty: false })
   }
@@ -307,8 +291,32 @@ export function EditorViewer(props: ViewComponentProps) {
           isDirty: false,
         })
       }
+      consumeReveal()
     },
   ))
+
+  // 把 openFileAt 挂上的 pendingReveal 在活文档里现找位置并选中（一次性）。
+  function consumeReveal(): void {
+    if (!view) return
+    const reveal = workspaceActions.takePendingReveal(props.leafId)
+    if (!reveal) return
+    const doc = view.state.doc.toString()
+    const pos =
+      reveal.kind === 'heading'
+        ? findHeading(doc, reveal.text)
+        : findWikiLink(doc, reveal.targetStem, reveal.headingPath)
+    if (pos) {
+      view.dispatch({
+        selection: { anchor: pos.from, head: pos.to },
+        effects: EditorView.scrollIntoView(pos.from, { y: 'center' }),
+      })
+    }
+  }
+
+  // 文件已打开（view 已存在）时再次 openFileAt：响应 pendingReveal 变化消费一次。
+  createEffect(() => {
+    if (leafInstances[props.leafId]?.pendingReveal && view) consumeReveal()
+  })
 
   onCleanup(() => {
     if (reindexTimer !== null) clearTimeout(reindexTimer)

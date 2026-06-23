@@ -112,7 +112,7 @@ describe('buildLinkMaps', () => {
   it('puts resolved links in backlinkMap keyed by full path', () => {
     const files = {
       'notes/todo.md': { outLinks: [] },
-      'daily/2024-01-01.md': { outLinks: ['todo.md'] },
+      'daily/2024-01-01.md': { outLinks: [{ target: 'todo.md' }] },
     }
     const { backlinkMap, unresolvedMap } = buildLinkMaps(files)
     expect(backlinkMap['notes/todo.md']).toEqual(['daily/2024-01-01.md'])
@@ -121,7 +121,7 @@ describe('buildLinkMaps', () => {
 
   it('puts unresolvable links in unresolvedMap', () => {
     const files = {
-      'a.md': { outLinks: ['ghost.md'] },
+      'a.md': { outLinks: [{ target: 'ghost.md' }] },
     }
     const { backlinkMap, unresolvedMap } = buildLinkMaps(files)
     expect(unresolvedMap['ghost.md']).toEqual(['a.md'])
@@ -132,7 +132,7 @@ describe('buildLinkMaps', () => {
     const files = {
       'notes/foo.md': { outLinks: [] },
       'work/foo.md': { outLinks: [] },
-      'src.md': { outLinks: ['foo.md'] },
+      'src.md': { outLinks: [{ target: 'foo.md' }] },
     }
     const { unresolvedMap } = buildLinkMaps(files)
     expect(unresolvedMap['foo.md']).toEqual(['src.md'])
@@ -142,7 +142,7 @@ describe('buildLinkMaps', () => {
     const files = {
       'notes/foo.md': { outLinks: [] },
       'work/foo.md': { outLinks: [] },
-      'src.md': { outLinks: ['notes/foo.md'] },
+      'src.md': { outLinks: [{ target: 'notes/foo.md' }] },
     }
     const { backlinkMap } = buildLinkMaps(files)
     expect(backlinkMap['notes/foo.md']).toEqual(['src.md'])
@@ -211,7 +211,7 @@ describe('buildLinkMaps alias resolution', () => {
   it('registers [[alias]] backlink under the real file path', () => {
     const files = {
       'notes/todo.md': { aliases: ['待办'], outLinks: [] },
-      'journal.md': { aliases: [], outLinks: ['待办'] },
+      'journal.md': { aliases: [], outLinks: [{ target: '待办' }] },
     }
     const { backlinkMap, unresolvedMap } = buildLinkMaps(files)
     expect(backlinkMap['notes/todo.md']).toEqual(['journal.md'])

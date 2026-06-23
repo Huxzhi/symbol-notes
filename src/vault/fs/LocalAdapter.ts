@@ -1,13 +1,17 @@
 import { get, set } from 'idb-keyval'
-import type { DirEntry, ScanEntry, FileSystemAdapter } from './types'
-import { mapWithConcurrency } from './concurrency'
+
+import type { DirEntry, FileSystemAdapter, ScanEntry } from './types'
 
 declare global {
   interface Window {
-    showDirectoryPicker(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>
+    showDirectoryPicker(options?: {
+      mode?: 'read' | 'readwrite'
+    }): Promise<FileSystemDirectoryHandle>
   }
   interface FileSystemDirectoryHandle {
-    requestPermission(options?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>
+    requestPermission(options?: {
+      mode?: 'read' | 'readwrite'
+    }): Promise<PermissionState>
   }
 }
 
@@ -36,17 +40,25 @@ export class LocalAdapter implements FileSystemAdapter {
     return this.rootHandle.name
   }
 
-  private async resolveFile(path: string, create = false): Promise<FileSystemFileHandle> {
+  private async resolveFile(
+    path: string,
+    create = false,
+  ): Promise<FileSystemFileHandle> {
     const parts = path.split('/')
     const name = parts.pop()!
     let dir = this.rootHandle
     for (const part of parts) {
-      dir = await dir.getDirectoryHandle(part, create ? { create: true } : undefined)
+      dir = await dir.getDirectoryHandle(
+        part,
+        create ? { create: true } : undefined,
+      )
     }
     return dir.getFileHandle(name, create ? { create: true } : undefined)
   }
 
-  private async resolveParentDir(path: string): Promise<[FileSystemDirectoryHandle, string]> {
+  private async resolveParentDir(
+    path: string,
+  ): Promise<[FileSystemDirectoryHandle, string]> {
     const parts = path.split('/')
     const name = parts.pop()!
     let dir = this.rootHandle
@@ -76,28 +88,52 @@ export class LocalAdapter implements FileSystemAdapter {
     return handle.getFile()
   }
 
-  async deleteEntry(path: string, opts?: { recursive?: boolean }): Promise<void> {
+  async deleteEntry(
+    path: string,
+    opts?: { recursive?: boolean },
+  ): Promise<void> {
     const [dir, name] = await this.resolveParentDir(path)
-    await dir.removeEntry(name, opts?.recursive ? { recursive: true } : undefined)
+    await dir.removeEntry(
+      name,
+      opts?.recursive ? { recursive: true } : undefined,
+    )
   }
 
   async createDirectory(path: string): Promise<void> {
     const parts = path.split('/')
     let dir = this.rootHandle
-    for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true })
+    for (const part of parts)
+      dir = await dir.getDirectoryHandle(part, { create: true })
   }
 
-  async *listAll(parentPath: string | null = null, dir?: FileSystemDirectoryHandle): AsyncGenerator<DirEntry> {
+  async *listAll(
+    parentPath: string | null = null,
+    dir?: FileSystemDirectoryHandle,
+  ): AsyncGenerator<DirEntry> {
     const handle = dir ?? this.rootHandle
     for await (const [name, entry] of handle.entries()) {
       if (name.startsWith('.')) continue
       const path = parentPath ? `${parentPath}/${name}` : name
       if (entry.kind === 'directory') {
-        yield { name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0 }
+        yield {
+          name,
+          path,
+          kind: 'directory',
+          parent: parentPath,
+          size: 0,
+          mtime: 0,
+        }
         yield* this.listAll(path, entry as FileSystemDirectoryHandle)
       } else {
         const file = await (entry as FileSystemFileHandle).getFile()
-        yield { name, path, kind: 'file', parent: parentPath, size: file.size, mtime: file.lastModified }
+        yield {
+          name,
+          path,
+          kind: 'file',
+          parent: parentPath,
+          size: file.size,
+          mtime: file.lastModified,
+        }
       }
     }
   }
@@ -114,11 +150,26 @@ export class LocalAdapter implements FileSystemAdapter {
         if (name.startsWith('.')) continue
         const path = parentPath ? `${parentPath}/${name}` : name
         if (entry.kind === 'directory') {
-          const node: ScanEntry = { name, path, kind: 'directory', parent: parentPath, size: 0, mtime: 0, children: [] }
+          const node: ScanEntry = {
+            name,
+            path,
+            kind: 'directory',
+            parent: parentPath,
+            size: 0,
+            mtime: 0,
+            children: [],
+          }
           siblings.push(node)
           await walk(path, node.children!, entry as FileSystemDirectoryHandle)
         } else {
-          const node: ScanEntry = { name, path, kind: 'file', parent: parentPath, size: 0, mtime: 0 }
+          const node: ScanEntry = {
+            name,
+            path,
+            kind: 'file',
+            parent: parentPath,
+            size: 0,
+            mtime: 0,
+          }
           siblings.push(node)
           fileStubs.push({ node, handle: entry as FileSystemFileHandle })
         }
@@ -126,12 +177,34 @@ export class LocalAdapter implements FileSystemAdapter {
     }
     const roots: ScanEntry[] = []
     await walk(null, roots, this.rootHandle)
-    await mapWithConcurrency(fileStubs, concurrency, async ({ node, handle }) => {
-      const f = await handle.getFile()
-      onStat?.()
-      node.size = f.size
-      node.mtime = f.lastModified
-    })
+    await mapWithConcurrency(
+      fileStubs,
+      concurrency,
+      async ({ node, handle }) => {
+        const f = await handle.getFile()
+        onStat?.()
+        node.size = f.size
+        node.mtime = f.lastModified
+      },
+    )
     return roots
   }
+}
+/** 有界并发 map：最多 limit 个 fn 同时执行，结果按输入顺序返回。 */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  const n = Math.max(1, Math.min(limit, items.length))
+  await Promise.all(Array.from({ length: n }, () => worker()))
+  return results
 }

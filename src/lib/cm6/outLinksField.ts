@@ -1,22 +1,37 @@
 import { syntaxTree } from '@codemirror/language'
 import { StateField } from '@codemirror/state'
 import type { EditorState } from '@codemirror/state'
+import { pushHeading, headingPathOf, type HeadingFrame } from './headingStack'
 
 export interface OutLink {
   type: 'wiki' | 'md'
-  target: string
+  target: string          // wiki: [[]] 内原始目标文本（含 anchor，未归一）；md: url
   label: string
+  alias?: string          // wiki only
+  headingPath?: string[]  // wiki only
+  from?: number           // wiki only：链接起始 offset
+  to?: number             // wiki only：链接结束 offset
 }
+
+const HEADING_RE = /^(#{1,6})\s+(.*)$/
 
 function extractOutLinks(state: EditorState): OutLink[] {
   const links: OutLink[] = []
-  const seen = new Set<string>()
+  const seenMd = new Set<string>()
+  const stack: HeadingFrame[] = []
 
   syntaxTree(state).iterate({
     from: 0,
     to: state.doc.length,
     enter(node) {
       if (node.name === 'FencedCode' || node.name === 'CodeBlock') return false
+
+      if (/^ATXHeading[1-6]$/.test(node.name)) {
+        const line = state.doc.lineAt(node.from).text
+        const m = HEADING_RE.exec(line)
+        if (m) pushHeading(stack, m[1].length, m[2].trim())
+        return false
+      }
 
       if (node.name === 'WikiLink') {
         const c = node.node.cursor()
@@ -28,11 +43,15 @@ function extractOutLinks(state: EditorState): OutLink[] {
           } while (c.nextSibling())
         }
         if (target) {
-          const key = `wiki:${target}`
-          if (!seen.has(key)) {
-            seen.add(key)
-            links.push({ type: 'wiki', target, label: alias || target })
-          }
+          links.push({
+            type: 'wiki',
+            target,
+            label: alias || target,
+            alias: alias || undefined,
+            headingPath: headingPathOf(stack),
+            from: node.from,
+            to: node.to,
+          })
         }
         return false
       }
@@ -40,12 +59,9 @@ function extractOutLinks(state: EditorState): OutLink[] {
       if (node.name === 'Autolink') {
         let url = state.doc.sliceString(node.from, node.to)
         if (url.startsWith('<') && url.endsWith('>')) url = url.slice(1, -1)
-        if (url) {
-          const key = `md:${url}`
-          if (!seen.has(key)) {
-            seen.add(key)
-            links.push({ type: 'md', target: url, label: url })
-          }
+        if (url && !seenMd.has(url)) {
+          seenMd.add(url)
+          links.push({ type: 'md', target: url, label: url })
         }
         return false
       }
@@ -65,9 +81,8 @@ function extractOutLinks(state: EditorState): OutLink[] {
             const labelStart = node.name === 'Image' ? node.from + 2 : node.from + 1
             labelText = state.doc.sliceString(labelStart, urlFrom - 2).trim()
           }
-          const key = `md:${url}`
-          if (!seen.has(key)) {
-            seen.add(key)
+          if (!seenMd.has(url)) {
+            seenMd.add(url)
             links.push({ type: 'md', target: url, label: labelText || url })
           }
         }

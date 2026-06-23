@@ -1,42 +1,43 @@
 import { describe, it, expect } from 'vitest'
-import { buildSelection } from '../selection'
+import { buildNeighborhood } from '../selection'
+import type { WikiLinkInfo } from '../../../stores/types'
 
-const files = {
-  'a.md': { outLinks: ['b', 'missing'] },
-  'b.md': { outLinks: [] },
-  'c.md': { outLinks: ['a'] },
-}
-// resolve：把 wiki 目标按 stem 解析到 .md；'missing' 解析不到
-const resolve = (t: string) => (`${t}.md` in files ? `${t}.md` : null)
-const backlinkMap = { 'a.md': ['c.md'] } // c 链接到 a
+const link = (target: string, ctx: Partial<WikiLinkInfo> = {}): WikiLinkInfo => ({
+  target, headingPath: [], lineTags: [], from: 0, to: 0, ...ctx,
+})
 
-describe('buildSelection', () => {
-  it('1 跳邻域 = 焦点 + 出链(已解析且存在) + 反链', () => {
-    const r = buildSelection('a.md', files, backlinkMap, resolve)
-    expect([...r.paths].sort()).toEqual(['a.md', 'b.md', 'c.md'])
+describe('buildNeighborhood', () => {
+  const files = {
+    'A.md': { outLinks: [link('B.md', { headingPath: ['计划'] })] },
+    'B.md': { outLinks: [link('C.md')] },
+    'C.md': { outLinks: [] as WikiLinkInfo[] },
+    'D.md': { outLinks: [link('A.md', { lineTags: ['想法'] })] },
+  }
+  const backlinkMap = { 'A.md': ['D.md'], 'B.md': ['A.md'], 'C.md': ['B.md'] }
+  const resolve = (t: string) => (t in files ? t : null)
+
+  it('从 focus 无向 BFS，记录 hop 与方向/上下文', () => {
+    const n = buildNeighborhood('A.md', files, backlinkMap, resolve, { maxFiles: 99 })
+    const paths = n.notes.map(x => x.path).sort()
+    expect(paths).toEqual(['A.md', 'B.md', 'C.md', 'D.md'])
+    expect(n.notes.find(x => x.path === 'A.md')!.hop).toBe(0)
+    expect(n.notes.find(x => x.path === 'C.md')!.hop).toBe(2)
+    const ab = n.edges.find(e => e.from === 'A.md' && e.to === 'B.md')!
+    expect(ab.dir).toBe('out')
+    expect(ab.headingPath).toEqual(['计划'])
+    const da = n.edges.find(e => e.from === 'D.md' && e.to === 'A.md')!
+    expect(da.dir).toBe('in')
+    expect(da.lineTags).toEqual(['想法'])
   })
 
-  it('忽略解析不到或不存在的出链目标', () => {
-    const r = buildSelection('a.md', files, backlinkMap, resolve)
-    expect(r.paths).not.toContain('missing.md')
-    expect(r.paths).not.toContain('missing')
-  })
-
-  it('边：焦点→出链、反链→焦点；去重', () => {
-    const r = buildSelection('a.md', files, backlinkMap, resolve)
-    expect(r.edges).toContainEqual({ from: 'a.md', to: 'b.md' })
-    expect(r.edges).toContainEqual({ from: 'c.md', to: 'a.md' })
-    expect(r.edges).toHaveLength(2)
+  it('整层预算：超过 maxFiles 后不再扩下一层', () => {
+    const n = buildNeighborhood('A.md', files, backlinkMap, resolve, { maxFiles: 2 })
+    // 第 0 层 {A}=1 < 2，扩第 1 层 {B,D} → 累计 3 ≥ 2，停止；C 不应进入
+    expect(n.notes.map(x => x.path).sort()).toEqual(['A.md', 'B.md', 'D.md'])
   })
 
   it('焦点不存在时返回空', () => {
-    const r = buildSelection('zzz.md', files, backlinkMap, resolve)
-    expect(r).toEqual({ paths: [], edges: [] })
-  })
-
-  it('焦点无任何链接/反链时只含自身', () => {
-    const r = buildSelection('b.md', files, {}, resolve)
-    expect(r.paths).toEqual(['b.md'])
-    expect(r.edges).toEqual([])
+    const n = buildNeighborhood('zzz.md', files, backlinkMap, resolve, { maxFiles: 99 })
+    expect(n).toEqual({ notes: [], edges: [] })
   })
 })

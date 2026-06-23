@@ -431,7 +431,11 @@ export async function reindexFile(
 
   const prev = vaultStore.files[path]
   setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...fields }))
-  applyFileBacklinks(path, prev?.outLinks ?? [], fields.outLinks)
+  applyFileBacklinks(
+    path,
+    (prev?.outLinks ?? []).map((l) => l.target),
+    fields.outLinks.map((l) => l.target),
+  )
   applyFileTags(path, prev?.tags ?? [], fields.tags)
   applyFileTasks(path, fields.lists)
   applyFileCalendar(path, prev, vaultStore.files[path])
@@ -469,10 +473,14 @@ export function remapFileLink(
   if (!file) return
   const prevOutLinks = file.outLinks
   const nextOutLinks = prevOutLinks.map((l) =>
-    l === oldTarget ? newTarget : l,
+    l.target === oldTarget ? { ...l, target: newTarget } : l,
   )
   setVaultStore('files', filePath, 'outLinks', nextOutLinks)
-  applyFileBacklinks(filePath, prevOutLinks, nextOutLinks)
+  applyFileBacklinks(
+    filePath,
+    prevOutLinks.map((l) => l.target),
+    nextOutLinks.map((l) => l.target),
+  )
 }
 
 export { resolveNewFile }

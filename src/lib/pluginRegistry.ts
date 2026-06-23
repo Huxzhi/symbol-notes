@@ -2,7 +2,7 @@ import type { Component, JSX } from 'solid-js'
 import { createEffect, createRoot, createSignal, onCleanup } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { settingsStore } from '../stores/settingsStore'
-import type { FileMeta, ViewComponentProps } from '../stores/types'
+import type { FileMeta, RevealRequest, ViewComponentProps } from '../stores/types'
 import {
   activeFilePath,
   activeLayout,
@@ -256,6 +256,8 @@ export interface PluginContext {
       path: string,
       opts?: { area?: 'left' | 'main' | 'right'; newTab?: boolean },
     ): void
+    /** 打开文件并在编辑器里精确定位（一次性 reveal）。 */
+    openFileAt(path: string, reveal: RevealRequest): void
     openPage(type: string): void
     openPanel(
       area: 'left' | 'right',
@@ -342,6 +344,7 @@ function loadPlugin(def: PluginDef): () => void {
         openLeaf: (viewState, opts) =>
           workspaceActions.openLeaf(viewState, opts),
         openFile: (path, opts) => workspaceActions.openFile(path, opts),
+        openFileAt: (path, reveal) => workspaceActions.openFileAt(path, reveal),
         openPage: (type) => workspaceActions.openPage(type),
         openPanel: (area, type, state) =>
           workspaceActions.openSidebarPanel(area, type, state),

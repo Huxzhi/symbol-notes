@@ -80,6 +80,17 @@ export interface ListItem {
 //   Phase 1 (FS scan): name/path/kind/parent/size/mtime/hash
 //   Phase 2 (content index): frontmatter/outLinks/tags/aliases/created/updated/tasks
 
+/** 一条 wiki 链接的本地事实（只关于所在文件自身，不存 resolve 后的 path）。 */
+export interface WikiLinkInfo {
+  target: string        // base + .md 归一（已剥离 anchor），== 喂索引的目标名
+  alias?: string        // [[目标|别名]]
+  anchor?: string       // [[目标#标题]] 的 # 后半段
+  headingPath: string[] // 所属 ## 标题路径，如 ["实验记录","计划"]
+  lineTags: string[]    // 与链接同一行的 #标签（不含 #）
+  from: number          // 链接在本文件中的起始 offset
+  to: number            // 结束 offset
+}
+
 /** 结构树节点（纯结构，无 stat）。fileTree 是结构的唯一真实来源，扫描时构建；
  *  size/mtime 等 stat 归扁平的 fileMeta。 */
 export interface TreeNode {
@@ -99,7 +110,7 @@ export interface FileMeta {
   mtime: number
   hash: string           // content hash (two-variant djb2, 64-bit); '' until indexed
   frontmatter: Record<string, unknown>
-  outLinks: string[]
+  outLinks: WikiLinkInfo[]
   etags: string[]
   tags: string[]
   aliases: string[]
@@ -157,6 +168,11 @@ export interface WorkspaceState {
 
 // ── Runtime store (non-serializable + ephemeral UI) ───────────────────────────
 
+/** 打开文件后在编辑器里精确定位的请求（一次性消费）。 */
+export type RevealRequest =
+  | { kind: 'wikilink'; targetStem: string; headingPath?: string[] } // 在源文档里找 [[focus]]
+  | { kind: 'heading'; text: string }                               // 在目标文档里找 ## 标题
+
 export interface LeafRuntimeState {
   cmView: EditorView | null
   isDirty: boolean
@@ -164,6 +180,7 @@ export interface LeafRuntimeState {
   headings: Heading[]
   history?: string[]      // 内存中的文件历史（不持久化）；oldest→newest
   historyIndex?: number   // 当前在 history 中的位置；空时缺省视为 -1
+  pendingReveal?: RevealRequest | null  // 编辑器挂载/激活后消费一次
 }
 
 
