@@ -4,7 +4,7 @@ import { readFile } from '../../vault/io'
 import { resolveLink } from '../../vault/backlinks'
 import { workspaceActions } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
-import { buildSelection } from './selection'
+import { buildNeighborhood } from './selection'
 import { deriveEvents, type TimelineEvent } from './events'
 import { extractPreview, type NotePreview } from './preview'
 
@@ -17,8 +17,8 @@ export function TimelineView(props: ViewComponentProps) {
     const files = vaultStore.files
     const resolve = (target: string) =>
       resolveLink(target, getStemIndex(), files, getAliasIndex())
-    const selection = buildSelection(f, files, vaultStore.backlinkMap, resolve)
-    return deriveEvents(selection, files)
+    const nb = buildNeighborhood(f, files, vaultStore.backlinkMap, resolve, { maxFiles: 20 })
+    return deriveEvents(nb, files)
   })
 
   // 异步把首图/首段补进 path → preview 映射

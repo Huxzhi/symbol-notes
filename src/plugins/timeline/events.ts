@@ -1,5 +1,5 @@
 import type { FileMeta } from '../../stores/types'
-import type { SelectionResult } from './selection'
+import type { Neighborhood } from './selection'
 
 export interface TimelineEvent {
   path: string
@@ -25,17 +25,17 @@ function stem(path: string): string {
  * 选区中已不在 files 的路径被跳过（容忍删除/未解析）。
  */
 export function deriveEvents(
-  selection: SelectionResult,
+  neighborhood: Neighborhood,
   files: Record<string, Pick<FileMeta, 'created' | 'updated' | 'tags'>>,
 ): TimelineEvent[] {
   const degree = new Map<string, number>()
-  for (const e of selection.edges) {
+  for (const e of neighborhood.edges) {
     degree.set(e.from, (degree.get(e.from) ?? 0) + 1)
     degree.set(e.to, (degree.get(e.to) ?? 0) + 1)
   }
 
   const events: TimelineEvent[] = []
-  for (const path of selection.paths) {
+  for (const { path } of neighborhood.notes) {
     const meta = files[path]
     if (!meta) continue
     events.push({
