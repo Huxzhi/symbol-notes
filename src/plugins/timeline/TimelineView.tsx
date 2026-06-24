@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { vaultStore, getStemIndex, getAliasIndex, extractDateFromName } from '../../vault'
 import { readFile } from '../../vault/io'
 import { resolveLink } from '../../vault/backlinks'
@@ -39,6 +39,61 @@ export function TimelineView(props: ViewComponentProps) {
   const grid = createMemo(() =>
     buildGrid(events(), columns(), neighborhood().edges, isDiary),
   )
+
+  // ── 箭头叠层 ──────────────────────────────────────────────────────────────
+  type ArrowStyle = { shape: 'straight' | 'elbow' | 'curve'; color: string }
+  const [arrowStyle, setArrowStyle] = createSignal<ArrowStyle>({ shape: 'curve', color: '#6aa0ff' })
+  const cardRefs = new Map<string, HTMLElement>()
+  const [arrowPaths, setArrowPaths] = createSignal<string[]>([])
+  let gridContainer: HTMLDivElement | undefined
+
+  function pathD(
+    shape: ArrowStyle['shape'],
+    p: { sx: number; sy: number; ex: number; ey: number },
+  ): string {
+    const { sx, sy, ex, ey } = p
+    if (shape === 'straight') return `M ${sx} ${sy} L ${ex} ${ey}`
+    if (shape === 'elbow') {
+      const mx = (sx + ex) / 2
+      return `M ${sx} ${sy} L ${mx} ${sy} L ${mx} ${ey} L ${ex} ${ey}`
+    }
+    const dx = Math.max(40, Math.abs(ex - sx) / 2)
+    return `M ${sx} ${sy} C ${sx + dx} ${sy} ${ex - dx} ${ey} ${ex} ${ey}`
+  }
+
+  function computeArrows(): void {
+    const base = gridContainer?.getBoundingClientRect()
+    if (!base) { setArrowPaths([]); return }
+    const shape = arrowStyle().shape
+    const ds: string[] = []
+    for (const { from, to } of grid().arrows) {
+      const f = cardRefs.get(from), t = cardRefs.get(to)
+      if (!f || !t) continue
+      const a = f.getBoundingClientRect()
+      const b = t.getBoundingClientRect()
+      const sx = a.right - base.left, sy = a.top + a.height / 2 - base.top
+      const ex = b.left - base.left, ey = b.top + b.height / 2 - base.top
+      ds.push(pathD(shape, { sx, sy, ex, ey }))
+    }
+    setArrowPaths(ds)
+  }
+
+  createEffect(() => {
+    grid(); arrowStyle(); columns(); maxFiles()   // 依赖触发重算
+    queueMicrotask(computeArrows)                 // 等 DOM 落定后量取
+  })
+
+  onMount(() => {
+    const ro = new ResizeObserver(() => computeArrows())
+    if (gridContainer) ro.observe(gridContainer)
+    const onScroll = () => computeArrows()
+    const scroller: Element | Window = gridContainer?.closest('.overflow-auto') ?? window
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    onCleanup(() => {
+      ro.disconnect()
+      scroller.removeEventListener('scroll', onScroll)
+    })
+  })
 
   // 可选过滤值：邻域里出现过的所有标题 / 标签
   const headingOptions = createMemo(() => [
@@ -116,6 +171,7 @@ export function TimelineView(props: ViewComponentProps) {
   function renderCard(ev: TimelineEvent) {
     return (
       <button
+        ref={(el) => cardRefs.set(ev.path, el)}
         class="block text-left w-full rounded border border-(--border) bg-(--bg-base) hover:border-(--accent) p-3 transition-colors mb-2"
         onClick={() => openCard(ev)}
       >
@@ -181,6 +237,26 @@ export function TimelineView(props: ViewComponentProps) {
               class="w-16 px-1 py-0.5 rounded border border-(--border) bg-(--bg-base)"
             />
             篇
+          </label>
+          <label class="flex items-center gap-1">
+            箭头
+            <select
+              class="bg-(--bg-base) border border-(--border) rounded px-1"
+              value={arrowStyle().shape}
+              onChange={(e) =>
+                setArrowStyle((s) => ({ ...s, shape: e.currentTarget.value as ArrowStyle['shape'] }))
+              }
+            >
+              <option value="straight">直线</option>
+              <option value="elbow">折线</option>
+              <option value="curve">曲线</option>
+            </select>
+            <input
+              type="color"
+              value={arrowStyle().color}
+              onInput={(e) => setArrowStyle((s) => ({ ...s, color: e.currentTarget.value }))}
+              class="w-7 h-6 p-0 border border-(--border) rounded"
+            />
           </label>
           <For each={columns()}>
             {(col, i) => (
@@ -253,6 +329,7 @@ export function TimelineView(props: ViewComponentProps) {
           fallback={<EmptyHint text="这篇笔记暂无关联笔记。" />}
         >
           <div
+            ref={(el) => (gridContainer = el)}
             class="relative grid gap-x-6 gap-y-2 items-start"
             style={{ 'grid-template-columns': `72px repeat(${columns().length}, minmax(0, 1fr))` }}
           >
@@ -291,6 +368,25 @@ export function TimelineView(props: ViewComponentProps) {
                 </>
               )}
             </For>
+
+            <svg class="absolute inset-0 pointer-events-none" style={{ overflow: 'visible' }}>
+              <defs>
+                <marker id="tl-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill={arrowStyle().color} />
+                </marker>
+              </defs>
+              <For each={arrowPaths()}>
+                {(d) => (
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke={arrowStyle().color}
+                    stroke-width="1.5"
+                    marker-end="url(#tl-arrow)"
+                  />
+                )}
+              </For>
+            </svg>
           </div>
         </Show>
       </Show>
