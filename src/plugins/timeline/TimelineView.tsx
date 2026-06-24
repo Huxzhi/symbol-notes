@@ -48,22 +48,28 @@ export function TimelineView(props: ViewComponentProps) {
   const [arrowPaths, setArrowPaths] = createSignal<string[]>([])
   let gridContainer: HTMLDivElement | undefined
 
-  const GUTTER = 12 // 列间空隙的一半（gap-x-6 = 24px）
+  const GUTTER = 24 // 列间空隙的一半（gap-x-12 = 48px）
 
   // 经列/行空隙绕行：水平 stub 进空隙 → 竖直走空隙 → 水平进目标，不穿过任何卡片。
+  // 跨栏：左卡走右边、右卡走左边（朝向中间空隙）。
+  // 同列：源在上→两端走左侧、左侧空隙下行；源在下→两端走右侧、右侧空隙上行。
   function routeD(shape: ArrowStyle['shape'], a: DOMRect, b: DOMRect, base: DOMRect): string {
     const sy = a.top + a.height / 2 - base.top
     const ey = b.top + b.height / 2 - base.top
     let sx: number, ex: number, gx: number
-    if (b.left >= a.right - 1) {            // 目标在右
+    if (b.left >= a.right - 1) {            // 目标在右栏
       sx = a.right - base.left
       ex = b.left - base.left
       gx = (sx + ex) / 2
-    } else if (b.right <= a.left + 1) {     // 目标在左
+    } else if (b.right <= a.left + 1) {     // 目标在左栏
       sx = a.left - base.left
       ex = b.right - base.left
       gx = (sx + ex) / 2
-    } else {                                 // 同列/重叠：走右侧空隙绕行
+    } else if (a.top <= b.top) {            // 同列、源在上 → 走左侧
+      sx = a.left - base.left
+      ex = b.left - base.left
+      gx = Math.min(sx, ex) - GUTTER
+    } else {                                 // 同列、源在下 → 走右侧
       sx = a.right - base.left
       ex = b.right - base.left
       gx = Math.max(sx, ex) + GUTTER
@@ -357,7 +363,7 @@ export function TimelineView(props: ViewComponentProps) {
         >
           <div
             ref={(el) => (gridContainer = el)}
-            class="relative grid gap-x-6 gap-y-2 items-start"
+            class="relative grid gap-x-12 gap-y-2 items-start"
             style={{ 'grid-template-columns': `72px repeat(${columns().length}, minmax(0, 1fr))` }}
           >
             {/* 表头行（row 1）：列标题 */}
