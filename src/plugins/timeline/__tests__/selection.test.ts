@@ -41,3 +41,20 @@ describe('buildNeighborhood', () => {
     expect(n).toEqual({ notes: [], edges: [] })
   })
 })
+
+describe('buildNeighborhood isDiary 跳过展开', () => {
+  const files = {
+    'A.md': { outLinks: [link('2026-06-20.md')] },
+    '2026-06-20.md': { outLinks: [link('Z.md')] }, // 日记的出链 Z 不应被展开
+    'Z.md': { outLinks: [] as WikiLinkInfo[] },
+  }
+  const backlinkMap = { '2026-06-20.md': ['A.md'], 'Z.md': ['2026-06-20.md'] }
+  const resolve = (t: string) => (t in files ? t : null)
+  const isDiary = (p: string) => /\d{4}-\d{2}-\d{2}/.test(p)
+
+  it('日记被收下但不展开 → Z 不进邻域；指向日记的边保留', () => {
+    const n = buildNeighborhood('A.md', files, backlinkMap, resolve, { maxFiles: 99, isDiary })
+    expect(n.notes.map((x) => x.path).sort()).toEqual(['2026-06-20.md', 'A.md'])
+    expect(n.edges.some((e) => e.from === 'A.md' && e.to === '2026-06-20.md')).toBe(true)
+  })
+})

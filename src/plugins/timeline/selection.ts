@@ -25,9 +25,10 @@ export function buildNeighborhood(
   files: Record<string, Pick<FileMeta, 'outLinks'>>,
   backlinkMap: Record<string, string[]>,
   resolve: (target: string) => string | null,
-  opts: { maxFiles: number },
+  opts: { maxFiles: number; isDiary?: (path: string) => boolean },
 ): Neighborhood {
   if (!(focus in files)) return { notes: [], edges: [] }
+  const isDiary = opts.isDiary ?? (() => false)
 
   const hop = new Map<string, number>([[focus, 0]])
   const edges: Edge[] = []
@@ -44,6 +45,7 @@ export function buildNeighborhood(
   while (frontier.length && hop.size < opts.maxFiles) {
     const next: string[] = []
     for (const cur of frontier) {
+      if (isDiary(cur) && cur !== focus) continue   // 日记是叶子：收下但不展开其出/入链
       // 出边：cur 的 outLinks
       for (const l of files[cur]?.outLinks ?? []) {
         const t = resolve(l.target)
