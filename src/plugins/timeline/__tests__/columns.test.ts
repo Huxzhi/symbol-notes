@@ -42,3 +42,24 @@ describe('assignColumns', () => {
     expect(assignColumns(notes, edges, cols)).toEqual([['C.md']])
   })
 })
+
+describe('assignColumns by:diary', () => {
+  const edges = new Map<string, Edge[]>()
+  const notes = ['journal/2026-06-20.md', 'plan.md']
+  const isDiary = (p: string) => /\d{4}-\d{2}-\d{2}/.test(p)
+
+  it('diary 列按 isDiary 归入', () => {
+    const cols: Column[] = [
+      { filter: { by: 'diary' }, priority: 0, repeat: false },
+      { filter: null, priority: 1, repeat: false },
+    ]
+    const [c0, c1] = assignColumns(notes, edges, cols, isDiary)
+    expect(c0).toEqual(['journal/2026-06-20.md'])
+    expect(c1).toEqual(['plan.md'])
+  })
+
+  it('缺省 isDiary 时 diary 列不匹配', () => {
+    const cols: Column[] = [{ filter: { by: 'diary' }, priority: 0, repeat: false }]
+    expect(assignColumns(notes, edges, cols)).toEqual([[]])
+  })
+})

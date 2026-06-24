@@ -281,6 +281,7 @@ export function TimelineView(props: ViewComponentProps) {
 
 function filterLabel(f: ColumnFilter | undefined): string {
   if (!f) return '全部'
+  if (f.by === 'diary') return '日记'
   if (f.by === 'heading') return `标题：${f.value}`
   if (f.by === 'tag') return `#${f.value}`
   return f.value === 'out' ? '出链' : '入链'
