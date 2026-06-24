@@ -42,8 +42,28 @@ describe('buildGrid', () => {
     expect(g.cells.get('2026-06-22')?.get(2)?.map(e => e.path)).toEqual(['reflect.md'])
   })
 
-  it('arrows 仅含 out 且两端可见的边', () => {
+  it('arrows = 两端可见的有向链接，剔除不可见目标', () => {
     const g = buildGrid(events, columns, edges, isDiary)
     expect(g.arrows).toEqual([{ from: 'plan.md', to: '2026-06-20.md' }]) // gone.md 不可见被剔除
+  })
+
+  it('入边/反链也画箭头（不再只看 dir:out）', () => {
+    const evs = [ev('A.md', '2026-06-20'), ev('B.md', '2026-06-21')]
+    const cols: Column[] = [{ filter: null, priority: 0, repeat: false }]
+    const inEdge: Edge = { from: 'B.md', to: 'A.md', dir: 'in', headingPath: [], lineTags: [] }
+    const g = buildGrid(evs, cols, [inEdge], isDiary)
+    expect(g.arrows).toEqual([{ from: 'B.md', to: 'A.md' }])
+  })
+
+  it('同一 from→to 去重，自链接跳过', () => {
+    const evs = [ev('A.md', '2026-06-20'), ev('B.md', '2026-06-21')]
+    const cols: Column[] = [{ filter: null, priority: 0, repeat: false }]
+    const dup: Edge[] = [
+      { from: 'A.md', to: 'B.md', dir: 'out', headingPath: [], lineTags: [] },
+      { from: 'A.md', to: 'B.md', dir: 'in', headingPath: [], lineTags: [] },
+      { from: 'A.md', to: 'A.md', dir: 'out', headingPath: [], lineTags: [] },
+    ]
+    const g = buildGrid(evs, cols, dup, isDiary)
+    expect(g.arrows).toEqual([{ from: 'A.md', to: 'B.md' }])
   })
 })

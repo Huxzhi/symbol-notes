@@ -57,4 +57,18 @@ describe('buildNeighborhood isDiary 跳过展开', () => {
     expect(n.notes.map((x) => x.path).sort()).toEqual(['2026-06-20.md', 'A.md'])
     expect(n.edges.some((e) => e.from === 'A.md' && e.to === '2026-06-20.md')).toBe(true)
   })
+
+  it('日记到已可见节点的出链仍记入边（供箭头）；但不引入新节点', () => {
+    const files2 = {
+      'A.md': { outLinks: [link('2026-06-20.md'), link('P.md')] },
+      '2026-06-20.md': { outLinks: [link('P.md'), link('Z.md')] }, // P 已可见、Z 未可见
+      'P.md': { outLinks: [] as WikiLinkInfo[] },
+      'Z.md': { outLinks: [] as WikiLinkInfo[] },
+    }
+    const resolve2 = (t: string) => (t in files2 ? t : null)
+    const n = buildNeighborhood('A.md', files2, {}, resolve2, { maxFiles: 99, isDiary })
+    expect(n.notes.map((x) => x.path).sort()).toEqual(['2026-06-20.md', 'A.md', 'P.md'])
+    expect(n.edges.some((e) => e.from === '2026-06-20.md' && e.to === 'P.md')).toBe(true)
+    expect(n.notes.some((x) => x.path === 'Z.md')).toBe(false) // 日记仍不引入新节点
+  })
 })

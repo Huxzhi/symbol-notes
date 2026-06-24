@@ -69,5 +69,15 @@ export function buildNeighborhood(
     frontier = next
   }
 
+  // 补全所有可见节点之间的出链（含日记/末层，不新增节点）：让每张卡片都能连线。
+  for (const p of hop.keys()) {
+    for (const l of files[p]?.outLinks ?? []) {
+      const t = resolve(l.target)
+      if (t && hop.has(t) && t !== p) {
+        addEdge({ from: p, to: t, dir: 'out', headingPath: l.headingPath, lineTags: l.lineTags })
+      }
+    }
+  }
+
   return { notes: [...hop].map(([path, h]) => ({ path, hop: h })), edges }
 }
