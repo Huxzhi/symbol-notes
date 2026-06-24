@@ -2,7 +2,14 @@ import { createRoot, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import * as vaultConfig from '../vault/vaultConfig'
 import { applyTheme, resolveTheme } from '../lib/theme'
-import type { SettingsState, ThemeId, CustomTheme, ThemeMode, ThemeSettings, VaultSettings } from './types'
+import type {
+  SettingsState,
+  ThemeId,
+  CustomTheme,
+  ThemeMode,
+  ThemeSettings,
+  VaultSettings,
+} from './types'
 
 const defaults: SettingsState = {
   theme: 'dark',
@@ -13,7 +20,9 @@ const defaults: SettingsState = {
   pluginStates: {},
 }
 
-const [settingsStore, setSettingsStore] = createStore<SettingsState>({ ...defaults })
+const [settingsStore, setSettingsStore] = createStore<SettingsState>({
+  ...defaults,
+})
 
 /** 注入非主题配置（settings.json → store，与默认值合并）。 */
 export function hydrateSettings(payload: Partial<VaultSettings>): void {
@@ -60,7 +69,11 @@ export const settingsActions = {
   setCustomThemes(themes: CustomTheme[]): void {
     setSettingsStore('customThemes', themes)
   },
-  addCustomTheme(base: string, mode: ThemeMode, vars: Record<string, string>): string {
+  addCustomTheme(
+    base: string,
+    mode: ThemeMode,
+    vars: Record<string, string>,
+  ): string {
     const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     const n = settingsStore.customThemes.length + 1
     const theme: CustomTheme = { id, name: `自定义 ${n}`, base, mode, vars }
