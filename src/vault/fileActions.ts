@@ -165,6 +165,75 @@ async function updateBacklinks(
   }
 }
 
+// ── CRUD 公共小工具 ────────────────────────────────────────────────────────────
+
+const EPOCH = new Date(0).toISOString().slice(0, 10)
+
+/** 新建文件/目录时的空 FileMeta 骨架（stat 全 0、内容字段全空）。 */
+function blankFileMeta(
+  name: string,
+  path: string,
+  kind: 'file' | 'directory',
+  parent: string | null,
+): FileMeta {
+  return {
+    name,
+    path,
+    kind,
+    parent,
+    size: 0,
+    mtime: 0,
+    hash: '',
+    frontmatter: {},
+    outLinks: [],
+    etags: [],
+    tags: [],
+    aliases: [],
+    created: EPOCH,
+    updated: null,
+    dated: EPOCH,
+    lists: [],
+  }
+}
+
+/** 从 store.files 一次性删掉若干 path（单次响应式更新）。 */
+function removeFilesFromStore(paths: string[]): void {
+  setVaultStore(
+    'files',
+    produce((m: Record<string, FileMeta>) => {
+      for (const p of paths) delete m[p]
+    }),
+  )
+}
+
+/** 把单个文件从 oldPath 搬到 newPath：落盘 → 改 store/树 → reindex → 改写反链。
+ *  改名与移动只差「目标路径推导 + 树操作」，其余流程完全一致。 */
+async function relocateFile(
+  oldPath: string,
+  newPath: string,
+  parent: string | null,
+  applyNode: () => void,
+): Promise<void> {
+  const oldContent = await readFile(oldPath)
+  await writeFile(newPath, oldContent)
+  await deleteEntry(oldPath)
+  await deleteFileStatEntry(oldPath)
+  removeVaultEntry(oldPath)
+  removeFilesFromStore([oldPath])
+  setVaultStore(
+    'files',
+    newPath,
+    blankFileMeta(newPath.split('/').pop()!, newPath, 'file', parent),
+  )
+  applyNode()
+  bumpStruct()
+  invalidateStemIndex()
+  const { workspaceActions } = await import('../stores/workspaceStore')
+  workspaceActions.renameLeafPath(oldPath, newPath)
+  await reindexFile(newPath, oldContent)
+  await updateBacklinks(oldPath, newPath)
+}
+
 // ── File CRUD ─────────────────────────────────────────────────────────────────
 
 export const fileActions = {
@@ -193,24 +262,7 @@ export const fileActions = {
       parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
     await writeFile(path, '')
     const parent = parts.length > 0 ? parts.join('/') : null
-    const entry: FileMeta = {
-      name: finalName,
-      path,
-      kind: 'file',
-      parent,
-      size: 0,
-      mtime: 0,
-      hash: '',
-      frontmatter: {},
-      outLinks: [],
-      etags: [],
-      tags: [],
-      aliases: [],
-      created: new Date(0).toISOString().slice(0, 10),
-      updated: null,
-      dated: new Date(0).toISOString().slice(0, 10),
-      lists: [],
-    }
+    const entry = blankFileMeta(finalName, path, 'file', parent)
     setVaultStore('files', path, entry)
     insertNode({ name: finalName, path, kind: 'file', parent })
     bumpStruct()
@@ -226,24 +278,7 @@ export const fileActions = {
     const parts = name.split('/')
     const dirName = parts[parts.length - 1]
     const parent = parts.length > 1 ? parts.slice(0, -1).join('/') : null
-    const entry: FileMeta = {
-      name: dirName,
-      path: name,
-      kind: 'directory',
-      parent,
-      size: 0,
-      mtime: 0,
-      hash: '',
-      frontmatter: {},
-      outLinks: [],
-      etags: [],
-      tags: [],
-      aliases: [],
-      created: new Date(0).toISOString().slice(0, 10),
-      updated: null,
-      dated: new Date(0).toISOString().slice(0, 10),
-      lists: [],
-    }
+    const entry = blankFileMeta(dirName, name, 'directory', parent)
     setVaultStore('files', name, entry)
     insertNode({ name: dirName, path: name, kind: 'directory', parent, children: [] })
     bumpStruct()
@@ -259,44 +294,9 @@ export const fileActions = {
     const newPath = dir ? `${dir}/${finalName}` : finalName
     if (newPath !== oldPath && vaultStore.files[newPath])
       throw new Error(`已存在同名文件：${finalName}`)
-    const oldContent = await readFile(oldPath)
-    await writeFile(newPath, oldContent)
-    await deleteEntry(oldPath)
-    await deleteFileStatEntry(oldPath)
-    removeVaultEntry(oldPath)
-    setVaultStore(
-      'files',
-      produce((m: Record<string, FileMeta>) => {
-        delete m[oldPath]
-      }),
+    await relocateFile(oldPath, newPath, dir || null, () =>
+      renameNode(oldPath, finalName),
     )
-    const parent = dir || null
-    const entry: FileMeta = {
-      name: finalName,
-      path: newPath,
-      kind: 'file',
-      parent,
-      size: 0,
-      mtime: 0,
-      hash: '',
-      frontmatter: {},
-      outLinks: [],
-      etags: [],
-      tags: [],
-      aliases: [],
-      created: new Date(0).toISOString().slice(0, 10),
-      updated: null,
-      dated: new Date(0).toISOString().slice(0, 10),
-      lists: [],
-    }
-    setVaultStore('files', newPath, entry)
-    renameNode(oldPath, finalName)
-    bumpStruct()
-    invalidateStemIndex()
-    const { workspaceActions } = await import('../stores/workspaceStore')
-    workspaceActions.renameLeafPath(oldPath, newPath)
-    await reindexFile(newPath, oldContent)
-    await updateBacklinks(oldPath, newPath)
   },
 
   async deleteFile(path: string): Promise<void> {
@@ -304,12 +304,7 @@ export const fileActions = {
     await deleteEntry(path)
     await deleteFileStatEntry(path)
     removeVaultEntry(path)
-    setVaultStore(
-      'files',
-      produce((m: Record<string, FileMeta>) => {
-        delete m[path]
-      }),
-    )
+    removeFilesFromStore([path])
     removeNode(path)
     bumpStruct()
     invalidateStemIndex()
@@ -328,12 +323,7 @@ export const fileActions = {
         removeVaultEntry(entry.path)
       }
     }
-    setVaultStore(
-      'files',
-      produce((m: Record<string, FileMeta>) => {
-        for (const entry of toRemove) delete m[entry.path]
-      }),
-    )
+    removeFilesFromStore(toRemove.map((e) => e.path))
     removeNode(path)
     bumpStruct()
     invalidateStemIndex()
@@ -346,43 +336,9 @@ export const fileActions = {
     if (newPath === srcPath) return
     if (vaultStore.files[newPath])
       throw new Error(`目标位置已存在同名文件：${name}`)
-    const oldContent = await readFile(srcPath)
-    await writeFile(newPath, oldContent)
-    await deleteEntry(srcPath)
-    await deleteFileStatEntry(srcPath)
-    removeVaultEntry(srcPath)
-    setVaultStore(
-      'files',
-      produce((m: Record<string, FileMeta>) => {
-        delete m[srcPath]
-      }),
+    await relocateFile(srcPath, newPath, destDirPath ?? null, () =>
+      moveNode(srcPath, destDirPath),
     )
-    const entry: FileMeta = {
-      name,
-      path: newPath,
-      kind: 'file',
-      parent: destDirPath ?? null,
-      size: 0,
-      mtime: 0,
-      hash: '',
-      frontmatter: {},
-      outLinks: [],
-      etags: [],
-      tags: [],
-      aliases: [],
-      created: new Date(0).toISOString().slice(0, 10),
-      updated: null,
-      dated: new Date(0).toISOString().slice(0, 10),
-      lists: [],
-    }
-    setVaultStore('files', newPath, entry)
-    moveNode(srcPath, destDirPath)
-    bumpStruct()
-    invalidateStemIndex()
-    const { workspaceActions } = await import('../stores/workspaceStore')
-    workspaceActions.renameLeafPath(srcPath, newPath)
-    await reindexFile(newPath, oldContent)
-    await updateBacklinks(srcPath, newPath)
   },
 
   async moveFolder(srcPath: string, destDirPath: string | null): Promise<void> {
@@ -416,12 +372,7 @@ export const fileActions = {
     invalidatePrefix(srcPath)
     for (const entry of fileEntries) await deleteFileStatEntry(entry.path)
     for (const entry of fileEntries) removeFileCalendar(entry.path, entry)
-    setVaultStore(
-      'files',
-      produce((m: Record<string, FileMeta>) => {
-        for (const entry of descendants) delete m[entry.path]
-      }),
-    )
+    removeFilesFromStore(descendants.map((e) => e.path))
     for (const entry of descendants) {
       const newEntryPath = newFolderPath + entry.path.slice(srcPath.length)
       const newParent = newEntryPath.includes('/')
