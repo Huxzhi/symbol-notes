@@ -80,16 +80,16 @@ export interface Grid {
 
 export function buildGrid(
   events: TimelineEvent[],
-  userColumns: Column[],
+  columns: Column[],
   edges: Edge[],
   isDiary: (path: string) => boolean,
 ): Grid
 ```
 
 构建规则：
-- **列索引**：第 `0` 列 = 内置「日记脉」列；第 `1..N` 列对应 `userColumns[0..N-1]`。
-- **日记路由**：`isDiary(ev.path)` 的事件全部进第 0 列；其余事件经 `assignColumns(others.map(e=>e.path), edgesByNote(edges), userColumns)` 归到 `1..N` 列。
-- **行**：`rows` = 所有可见事件 `date` 去重后升序。某日期无日记 → 该行第 0 列空，但其他列若有该日期卡片照常显示。
+- **列即顺序**：`columns` 是有序列表，**数组次序 = 屏幕从左到右**。每列都是普通 `Column`；其中过滤 `by:'diary'` 的那列即「日记脉」，可放在任意位置（例：左=标题:计划、中=日记、右=标题:反思）。
+- **归列**：所有事件经 `assignColumns(events.map(e=>e.path), edgesByNote(edges), columns, isDiary)` 归到各列；列索引 = 该列在 `columns` 中的位置。`by:'diary'` 列匹配 `isDiary(path)` 的事件。`priority` 仅决定 dedupe 抢占（与显示顺序解耦）。
+- **行**：`rows` = 所有可见事件 `date` 去重后升序。某日期无日记 → 日记列该行空，但其他列若有该日期卡片照常显示。
 - **同格多卡**（同列同日期）→ 数组堆叠，按 `path` 稳定次序。
 - **arrows**：`edges.filter(e => e.dir === 'out' && visible.has(e.from) && visible.has(e.to))`，`visible` = `new Set(events.map(e=>e.path))`。日记是 BFS 叶子，故无「从日记发出」的 out 边，只有指向日记的箭头。
 
@@ -100,10 +100,11 @@ export function buildGrid(
 ## 4. 渲染：日期对齐网格
 
 `TimelineView` 用 CSS Grid 渲染（`display:grid`）：
-- **列**：`日记脉 + N 个用户列`，列宽等分或 `minmax`。
+- **列**：`columns` 数组次序（含日记列在内），列宽等分或 `minmax`。
 - **行**：`grid.rows`（每个日期一行）。
 - 每个事件渲染进 `grid-row = 该日期的行序`、`grid-column = 列序`。同格多卡纵向堆叠。
-- 第 0 列（日记脉）视觉上作为时间轴：显示日期 + 日记卡；其他列卡片与其所在日期行水平对齐。
+- **日期对齐对所有列生效**：同一行 = 同一天，无论日记列被放在左/中/右，各列卡片都按其 `date` 行水平对齐。日记列只是视觉上点亮为时间脉络（背景/日期标签），不影响对齐逻辑。
+- 行首（最左）固定显示日期标签，作为时间标尺。
 - 卡片样式复用现有卡片（日期/标题/缩略图/snippet/tags/linkCount/焦点徽标）。
 - 卡片点击：沿用现有 `openCard`（焦点→openFile；反链→openFileAt 定位 `[[focus]]`；否则 openFile）。
 
@@ -150,9 +151,41 @@ UI：形状下拉（直线/折线/曲线）+ `<input type="color">`（默认值 
 
 ## 6. 列配置
 
-- 保留 `maxFiles` 数值输入 + 用户列（`filter` 标题/标签/方向 + 值、`priority`、`repeat`）。
-- **日记脉列内置**：始终最左、不在用户列里、不可删除。
-- **dedupe / repeat 语义**（按用户定义）：某卡符合多列过滤时，只在 `priority` 最高（数值最小）的列显示；低优先列不再显示；仅当某列 `repeat: true` 才额外再显示一份。此语义与现有 `assignColumns` 一致，无需改。
+### 6.1 `ColumnFilter` 增日记类型
+
+`src/plugins/timeline/columns.ts` 的 `ColumnFilter` 新增一种：
+
+```ts
+export type ColumnFilter =
+  | { by: 'diary' }                        // 新增：日记列（匹配 isDiary(path)）
+  | { by: 'heading'; value: string }
+  | { by: 'tag'; value: string }
+  | { by: 'direction'; value: 'out' | 'in' }
+  | null                                   // 全部
+```
+
+`assignColumns` / `matches` 增收 `isDiary` 参数：`by:'diary'` 时返回 `isDiary(note)`（其余分支不变）。签名：
+
+```ts
+export function assignColumns(
+  noteIds: string[],
+  edgesByNote: Map<string, Edge[]>,
+  columns: Column[],
+  isDiary: (path: string) => boolean,
+): string[][]
+```
+
+### 6.2 重排与编辑
+
+- 每列一个控件块：过滤 `by`（全部/日记/标题/标签/方向 + 值）、`priority`、`repeat`、**左移 `←` / 右移 `→`**（与相邻列交换数组位置）、删除 `✕`。
+- 「+ 列」追加一列；可把任意列设为日记列并移到中间，实现「左计划 / 中日记 / 右反思」。
+- **显示顺序 = `columns` 数组次序**；`priority` 独立，仅管 dedupe 抢占。
+- **dedupe / repeat 语义**（按用户定义）：某卡符合多列过滤时，只在 `priority` 最高（数值最小）的列显示；低优先列不再显示；仅当某列 `repeat: true` 才额外再显示一份。语义不变。
+- **默认列**：`[{ filter: { by:'diary' }, priority:0, repeat:false }]`（开局只有日记脉，用户自行加列重排）。
+
+### 6.3 其他
+
+- 保留 `maxFiles` 数值输入。
 - 新增**箭头样式**配置（§5.2）。
 - 配置均为组件本地 signal（未持久化进 viewState，与现状一致）。
 
@@ -162,10 +195,12 @@ UI：形状下拉（直线/折线/曲线）+ `<input type="color">`（默认值 
 
 | 文件 | 改动 |
 |---|---|
+| `src/plugins/timeline/columns.ts` | `ColumnFilter` 增 `{by:'diary'}`；`assignColumns`/`matches` 加 `isDiary` 参数 |
+| `src/plugins/timeline/__tests__/columns.test.ts` | 补 `by:'diary'` 归列用例（传 isDiary） |
 | `src/plugins/timeline/grid.ts`（新） | `buildGrid` + `Grid` 类型 + 测试 |
 | `src/plugins/timeline/selection.ts` | `buildNeighborhood` opts 加 `isDiary`，跳过日记展开 |
 | `src/plugins/timeline/__tests__/selection.test.ts` | 补「日记不展开 / 入边保留」用例 |
-| `src/plugins/timeline/TimelineView.tsx` | CSS Grid 网格渲染 + 卡片 ref + SVG 箭头叠层 + 箭头样式配置 UI；调用 `buildGrid` |
+| `src/plugins/timeline/TimelineView.tsx` | CSS Grid 网格渲染 + 卡片 ref + SVG 箭头叠层 + 列重排/箭头样式配置 UI；调用 `buildGrid` |
 
 `extractDateFromName` 已 re-export，无需改 vault 层。
 
@@ -174,9 +209,10 @@ UI：形状下拉（直线/折线/曲线）+ `<input type="color">`（默认值 
 ## 8. 测试
 
 纯逻辑（node，`npx vitest run`）：
+- `assignColumns`（扩充）：`by:'diary'` 列按 `isDiary(path)` 归入；与现有过滤、dedupe、repeat 不冲突。
 - `buildGrid`：
   - `rows` = 可见事件日期并集且升序；
-  - 日记事件进第 0 列、非日记走 `assignColumns`；
+  - 列索引 = `columns` 数组次序；日记列可在任意位置；
   - 同格多卡堆叠；
   - `arrows` 仅含 `dir:'out'` 且两端可见的边。
 - `buildNeighborhood`（扩充）：
