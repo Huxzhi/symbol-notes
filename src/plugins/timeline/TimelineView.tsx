@@ -42,38 +42,71 @@ export function TimelineView(props: ViewComponentProps) {
 
   // ── 箭头叠层 ──────────────────────────────────────────────────────────────
   type ArrowStyle = { shape: 'straight' | 'elbow' | 'curve'; color: string }
-  const [arrowStyle, setArrowStyle] = createSignal<ArrowStyle>({ shape: 'curve', color: '#6aa0ff' })
+  const [arrowStyle, setArrowStyle] = createSignal<ArrowStyle>({ shape: 'elbow', color: '#6aa0ff' })
+  // 同一 path 可在多列重复显示 → 用「列:path」做实例 key，连每张真实渲染的卡片。
   const cardRefs = new Map<string, HTMLElement>()
   const [arrowPaths, setArrowPaths] = createSignal<string[]>([])
   let gridContainer: HTMLDivElement | undefined
 
-  function pathD(
-    shape: ArrowStyle['shape'],
-    p: { sx: number; sy: number; ex: number; ey: number },
-  ): string {
-    const { sx, sy, ex, ey } = p
-    if (shape === 'straight') return `M ${sx} ${sy} L ${ex} ${ey}`
-    if (shape === 'elbow') {
-      const mx = (sx + ex) / 2
-      return `M ${sx} ${sy} L ${mx} ${sy} L ${mx} ${ey} L ${ex} ${ey}`
+  const GUTTER = 24 // 列间空隙的一半（gap-x-12 = 48px）
+
+  // 经列/行空隙绕行：水平 stub 进空隙 → 竖直走空隙 → 水平进目标，不穿过任何卡片。
+  // 跨栏：左卡走右边、右卡走左边（朝向中间空隙）。
+  // 同列：源在上→两端走左侧、左侧空隙下行；源在下→两端走右侧、右侧空隙上行。
+  function routeD(shape: ArrowStyle['shape'], a: DOMRect, b: DOMRect, base: DOMRect): string {
+    const sy = a.top + a.height / 2 - base.top
+    const ey = b.top + b.height / 2 - base.top
+    let sx: number, ex: number, gx: number
+    if (b.left >= a.right - 1) {            // 目标在右栏
+      sx = a.right - base.left
+      ex = b.left - base.left
+      gx = (sx + ex) / 2
+    } else if (b.right <= a.left + 1) {     // 目标在左栏
+      sx = a.left - base.left
+      ex = b.right - base.left
+      gx = (sx + ex) / 2
+    } else if (a.top <= b.top) {            // 同列、源在上 → 走左侧
+      sx = a.left - base.left
+      ex = b.left - base.left
+      gx = Math.min(sx, ex) - GUTTER
+    } else {                                 // 同列、源在下 → 走右侧
+      sx = a.right - base.left
+      ex = b.right - base.left
+      gx = Math.max(sx, ex) + GUTTER
     }
-    const dx = Math.max(40, Math.abs(ex - sx) / 2)
-    return `M ${sx} ${sy} C ${sx + dx} ${sy} ${ex - dx} ${ey} ${ex} ${ey}`
+    if (shape === 'straight') return `M ${sx} ${sy} L ${ex} ${ey}`
+    if (shape === 'curve') return `M ${sx} ${sy} C ${gx} ${sy} ${gx} ${ey} ${ex} ${ey}`
+    return `M ${sx} ${sy} L ${gx} ${sy} L ${gx} ${ey} L ${ex} ${ey}` // elbow
   }
 
   function computeArrows(): void {
     const base = gridContainer?.getBoundingClientRect()
     if (!base) { setArrowPaths([]); return }
+    // 收集存活实例：path → 当前渲染的所有卡片矩形（含重复列）
+    const instances = new Map<string, DOMRect[]>()
+    for (const [key, el] of cardRefs) {
+      if (!el.isConnected) { cardRefs.delete(key); continue }
+      const path = key.slice(key.indexOf(':') + 1)
+      const arr = instances.get(path) ?? []
+      arr.push(el.getBoundingClientRect())
+      instances.set(path, arr)
+    }
     const shape = arrowStyle().shape
     const ds: string[] = []
     for (const { from, to } of grid().arrows) {
-      const f = cardRefs.get(from), t = cardRefs.get(to)
-      if (!f || !t) continue
-      const a = f.getBoundingClientRect()
-      const b = t.getBoundingClientRect()
-      const sx = a.right - base.left, sy = a.top + a.height / 2 - base.top
-      const ex = b.left - base.left, ey = b.top + b.height / 2 - base.top
-      ds.push(pathD(shape, { sx, sy, ex, ey }))
+      const fromRects = instances.get(from) ?? []
+      const toRects = instances.get(to) ?? []
+      if (!fromRects.length || !toRects.length) continue
+      for (const a of fromRects) {
+        // 每张源卡连最近的一张目标卡
+        const ax = a.left + a.width / 2, ay = a.top + a.height / 2
+        let best: DOMRect | null = null, bestD = Infinity
+        for (const b of toRects) {
+          const d = Math.hypot(b.left + b.width / 2 - ax, b.top + b.height / 2 - ay)
+          if (d < bestD) { bestD = d; best = b }
+        }
+        if (best) ds.push(routeD(shape, a, best, base))
+      }
     }
     setArrowPaths(ds)
   }
@@ -168,10 +201,10 @@ export function TimelineView(props: ViewComponentProps) {
     }
   }
 
-  function renderCard(ev: TimelineEvent) {
+  function renderCard(ev: TimelineEvent, colIdx: number) {
     return (
       <button
-        ref={(el) => cardRefs.set(ev.path, el)}
+        ref={(el) => cardRefs.set(`${colIdx}:${ev.path}`, el)}
         class="block text-left w-full rounded border border-(--border) bg-(--bg-base) hover:border-(--accent) p-3 transition-colors mb-2"
         onClick={() => openCard(ev)}
       >
@@ -181,6 +214,16 @@ export function TimelineView(props: ViewComponentProps) {
           <Show when={ev.path === focus()}>
             <span class="text-[10px] px-1 rounded bg-(--accent) text-white">焦点</span>
           </Show>
+          <For each={ev.dirs}>
+            {(d) => (
+              <span
+                class="text-[10px] t-3 shrink-0"
+                title={d === 'out' ? '出链找到（被链接的目标）' : '反链找到（链接来源）'}
+              >
+                {d === 'out' ? '↗' : '↙'}
+              </span>
+            )}
+          </For>
         </div>
         <Show when={ev.span}>
           <div class="text-[10px] t-3 mt-0.5">
@@ -330,7 +373,7 @@ export function TimelineView(props: ViewComponentProps) {
         >
           <div
             ref={(el) => (gridContainer = el)}
-            class="relative grid gap-x-6 gap-y-2 items-start"
+            class="relative grid gap-x-12 gap-y-2 items-start"
             style={{ 'grid-template-columns': `72px repeat(${columns().length}, minmax(0, 1fr))` }}
           >
             {/* 表头行（row 1）：列标题 */}
@@ -360,7 +403,7 @@ export function TimelineView(props: ViewComponentProps) {
                     {(_col, ci) => (
                       <div style={{ 'grid-row': `${r() + 2}`, 'grid-column': `${ci() + 2}` }}>
                         <For each={grid().cells.get(date)?.get(ci()) ?? []}>
-                          {(ev) => renderCard(ev)}
+                          {(ev) => renderCard(ev, ci())}
                         </For>
                       </div>
                     )}

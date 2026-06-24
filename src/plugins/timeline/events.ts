@@ -1,5 +1,5 @@
 import type { FileMeta } from '../../stores/types'
-import type { Edge, Neighborhood } from './selection'
+import type { Direction, Edge, Neighborhood } from './selection'
 
 /** path → 触及它的所有边（用于按上下文归列）。 */
 export function edgesByNote(edges: Edge[]): Map<string, Edge[]> {
@@ -21,6 +21,7 @@ export interface TimelineEvent {
   title: string
   tags: string[]
   linkCount: number
+  dirs: Direction[]   // 来源标注（out/in，可并存）
   kind: 'note'
   thumbnail?: string
   snippet?: string
@@ -48,7 +49,7 @@ export function deriveEvents(
   }
 
   const events: TimelineEvent[] = []
-  for (const { path } of neighborhood.notes) {
+  for (const { path, dirs } of neighborhood.notes) {
     const meta = files[path]
     if (!meta) continue
     events.push({
@@ -58,6 +59,7 @@ export function deriveEvents(
       title: stem(path),
       tags: meta.tags,
       linkCount: degree.get(path) ?? 0,
+      dirs,
       kind: 'note',
     })
   }

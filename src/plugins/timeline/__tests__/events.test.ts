@@ -12,9 +12,9 @@ const edge = (from: string, to: string): Edge => ({
 })
 const neighborhood: Neighborhood = {
   notes: [
-    { path: 'a.md', hop: 0 },
-    { path: 'b.md', hop: 1 },
-    { path: 'c.md', hop: 1 },
+    { path: 'a.md', hop: 0, dirs: ['out', 'in'] },
+    { path: 'b.md', hop: 1, dirs: ['out'] },
+    { path: 'c.md', hop: 1, dirs: ['in'] },
   ],
   edges: [edge('a.md', 'b.md'), edge('c.md', 'a.md')],
 }
@@ -52,7 +52,7 @@ describe('deriveEvents', () => {
   })
 
   it('跳过选区中已不在 files 的路径', () => {
-    const nb: Neighborhood = { notes: [{ path: 'a.md', hop: 0 }, { path: 'gone.md', hop: 1 }], edges: [] }
+    const nb: Neighborhood = { notes: [{ path: 'a.md', hop: 0, dirs: [] }, { path: 'gone.md', hop: 1, dirs: [] }], edges: [] }
     const evs = deriveEvents(nb, files)
     expect(evs.map((e) => e.path)).toEqual(['a.md'])
   })

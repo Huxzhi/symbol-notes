@@ -1,5 +1,11 @@
 import type { FileMeta } from '../../stores/types'
 
+/** 卡片相对邻域的来源方向：
+ *  out = 它被集合内某卡片链接（是出链的目标，沿 outlink 找到）；
+ *  in  = 它链接了集合内某卡片（是反链的来源，沿 backlink 找到）。
+ *  二者不矛盾，可并存。 */
+export type Direction = 'out' | 'in'
+
 export type Edge = {
   from: string
   to: string
@@ -8,8 +14,14 @@ export type Edge = {
   lineTags: string[]       // 链接站点的同行标签
 }
 
+export interface TimelineNote {
+  path: string
+  hop: number
+  dirs: Direction[]        // 该卡片的来源标注（out/in，可并存）
+}
+
 export interface Neighborhood {
-  notes: { path: string; hop: number }[]
+  notes: TimelineNote[]
   edges: Edge[]
 }
 
@@ -69,5 +81,36 @@ export function buildNeighborhood(
     frontier = next
   }
 
-  return { notes: [...hop].map(([path, h]) => ({ path, hop: h })), edges }
+  // 补全所有可见节点之间的出链（含日记/末层，不新增节点）：让每张卡片都能连线。
+  for (const p of hop.keys()) {
+    for (const l of files[p]?.outLinks ?? []) {
+      const t = resolve(l.target)
+      if (t && hop.has(t) && t !== p) {
+        addEdge({ from: p, to: t, dir: 'out', headingPath: l.headingPath, lineTags: l.lineTags })
+      }
+    }
+  }
+
+  // 从最终边集为每张卡片标注来源方向：被指向→out，指出→in（可并存）。
+  const dirSet = new Map<string, Set<Direction>>()
+  const mark = (p: string, d: Direction) => {
+    const s = dirSet.get(p) ?? new Set<Direction>()
+    s.add(d)
+    dirSet.set(p, s)
+  }
+  for (const e of edges) {
+    mark(e.to, 'out')
+    mark(e.from, 'in')
+  }
+  const dirsOf = (p: string): Direction[] => {
+    const s = dirSet.get(p)
+    return s ? (['out', 'in'] as Direction[]).filter((d) => s.has(d)) : []
+  }
+
+  const notes: TimelineNote[] = [...hop].map(([path, h]) => ({
+    path,
+    hop: h,
+    dirs: dirsOf(path),
+  }))
+  return { notes, edges }
 }

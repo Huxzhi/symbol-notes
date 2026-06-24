@@ -37,9 +37,26 @@ describe('assignColumns', () => {
     expect(c1).toEqual(['B.md', 'C.md'])
   })
 
-  it('按方向过滤', () => {
-    const cols: Column[] = [{ filter: { by: 'direction', value: 'in' }, priority: 0, repeat: false }]
-    expect(assignColumns(notes, edges, cols)).toEqual([['C.md']])
+  it('按方向过滤用卡片来源标注 dirs（与边 dir 无关）', () => {
+    const dirs = new Map<string, ('out' | 'in')[]>([
+      ['B.md', ['out']],
+      ['C.md', ['in']],
+    ])
+    const inCol: Column[] = [{ filter: { by: 'direction', value: 'in' }, priority: 0, repeat: false }]
+    expect(assignColumns(notes, edges, inCol, undefined, dirs)).toEqual([['C.md']])
+    const outCol: Column[] = [{ filter: { by: 'direction', value: 'out' }, priority: 0, repeat: false }]
+    expect(assignColumns(notes, edges, outCol, undefined, dirs)).toEqual([['B.md']])
+  })
+
+  it('out/in 并存的卡片同时匹配两个方向列', () => {
+    const dirs = new Map<string, ('out' | 'in')[]>([['B.md', ['out', 'in']], ['C.md', ['in']]])
+    const cols: Column[] = [
+      { filter: { by: 'direction', value: 'out' }, priority: 0, repeat: true },
+      { filter: { by: 'direction', value: 'in' }, priority: 1, repeat: true },
+    ]
+    const [c0, c1] = assignColumns(notes, edges, cols, undefined, dirs)
+    expect(c0).toEqual(['B.md'])           // 只有 B 有 out
+    expect(c1).toEqual(['B.md', 'C.md'])   // B、C 都有 in（repeat 列各收一份）
   })
 })
 
