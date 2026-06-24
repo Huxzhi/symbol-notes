@@ -98,6 +98,32 @@ export function buildBacklinks(mdFiles: Record<string, FileMeta>): void {
   setVaultStore('unresolvedMap', unresolvedMap)
 }
 
+/** 把 path 这条入链记进 target 对应的 map（解析得到 → backlinkMap，否则 unresolvedMap）。 */
+function linkSource(
+  target: string,
+  path: string,
+  stemIndex: Map<string, string[]>,
+  aliasIndex: Map<string, string[]>,
+): void {
+  const add = (l: string[]): string[] => (l ? [...l, path] : [path])
+  const r = resolveLink(target, stemIndex, vaultStore.files, aliasIndex)
+  if (r) setVaultStore('backlinkMap', r, add)
+  else setVaultStore('unresolvedMap', target, add)
+}
+
+/** 从 target 对应的 map 里移除 path 这条入链。 */
+function unlinkSource(
+  target: string,
+  path: string,
+  stemIndex: Map<string, string[]>,
+  aliasIndex: Map<string, string[]>,
+): void {
+  const remove = (l: string[]): string[] => l?.filter((p) => p !== path) ?? []
+  const r = resolveLink(target, stemIndex, vaultStore.files, aliasIndex)
+  if (r) setVaultStore('backlinkMap', r, remove)
+  else setVaultStore('unresolvedMap', target, remove)
+}
+
 /** 单文件 outLinks 变化时增量更新 */
 export function applyFileBacklinks(
   path: string,
@@ -108,20 +134,8 @@ export function applyFileBacklinks(
   const aliasIndex = getAliasIndex()
   const prev = new Set(prevOutLinks)
   const next = new Set(nextOutLinks)
-  for (const t of prev) {
-    if (!next.has(t)) {
-      const r = resolveLink(t, stemIndex, vaultStore.files, aliasIndex)
-      if (r) setVaultStore('backlinkMap', r, (l: string[]) => l?.filter(p => p !== path) ?? [])
-      else setVaultStore('unresolvedMap', t, (l: string[]) => l?.filter(p => p !== path) ?? [])
-    }
-  }
-  for (const t of next) {
-    if (!prev.has(t)) {
-      const r = resolveLink(t, stemIndex, vaultStore.files, aliasIndex)
-      if (r) setVaultStore('backlinkMap', r, (l: string[]) => l ? [...l, path] : [path])
-      else setVaultStore('unresolvedMap', t, (l: string[]) => l ? [...l, path] : [path])
-    }
-  }
+  for (const t of prev) if (!next.has(t)) unlinkSource(t, path, stemIndex, aliasIndex)
+  for (const t of next) if (!prev.has(t)) linkSource(t, path, stemIndex, aliasIndex)
 }
 
 /** 文件删除：将其入链移入 unresolvedMap，清理出链 */
@@ -133,11 +147,8 @@ export function removeFileBacklinks(path: string, file: FileMeta): void {
   }
   const stemIndex = getStemIndex()
   const aliasIndex = getAliasIndex()
-  for (const t of new Set(file.outLinks.map(l => l.target))) {
-    const r = resolveLink(t, stemIndex, vaultStore.files, aliasIndex)
-    if (r) setVaultStore('backlinkMap', r, (l: string[]) => l?.filter(p => p !== path) ?? [])
-    else setVaultStore('unresolvedMap', t, (l: string[]) => l?.filter(p => p !== path) ?? [])
-  }
+  for (const t of new Set(file.outLinks.map((l) => l.target)))
+    unlinkSource(t, path, stemIndex, aliasIndex)
 }
 
 /** 新文件创建：将 unresolvedMap 中指向它的链接解析到 backlinkMap */
