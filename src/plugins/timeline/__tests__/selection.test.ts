@@ -58,6 +58,20 @@ describe('buildNeighborhood isDiary 跳过展开', () => {
     expect(n.edges.some((e) => e.from === 'A.md' && e.to === '2026-06-20.md')).toBe(true)
   })
 
+  it('标注来源方向 dirs：被指向→out，指出→in，可并存', () => {
+    const files2 = {
+      'A.md': { outLinks: [link('B.md')] }, // A 链接 B
+      'B.md': { outLinks: [link('A.md')] }, // B 也链接 A（互链）
+      'C.md': { outLinks: [link('A.md')] }, // C 链接 A（A 的反链来源）
+    }
+    const resolve2 = (t: string) => (t in files2 ? t : null)
+    const backlinkMap2 = { 'A.md': ['B.md', 'C.md'], 'B.md': ['A.md'] }
+    const n = buildNeighborhood('A.md', files2, backlinkMap2, resolve2, { maxFiles: 99, isDiary })
+    const dirsOf = (p: string) => n.notes.find((x) => x.path === p)!.dirs
+    expect(dirsOf('B.md').sort()).toEqual(['in', 'out']) // A→B(out) 且 B→A(in)
+    expect(dirsOf('C.md')).toEqual(['in'])               // 只 C→A
+  })
+
   it('日记到已可见节点的出链仍记入边（供箭头）；但不引入新节点', () => {
     const files2 = {
       'A.md': { outLinks: [link('2026-06-20.md'), link('P.md')] },

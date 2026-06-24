@@ -4,8 +4,8 @@ import type { TimelineEvent } from '../events'
 import type { Edge } from '../selection'
 import type { Column } from '../columns'
 
-const ev = (path: string, date: string): TimelineEvent => ({
-  path, date, title: path, tags: [], linkCount: 0, kind: 'note',
+const ev = (path: string, date: string, dirs: ('out' | 'in')[] = []): TimelineEvent => ({
+  path, date, title: path, tags: [], linkCount: 0, dirs, kind: 'note',
 })
 const edge = (from: string, to: string): Edge => ({
   from, to, dir: 'out', headingPath: [], lineTags: [],
@@ -65,5 +65,16 @@ describe('buildGrid', () => {
     ]
     const g = buildGrid(evs, cols, dup, isDiary)
     expect(g.arrows).toEqual([{ from: 'A.md', to: 'B.md' }])
+  })
+
+  it('方向列按事件 dirs 归类', () => {
+    const evs = [ev('A.md', '2026-06-20', ['out']), ev('B.md', '2026-06-21', ['in'])]
+    const cols: Column[] = [
+      { filter: { by: 'direction', value: 'in' }, priority: 0, repeat: false }, // col0
+      { filter: { by: 'direction', value: 'out' }, priority: 1, repeat: false }, // col1
+    ]
+    const g = buildGrid(evs, cols, [], isDiary)
+    expect(g.cells.get('2026-06-21')?.get(0)?.map((e) => e.path)).toEqual(['B.md']) // in
+    expect(g.cells.get('2026-06-20')?.get(1)?.map((e) => e.path)).toEqual(['A.md']) // out
   })
 })

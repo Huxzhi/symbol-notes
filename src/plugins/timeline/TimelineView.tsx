@@ -214,6 +214,16 @@ export function TimelineView(props: ViewComponentProps) {
           <Show when={ev.path === focus()}>
             <span class="text-[10px] px-1 rounded bg-(--accent) text-white">焦点</span>
           </Show>
+          <For each={ev.dirs}>
+            {(d) => (
+              <span
+                class="text-[10px] t-3 shrink-0"
+                title={d === 'out' ? '出链找到（被链接的目标）' : '反链找到（链接来源）'}
+              >
+                {d === 'out' ? '↗' : '↙'}
+              </span>
+            )}
+          </For>
         </div>
         <Show when={ev.span}>
           <div class="text-[10px] t-3 mt-0.5">
