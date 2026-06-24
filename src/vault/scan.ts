@@ -1,9 +1,8 @@
-// 职责：FS walk → FileMeta（buildScan），内容解析（runPhase1），快速重扫（rescanTree）
-// isIndexing / scanAndIndex / Phase2 索引构建 在 index.ts
-import { parseFrontmatter } from '../lib/parseFrontmatter'
+// 职责：FS walk → FileMeta（buildScan），后台批量解析（parseAll），快速重扫（rescanTree）
+// 字段抽取/拼装在 parse/；Phase2 索引构建在 index.ts
 import { createMarkdownParser } from '../lib/parseMarkdown'
 import type { FileMeta, TreeNode } from '../stores/types'
-import { setVaultStore, vaultStore } from './index'
+import { setVaultStore, vaultStore } from './store'
 import { buildTreeFromScan, setFileTree } from './fileTree'
 import {
   getCachedMeta,
@@ -12,76 +11,9 @@ import {
   setCachedMeta,
   setFileStatEntry,
 } from './indexStorage'
-import { scanTree, readFile, type ScanEntry } from './io'
-
-// ── Content parsing helpers ───────────────────────────────────────────────────
-
-export function extractTags(raw: unknown): string[] {
-  if (!raw) return []
-  if (Array.isArray(raw)) return raw.map(String)
-  if (typeof raw === 'string')
-    return raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-  return []
-}
-
-export function extractAliases(raw: unknown): string[] {
-  if (!raw) return []
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
-  if (typeof raw === 'string')
-    return raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-  return []
-}
-
-function expandEtag(etag: string): string[] {
-  const parts = etag.split('/')
-  return parts.map((_, i) => parts.slice(0, i + 1).join('/'))
-}
-
-export function mergeTagsWithBody(
-  fmTags: string[],
-  bodyEtags: string[],
-): string[] {
-  const set = new Set(fmTags)
-  for (const etag of bodyEtags) for (const t of expandEtag(etag)) set.add(t)
-  return [...set]
-}
-
-export function extractDateString(val: unknown): string | null {
-  if (typeof val !== 'string') return null
-  return /^\d{4}-\d{2}-\d{2}/.test(val) ? val.slice(0, 10) : null
-}
-
-/** 周格式 2026-W22 或月格式 2026-06——周期笔记，不落到日历的某一天。 */
-export function isPeriodDated(val: unknown): boolean {
-  return typeof val === 'string' && /^\d{4}-(W\d{2}|\d{2})$/.test(val.trim())
-}
-
-/**
- * 计算 FileMeta.dated（用于按天聚合 listItem）。
- * - 完整日期 YYYY-MM-DD → 该天
- * - 周/月格式 → ''（不参与每日聚合；文件本身仍按 created/updated 显示）
- * - 缺失或无法识别 → 回退到 created
- */
-export function resolveDatedField(rawDated: unknown, created: string): string {
-  const day = extractDateString(rawDated)
-  if (day) return day
-  if (isPeriodDated(rawDated)) return ''
-  return created
-}
-
-export function extractDateFromName(name: string): string | null {
-  const hyphen = name.match(/(\d{4}-\d{2}-\d{2})/)
-  if (hyphen) return hyphen[1]
-  const compact = name.match(/(?<!\d)(\d{4})(\d{2})(\d{2})(?!\d)/)
-  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
-  return null
-}
+import { scanTree, readFile, type ScanEntry } from './fs/io'
+import { extractDateFromName } from './parse/extract'
+import { buildContentFields } from './parse/fileMeta'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -222,25 +154,9 @@ export async function parseAll(
       if (cachedMeta && Array.isArray(cachedMeta.lists)) {
         results.set(path, { hash, ...cachedMeta })
       } else {
-        const { frontmatter } = parseFrontmatter(content)
-        const { outLinks, inlineTags, lists } = parser.parse(content)
-        const created =
-          extractDateString(frontmatter.created) ??
-          new Date(entry.mtime).toISOString().slice(0, 10)
-        const updated = extractDateString(frontmatter.updated) ?? null
-        const dated = resolveDatedField(frontmatter.dated, created)
-        const fmTags = extractTags(frontmatter.tags)
-        const parsed = {
-          frontmatter,
-          outLinks,
-          etags: [...new Set([...fmTags, ...inlineTags])],
-          tags: mergeTagsWithBody(fmTags, inlineTags),
-          aliases: extractAliases(frontmatter.aliases),
-          created,
-          updated,
-          dated,
-          lists,
-        }
+        // 复用同一个 parser 实例解析 body（批量解析省开销），frontmatter 与字段
+        // 拼装交给共享的 buildContentFields。
+        const parsed = buildContentFields(content, parser.parse(content), entry.mtime)
         await setCachedMeta(hash, parsed)
         results.set(path, { hash, ...parsed })
       }

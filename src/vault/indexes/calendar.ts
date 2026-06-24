@@ -1,5 +1,5 @@
-import type { FileMeta, DateBucket, Task } from '../stores/types'
-import { setVaultStore, vaultStore } from './index'
+import type { FileMeta, DateBucket, Task } from '../../stores/types'
+import { setVaultStore, vaultStore } from '../store'
 
 // 日历日期归类逻辑（原先散在 calendar 插件的 buildDayData/buildTaskDayData/
 // buildEntryDayData）。放在 vault 层，因为增量维护需要 reindex 时的 prev/next

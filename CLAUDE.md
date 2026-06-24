@@ -24,13 +24,21 @@ npx vitest run path/to/file.test.ts   # 跑单个测试文件
 
 三层职责，**不要跨层耦合**：
 
-1. **`src/vault/` —— 领域核心，单一真实来源。**
-   - `vaultStore`（`src/vault/index.ts`）是 `FileMeta` 与跨文件索引（`backlinkMap` / `tagMap` /
-     `taskMap` / `calendarByDate`）的唯一响应式真实来源。
-   - `fileTree`（`src/vault/fileTree.ts`）单独持有**纯结构**（无 stat），是目录结构的真实来源。
-   - **所有文件写操作必须经过 `fileActions`**（create/save/rename/delete/move）。它的契约是：
-     先落盘（`io.ts`）→ 再增量更新 store 与各索引 → 必要时改写反链。不要绕过它直接 `setVaultStore`。
-   - 索引是增量维护的：`applyFile*` 加，`removeFile*` 删，全量 `build*` 仅在扫描时用。
+1. **`src/vault/` —— 领域核心，单一真实来源。** 按职责分模块，`index.ts` 仅是 re-export barrel：
+   - `store.ts` 是 `vaultStore`（`FileMeta` 与跨文件索引 `backlinkMap` / `tagMap` / `taskMap` /
+     `calendarByDate`）+ 连接句柄 + 扫描状态的唯一真实来源。它是**叶子模块**：其余模块都 import 它，
+     它不 import 任何 vault 内部模块（以此避免循环依赖，不要让 store 反向依赖上层）。
+   - `fileTree.ts` 单独持有**纯结构**（无 stat），是目录结构的真实来源。
+   - `fs/`：文件系统访问层（`types.ts` port + `LocalAdapter.ts` 实现 + `io.ts` 活跃句柄/内容缓存）。
+   - `indexStorage.ts`：IndexedDB 缓存（stat / 解析 meta）。
+   - `parse/`：字节 → `FileMeta` 字段（`extract.ts` 纯抽取 + `fileMeta.ts` 字段构建器）。
+     `buildContentFields` 是 `scan` 与 `reindexFile` **共用的唯一字段拼装器**，改 `FileMeta` 形状先看它。
+   - `indexes/`：跨文件派生索引家族（`backlinks` / `tags` / `tasks` / `calendar`），统一
+     `build* / applyFile* / removeFile*` 契约——`applyFile*` 加、`removeFile*` 删、全量 `build*` 仅扫描时用。
+   - `scan.ts`：FS 扫描 + 后台批量解析管线。
+   - **所有文件写操作必须经过 `fileActions.ts`**（create/save/rename/delete/move + `reindexFile`）。契约：
+     先落盘（`fs/io`）→ 再增量更新 store 与各索引 → 必要时改写反链。不要绕过它直接 `setVaultStore`。
+   - `lifecycle.ts`：接入 vault 的编排（open/restore、配置文件夹编排、扫描+建索引）。
 
 2. **`src/stores/` —— UI/工作区状态。**
    - `workspaceStore.ts`：分屏/标签树、leaf 生命周期、左右侧边栏、布局持久化（localStorage）。

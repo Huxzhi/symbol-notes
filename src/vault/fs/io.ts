@@ -1,6 +1,6 @@
-import type { FileSystemAdapter } from './fs/types'
-import { deleteFileStatEntry } from './indexStorage'
-export type { DirEntry, ScanEntry } from './fs/types'
+import type { FileSystemAdapter } from './types'
+import { deleteFileStatEntry } from '../indexStorage'
+export type { DirEntry, ScanEntry } from './types'
 
 let _adapter: FileSystemAdapter | null = null
 const contentCache = new Map<string, string>()
@@ -61,7 +61,7 @@ export async function createDirectory(path: string): Promise<void> {
 }
 
 export async function* listAll(): AsyncGenerator<
-  import('./fs/types').DirEntry
+  import('./types').DirEntry
 > {
   if (!_adapter) return
   yield* _adapter.listAll()
@@ -70,7 +70,7 @@ export async function* listAll(): AsyncGenerator<
 export async function scanTree(
   concurrency?: number,
   onStat?: () => void,
-): Promise<import('./fs/types').ScanEntry[]> {
+): Promise<import('./types').ScanEntry[]> {
   if (!_adapter) return []
   return _adapter.scanTree(concurrency, onStat)
 }

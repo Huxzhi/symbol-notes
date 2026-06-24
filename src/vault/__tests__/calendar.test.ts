@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fileCal, buildCalendarByDate, calAdd, calRemove } from '../calendarIndex'
+import { fileCal, buildCalendarByDate, calAdd, calRemove } from '../indexes/calendar'
 import type { FileMeta, ListItem } from '../../stores/types'
 
 function li(overrides: Partial<ListItem>): ListItem {

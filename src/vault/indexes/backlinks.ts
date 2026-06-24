@@ -1,5 +1,25 @@
-import type { FileMeta } from '../stores/types'
-import { vaultStore, setVaultStore, getStemIndex, getAliasIndex } from './index'
+import type { FileMeta } from '../../stores/types'
+import { vaultStore, setVaultStore } from '../store'
+
+// ── Stem / alias 懒缓存（派生自 store.files 的链接索引） ───────────────────────
+
+let _stemIndex: Map<string, string[]> | null = null
+let _aliasIndex: Map<string, string[]> | null = null
+
+export function invalidateStemIndex(): void {
+  _stemIndex = null
+  _aliasIndex = null
+}
+
+export function getStemIndex(): Map<string, string[]> {
+  if (!_stemIndex) _stemIndex = buildStemIndex(vaultStore.files)
+  return _stemIndex
+}
+
+export function getAliasIndex(): Map<string, string[]> {
+  if (!_aliasIndex) _aliasIndex = buildAliasIndex(vaultStore.files)
+  return _aliasIndex
+}
 
 // ── Link resolution ───────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractTags, mergeTagsWithBody } from '../scan'
+import { extractTags, mergeTagsWithBody } from '../parse/extract'
 
 describe('extractTags', () => {
   it('returns array as-is', () => {

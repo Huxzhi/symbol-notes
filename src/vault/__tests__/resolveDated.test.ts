@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveDatedField, isPeriodDated } from '../scan'
+import { resolveDatedField, isPeriodDated } from '../parse/extract'
 
 describe('isPeriodDated', () => {
   it('true for week and month formats', () => {
