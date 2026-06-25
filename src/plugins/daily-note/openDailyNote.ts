@@ -3,7 +3,7 @@ import { workspaceActions } from '../../stores/workspaceStore'
 import { vaultStore, readFile } from '../../vault'
 import { fileActions } from '../../fileManager'
 import { resolveTemplate } from '../../lib/templates'
-import { showModal, closeModal } from '../../stores/modalStore'
+import { ui } from '../../stores/ui'
 import { todayPath } from './formatDate'
 
 const DEFAULTS = {
@@ -59,16 +59,16 @@ export async function openDailyNote(date: Date): Promise<void> {
     return
   }
 
-  showModal({
+  ui.confirm({
     title: '创建日记',
     message: `创建 ${path}？`,
     buttons: [
-      { label: '取消', variant: 'ghost', onClick: closeModal },
+      { label: '取消', variant: 'ghost', onClick: ui.closeConfirm },
       {
         label: '创建',
         variant: 'primary',
         onClick: () => {
-          closeModal()
+          ui.closeConfirm()
           void createWithTemplate()
         },
       },

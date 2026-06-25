@@ -9,7 +9,7 @@ import { workspaceActions } from '../../stores/workspaceStore'
 import { fileOp, beginCreate, cancelOp } from './fileOpStore'
 import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
 import { settingsStore } from '../../stores/settingsStore'
-import { showError, showToast } from '../../stores/toastStore'
+import { ui } from '../../stores/ui'
 import { getFileViewForPath } from '../../lib/pluginRegistry'
 import type { FileMeta, TreeNode, ViewComponentProps } from '../../stores/types'
 import { activeFilePath } from '../../stores/workspaceStore'
@@ -66,7 +66,7 @@ function FileRow(props: {
     try {
       await fileActions.renameFile(entry().path, val)
     } catch (err) {
-      showError(err instanceof Error ? err.message : '重命名失败')
+      ui.error(err instanceof Error ? err.message : '重命名失败')
     }
   }
 
@@ -284,9 +284,9 @@ export function FilesPanel(props: ViewComponentProps) {
     const destName = target ? (target.split('/').pop() ?? target) : '根目录'
     try {
       await fileActions.moveEntry(src, target)
-      showToast(`已移动 ${srcName} → ${destName}`)
+      ui.toast(`已移动 ${srcName} → ${destName}`)
     } catch (err) {
-      showError(err instanceof Error ? err.message : '移动失败')
+      ui.error(err instanceof Error ? err.message : '移动失败')
     }
   }
 
@@ -318,9 +318,9 @@ export function FilesPanel(props: ViewComponentProps) {
     const srcName = displayName(srcEntry?.name ?? src.split('/').pop()!)
     try {
       await fileActions.moveEntry(src, null)
-      showToast(`已移动 ${srcName} → 根目录`)
+      ui.toast(`已移动 ${srcName} → 根目录`)
     } catch (err) {
-      showError(err instanceof Error ? err.message : '移动失败')
+      ui.error(err instanceof Error ? err.message : '移动失败')
     }
   }
 

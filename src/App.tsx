@@ -1,7 +1,6 @@
 import { SettingsIcon } from 'lucide-solid'
-import { createEffect, createSignal, onMount, Show } from 'solid-js'
-
-const [showSettings, setShowSettings] = createSignal(false)
+import { createEffect, onMount, Show } from 'solid-js'
+import { ui, settingsOpen } from './stores/ui'
 import { ConfirmModal } from './components/ConfirmModal'
 import { ConflictModal } from './components/ConflictModal'
 import { ContextMenu } from './components/ContextMenu'
@@ -48,7 +47,7 @@ const AppPlugin = definePlugin({
       id: 'settings',
       title: '设置',
       getIcon: () => <SettingsIcon size={18} />,
-      onClick: () => setShowSettings(v => !v),
+      onClick: () => ui.toggleSettings(),
       position: 'bottom',
     })
   },
@@ -103,8 +102,8 @@ export default function App() {
         />
       </div>
       <StatusBar />
-      <Show when={showSettings()}>
-        <Settings onClose={() => setShowSettings(false)} />
+      <Show when={settingsOpen()}>
+        <Settings onClose={() => ui.closeSettings()} />
       </Show>
       <ContextMenu />
       <ToastContainer />

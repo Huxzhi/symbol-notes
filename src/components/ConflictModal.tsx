@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { closeConflict, conflictStore } from '../stores/conflictStore'
+import { conflictState, ui } from '../stores/ui'
 
 // ── Line diff (LCS-based, capped at 500 lines each side) ─────────────────────
 
@@ -97,8 +97,8 @@ export function ConflictModal() {
   const [tab, setTab] = createSignal<'diff' | 'disk'>('diff')
 
   const diff = createMemo(() =>
-    conflictStore.open
-      ? computeDiff(conflictStore.editorContent, conflictStore.diskContent)
+    conflictState.open
+      ? computeDiff(conflictState.editorContent, conflictState.diskContent)
       : null,
   )
   const chunks = createMemo(() => {
@@ -107,12 +107,12 @@ export function ConflictModal() {
   })
 
   function choose(choice: 'overwrite' | 'reload' | 'cancel') {
-    conflictStore.onChoice(choice)
-    closeConflict()
+    conflictState.onChoice(choice)
+    ui.closeConflict()
   }
 
   return (
-    <Show when={conflictStore.open}>
+    <Show when={conflictState.open}>
       <div
         class="fixed inset-0 z-[10000] flex items-center justify-center"
         style={{ background: 'rgba(0,0,0,0.6)' }}
@@ -131,7 +131,7 @@ export function ConflictModal() {
             </h2>
             <p class="text-[12px] text-(--text-3)">
               <span class="font-medium text-(--text-2)">
-                {conflictStore.filename}
+                {conflictState.filename}
               </span>{' '}
               已被外部程序修改，与编辑器中的版本不一致。
             </p>
@@ -211,7 +211,7 @@ export function ConflictModal() {
             {/* Disk tab */}
             <Show when={tab() === 'disk'}>
               <pre class="px-4 py-3 text-(--text-2) whitespace-pre-wrap break-all select-text leading-relaxed text-[11px]">
-                {conflictStore.diskContent}
+                {conflictState.diskContent}
               </pre>
             </Show>
           </div>

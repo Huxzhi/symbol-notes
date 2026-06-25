@@ -20,7 +20,7 @@ import {
   endScanOverlay,
   incDetected,
 } from './loadProgress'
-import { showToast, updateToast, dismissToast } from '../stores/toastStore'
+import { ui } from '../stores/ui'
 import {
   loadAllFileStats,
   pruneCache,
@@ -30,7 +30,6 @@ import { isReady, initFileIO } from '../vault/fs/io'
 import { buildScan, parseAll } from './scan'
 import { setFileTree } from '../vault/fileTree'
 import * as vaultConfig from '../config/vaultConfig'
-import { showModal, closeModal } from '../stores/modalStore'
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
@@ -134,7 +133,7 @@ async function createVaultConfigFromStores(): Promise<void> {
 
 /** 弹窗询问是否创建配置文件夹。 */
 function promptCreateVaultConfig(): void {
-  showModal({
+  ui.confirm({
     title: '配置文件夹',
     message: `在此 vault 顶层创建 ${vaultConfig.configPath()}/ 用于保存布局与设置？`,
     buttons: [
@@ -142,7 +141,7 @@ function promptCreateVaultConfig(): void {
         label: '不创建',
         variant: 'ghost',
         onClick: () => {
-          closeModal()
+          ui.closeConfirm()
           void vaultConfig.decline()
         },
       },
@@ -150,7 +149,7 @@ function promptCreateVaultConfig(): void {
         label: '创建',
         variant: 'primary',
         onClick: () => {
-          closeModal()
+          ui.closeConfirm()
           void createVaultConfigFromStores()
         },
       },
@@ -244,7 +243,7 @@ export async function parseAndIndex(mid: ScanMid): Promise<void> {
     const total = mdUnchanged.length + mdChanged.length
     const toastId =
       total > 0
-        ? showToast(`解析 0 / ${total}（双链/任务暂不完整）`, { requireClick: true })
+        ? ui.toast(`解析 0 / ${total}（双链/任务暂不完整）`, { requireClick: true })
         : -1
     let done = 0
     const activeHashes = new Set<string>()
@@ -256,13 +255,13 @@ export async function parseAndIndex(mid: ScanMid): Promise<void> {
       () => {
         done++
         if (toastId >= 0 && (done === total || done % 20 === 0)) {
-          updateToast(toastId, `解析 ${done} / ${total}（双链/任务暂不完整）`)
+          ui.updateToast(toastId, `解析 ${done} / ${total}（双链/任务暂不完整）`)
         }
       },
     )
 
     if (session.cancelled) {
-      if (toastId >= 0) dismissToast(toastId)
+      if (toastId >= 0) ui.dismissToast(toastId)
       return
     }
 
@@ -289,8 +288,8 @@ export async function parseAndIndex(mid: ScanMid): Promise<void> {
     pruneCache(activeHashes).catch(() => {})
 
     if (toastId >= 0) {
-      dismissToast(toastId)
-      showToast('解析完成', { duration: 2000 })
+      ui.dismissToast(toastId)
+      ui.toast('解析完成', { duration: 2000 })
     }
   } finally {
     if (currentSession === session) {

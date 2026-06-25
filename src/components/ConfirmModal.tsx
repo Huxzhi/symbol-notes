@@ -1,6 +1,6 @@
 import { Show, For } from "solid-js";
-import { modalStore } from "../stores/modalStore";
-import type { ModalButton } from "../stores/modalStore";
+import { modalState } from "../stores/ui";
+import type { ModalButton } from "../stores/ui";
 
 const VARIANT: Record<NonNullable<ModalButton["variant"]>, string> = {
   primary: "border-(--accent) text-(--accent) hover:bg-(--accent)/10",
@@ -10,7 +10,7 @@ const VARIANT: Record<NonNullable<ModalButton["variant"]>, string> = {
 
 export function ConfirmModal() {
   return (
-    <Show when={modalStore.open}>
+    <Show when={modalState.open}>
       <div
         class="fixed inset-0 z-[10000] flex items-center justify-center"
         style={{ background: "rgba(0,0,0,0.55)" }}
@@ -21,14 +21,14 @@ export function ConfirmModal() {
         >
           <div class="flex flex-col gap-1">
             <h2 class="text-[15px] font-semibold text-(--text)">
-              {modalStore.title}
+              {modalState.title}
             </h2>
             <p class="text-[13px] text-(--text-2) leading-relaxed">
-              {modalStore.message}
+              {modalState.message}
             </p>
           </div>
           <div class="flex justify-end gap-2 flex-wrap">
-            <For each={modalStore.buttons}>
+            <For each={modalState.buttons}>
               {(btn) => (
                 <button
                   class={`px-3 py-1.5 text-[13px] rounded border transition-colors ${VARIANT[btn.variant ?? "ghost"]}`}

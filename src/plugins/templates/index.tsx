@@ -7,7 +7,7 @@ import {
   templatesFolder,
   setTemplatesFolder,
 } from '../../lib/templates'
-import { showToast } from '../../stores/toastStore'
+import { ui } from '../../stores/ui'
 import { openTemplatePicker } from './pickerStore'
 
 function TemplatesSettings(_props: SettingsTabProps) {
@@ -45,7 +45,7 @@ export const TemplatesPlugin = definePlugin({
         const { text } = resolveTemplate(raw, { title: name })
         await ctx.fileManager.saveFile(created, text)
       } catch {
-        showToast('读取模板失败，已创建空文件')
+        ui.toast('读取模板失败，已创建空文件')
       }
       ctx.workspace.openFile(created)
     }
@@ -73,7 +73,7 @@ export const TemplatesPlugin = definePlugin({
       getIcon: () => <FileText size={18} />,
       onClick: () => {
         if (listTemplates().length === 0) {
-          showToast('没有可用模板，请先在设置中配置模板文件夹')
+          ui.toast('没有可用模板，请先在设置中配置模板文件夹')
           return
         }
         void openTemplatePicker('insert').then(async (result) => {
@@ -90,7 +90,7 @@ export const TemplatesPlugin = definePlugin({
               })
             }
           } catch {
-            showToast('读取模板失败')
+            ui.toast('读取模板失败')
           }
         })
       },

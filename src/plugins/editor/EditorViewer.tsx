@@ -16,7 +16,7 @@ import {
 import { vaultStore, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
 import { fileActions, reindexFile } from '../../fileManager'
 import { getStemIndex, getAliasIndex } from '../../metadata'
-import { showConflict } from '../../stores/conflictStore'
+import { ui } from '../../stores/ui'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
 import { frontmatterField } from '../../lib/cm6/frontmatterField'
@@ -200,7 +200,7 @@ export function EditorViewer(props: ViewComponentProps) {
       if (currentMtime > knownMtime) {
         const filename = p.split('/').pop() ?? p
         const diskContent = await readFile(p)
-        showConflict({
+        ui.conflict({
           filename,
           editorContent: view.state.doc.toString(),
           diskContent,

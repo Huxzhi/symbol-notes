@@ -1,9 +1,5 @@
 import { For } from "solid-js";
-import {
-  dismissToast,
-  toastStore,
-  type ToastLevel,
-} from "../stores/toastStore";
+import { toastState, ui, type ToastLevel } from "../stores/ui";
 
 const LEVEL: Record<ToastLevel, { border: string; icon: string }> = {
   info: { border: "var(--accent)", icon: "" },
@@ -17,7 +13,7 @@ export function ToastContainer() {
       class="fixed top-3 right-3 z-[9999] flex flex-col gap-2 pointer-events-none"
       style={{ "max-width": "300px", "min-width": "180px" }}
     >
-      <For each={toastStore.items}>
+      <For each={toastState.items}>
         {(toast) => {
           const lv = LEVEL[toast.level];
           return (
@@ -40,7 +36,7 @@ export function ToastContainer() {
               <span class="flex-1 break-words">{toast.msg}</span>
               <button
                 class="shrink-0 text-(--text-3) hover:text-(--text) text-[14px] leading-none mt-[-1px] transition-colors"
-                onClick={() => dismissToast(toast.id)}
+                onClick={() => ui.dismissToast(toast.id)}
                 title="关闭"
               >
                 ×
