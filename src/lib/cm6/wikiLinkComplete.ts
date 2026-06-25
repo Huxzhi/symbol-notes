@@ -4,7 +4,7 @@ import {
   type CompletionResult,
 } from '@codemirror/autocomplete'
 import type { EditorView } from '@codemirror/view'
-import { vaultStore } from '../../vault'
+import { allFiles } from '../../metadata'
 import type { FileMeta } from '../../stores/types'
 
 const MS_PER_DAY = 86_400_000
@@ -60,5 +60,5 @@ export function wikiLinkCompletionSource(
 
 /** 绑定到响应式 vault 的补全源,供编辑器统一 autocompletion 组合使用。 */
 export function wikiLinkSource(ctx: CompletionContext): CompletionResult | null {
-  return wikiLinkCompletionSource(ctx, vaultStore.files, Date.now())
+  return wikiLinkCompletionSource(ctx, allFiles(), Date.now())
 }

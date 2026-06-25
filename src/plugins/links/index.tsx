@@ -63,8 +63,8 @@ export const LinksPlugin = definePlugin({
                   const focusPath = ctx.workspace.activeFilePath()
                   if (!focusPath) { ctx.workspace.openFile(path); return }
                   const focusStem = focusPath.split('/').pop()!.replace(/\.md$/, '')
-                  const hit = ctx.vault
-                    .files()[path]
+                  const hit = ctx.metadata
+                    .file(path)
                     ?.outLinks.find((l) => ctx.metadata.resolveLink(l.target) === focusPath)
                   ctx.workspace.openFileAt(path, {
                     kind: 'wikilink',

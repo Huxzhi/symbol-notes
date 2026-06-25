@@ -4,10 +4,16 @@
 import { produce } from 'solid-js/store'
 import type { ParseResult } from '../lib/parseMarkdown'
 import { parseMarkdown } from '../lib/parseMarkdown'
-import type { FileMeta } from '../stores/types'
+import type { FileCache, FileEntry } from '../stores/types'
 import { buildContentFields, type ContentFields } from '../metadata/parse/fileMeta'
 import { vaultStore, setVaultStore } from '../vault/store'
-import { metadataStore } from '../metadata/store'
+import { metadataStore, setMetadataStore } from '../metadata/store'
+import {
+  getFile,
+  setFileCache,
+  removeFileCache,
+  EMPTY_CACHE,
+} from '../metadata/cache'
 import {
   applyFileBacklinks,
   removeFileBacklinks,
@@ -61,8 +67,9 @@ export async function reindexFile(
     await setCachedMeta(hash, fields)
   }
 
-  const prev = vaultStore.files[path]
-  setVaultStore('files', path, (f: FileMeta) => ({ ...f, hash, ...fields }))
+  const prev = getFile(path) // 合并视图(改前),供索引读旧 outLinks/tags
+  setVaultStore('files', path, 'hash', hash) // hash 属 stat
+  setFileCache(path, fields) // 解析内容落 metadata
   applyFileBacklinks(
     path,
     (prev?.outLinks ?? []).map((l) => l.target),
@@ -70,7 +77,7 @@ export async function reindexFile(
   )
   applyFileTags(path, prev?.tags ?? [], fields.tags)
   applyFileTasks(path, fields.lists)
-  applyFileCalendar(path, prev, vaultStore.files[path])
+  applyFileCalendar(path, prev, getFile(path))
 
   if (persistStat) {
     const entry = vaultStore.files[path]
@@ -83,15 +90,16 @@ export async function reindexFile(
   }
 }
 
-/** 文件删除：从 FileMeta 和所有索引中移除 */
+/** 文件删除：从 fileMap、解析内容和所有索引中移除 */
 export function removeVaultEntry(path: string): void {
-  const file = vaultStore.files[path]
+  const file = getFile(path)
   if (!file) return
   removeFileBacklinks(path, file)
   removeFileTags(path, file.tags)
   removeFileTasks(path)
   removeFileCalendar(path, file)
-  setVaultStore('files', path, undefined as unknown as FileMeta)
+  setVaultStore('files', path, undefined as unknown as FileEntry)
+  removeFileCache(path)
   invalidateStemIndex()
 }
 
@@ -101,13 +109,13 @@ export function remapFileLink(
   oldTarget: string,
   newTarget: string,
 ): void {
-  const file = vaultStore.files[filePath]
-  if (!file) return
-  const prevOutLinks = file.outLinks
+  const content = metadataStore.cache[filePath]
+  if (!content) return
+  const prevOutLinks = content.outLinks
   const nextOutLinks = prevOutLinks.map((l) =>
     l.target === oldTarget ? { ...l, target: newTarget } : l,
   )
-  setVaultStore('files', filePath, 'outLinks', nextOutLinks)
+  setMetadataStore('cache', filePath, 'outLinks', nextOutLinks)
   applyFileBacklinks(
     filePath,
     prevOutLinks.map((l) => l.target),
@@ -170,39 +178,33 @@ async function updateBacklinks(
 
 const EPOCH = new Date(0).toISOString().slice(0, 10)
 
-/** 新建文件/目录时的空 FileMeta 骨架（stat 全 0、内容字段全空）。 */
-function blankFileMeta(
+/** 新建文件/目录的空 fileMap 条目（仅 stat）。 */
+function blankEntry(
   name: string,
   path: string,
   kind: 'file' | 'directory',
   parent: string | null,
-): FileMeta {
-  return {
-    name,
-    path,
-    kind,
-    parent,
-    size: 0,
-    mtime: 0,
-    hash: '',
-    frontmatter: {},
-    outLinks: [],
-    etags: [],
-    tags: [],
-    aliases: [],
-    created: EPOCH,
-    updated: null,
-    dated: EPOCH,
-    lists: [],
-  }
+): FileEntry {
+  return { name, path, kind, parent, size: 0, mtime: 0, hash: '' }
 }
 
-/** 从 store.files 一次性删掉若干 path（单次响应式更新）。 */
+/** 新建文件的空解析内容（日期占位为 epoch）。 */
+function blankContent(): FileCache {
+  return { ...EMPTY_CACHE, created: EPOCH, dated: EPOCH }
+}
+
+/** 从 fileMap 与 cache 一次性删掉若干 path（单次响应式更新）。 */
 function removeFilesFromStore(paths: string[]): void {
   setVaultStore(
     'files',
-    produce((m: Record<string, FileMeta>) => {
+    produce((m: Record<string, FileEntry>) => {
       for (const p of paths) delete m[p]
+    }),
+  )
+  setMetadataStore(
+    'cache',
+    produce((c: Record<string, FileCache>) => {
+      for (const p of paths) delete c[p]
     }),
   )
 }
@@ -224,8 +226,9 @@ async function relocateFile(
   setVaultStore(
     'files',
     newPath,
-    blankFileMeta(newPath.split('/').pop()!, newPath, 'file', parent),
+    blankEntry(newPath.split('/').pop()!, newPath, 'file', parent),
   )
+  setFileCache(newPath, blankContent())
   applyNode()
   bumpStruct()
   invalidateStemIndex()
@@ -263,11 +266,11 @@ export const fileActions = {
       parts.length > 0 ? `${parts.join('/')}/${finalName}` : finalName
     await writeFile(path, '')
     const parent = parts.length > 0 ? parts.join('/') : null
-    const entry = blankFileMeta(finalName, path, 'file', parent)
-    setVaultStore('files', path, entry)
+    setVaultStore('files', path, blankEntry(finalName, path, 'file', parent))
+    setFileCache(path, blankContent())
     insertNode({ name: finalName, path, kind: 'file', parent })
     bumpStruct()
-    applyFileCalendar(path, undefined, entry)
+    applyFileCalendar(path, undefined, getFile(path))
     invalidateStemIndex()
     resolveNewFile(path)
     return path
@@ -279,8 +282,7 @@ export const fileActions = {
     const parts = name.split('/')
     const dirName = parts[parts.length - 1]
     const parent = parts.length > 1 ? parts.slice(0, -1).join('/') : null
-    const entry = blankFileMeta(dirName, name, 'directory', parent)
-    setVaultStore('files', name, entry)
+    setVaultStore('files', name, blankEntry(dirName, name, 'directory', parent))
     insertNode({ name: dirName, path: name, kind: 'directory', parent, children: [] })
     bumpStruct()
     invalidateStemIndex()
@@ -372,7 +374,7 @@ export const fileActions = {
     await deleteEntry(srcPath, { recursive: true })
     invalidatePrefix(srcPath)
     for (const entry of fileEntries) await deleteFileStatEntry(entry.path)
-    for (const entry of fileEntries) removeFileCalendar(entry.path, entry)
+    for (const entry of fileEntries) removeFileCalendar(entry.path, getFile(entry.path))
     removeFilesFromStore(descendants.map((e) => e.path))
     for (const entry of descendants) {
       const newEntryPath = newFolderPath + entry.path.slice(srcPath.length)

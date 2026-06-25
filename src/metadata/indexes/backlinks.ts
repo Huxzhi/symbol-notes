@@ -18,7 +18,7 @@ export function getStemIndex(): Map<string, string[]> {
 }
 
 export function getAliasIndex(): Map<string, string[]> {
-  if (!_aliasIndex) _aliasIndex = buildAliasIndex(vaultStore.files)
+  if (!_aliasIndex) _aliasIndex = buildAliasIndex(metadataStore.cache)
   return _aliasIndex
 }
 

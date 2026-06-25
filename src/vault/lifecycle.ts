@@ -2,13 +2,15 @@
 // 这是把磁盘上的 vault「装进」store 的编排层，写操作（CRUD）见 fileActions.ts。
 import { produce } from 'solid-js/store'
 import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
-import type { FileMeta } from '../stores/types'
+import type { FileCache, FileEntry } from '../stores/types'
 import {
   vaultStore,
   setVaultStore,
   setVaultFs,
   setIsIndexing,
 } from './store'
+import { setMetadataStore } from '../metadata/store'
+import { seedCache, allFiles, EMPTY_CACHE } from '../metadata/cache'
 import { buildBacklinks } from '../metadata/indexes/backlinks'
 import { buildTags } from '../metadata/indexes/tags'
 import { buildTasks } from '../metadata/indexes/tasks'
@@ -207,7 +209,7 @@ export async function scanPhase1(): Promise<ScanMid | null> {
   setIsIndexing(true)
   beginLoadProgress(session)
 
-  const [{ files, activePaths, tree }, idbStats] = await Promise.all([
+  const [{ entries, activePaths, tree }, idbStats] = await Promise.all([
     buildScan(incDetected),
     loadAllFileStats(),
   ])
@@ -218,20 +220,21 @@ export async function scanPhase1(): Promise<ScanMid | null> {
   const mdUnchanged: string[] = []
   const mdChanged: string[] = []
 
-  for (const [path, file] of Object.entries(files)) {
-    if (file.kind !== 'file' || !path.endsWith('.md')) continue
-    if (file.size > MAX_PARSE_BYTES) continue
+  for (const [path, entry] of Object.entries(entries)) {
+    if (entry.kind !== 'file' || !path.endsWith('.md')) continue
+    if (entry.size > MAX_PARSE_BYTES) continue
     const stat = idbStats.get(path)
-    if (stat && stat.size === file.size && stat.mtime === file.mtime) {
-      files[path] = { ...file, hash: stat.hash }
+    if (stat && stat.size === entry.size && stat.mtime === entry.mtime) {
+      entries[path] = { ...entry, hash: stat.hash }
       mdUnchanged.push(path)
     } else {
       mdChanged.push(path)
     }
   }
 
-  // 阶段 1：仅 stat 的 FileMeta 入 store + 建树（撤遮挡交给调用方，在 hydrate 后）
-  setVaultStore('files', files)
+  // 阶段 1：仅 stat 的 fileMap 入 vault store + 建树 + metadata 播种临时内容
+  setVaultStore('files', entries)
+  setMetadataStore('cache', seedCache(entries))
   setFileTree(tree)
   return { session, mdUnchanged, mdChanged, activePaths }
 }
@@ -266,25 +269,34 @@ export async function parseAndIndex(mid: ScanMid): Promise<void> {
       return
     }
 
-    // 阶段 2.5：一次性就地合并完整 FileMeta（单次响应式更新）
+    // 阶段 2.5：一次性合并——hash 落 vault.fileMap，解析内容落 metadata.content
     setVaultStore(
       'files',
-      produce((fs: Record<string, FileMeta>) => {
+      produce((fs: Record<string, FileEntry>) => {
         for (const [path, fields] of results) {
-          const f = fs[path]
-          if (f) Object.assign(f, fields)
+          if (fs[path] && fields.hash !== undefined) fs[path].hash = fields.hash
+        }
+      }),
+    )
+    setMetadataStore(
+      'cache',
+      produce((cs: Record<string, FileCache>) => {
+        for (const [path, fields] of results) {
+          const { hash: _h, ...content } = fields
+          cs[path] = { ...EMPTY_CACHE, ...content }
         }
       }),
     )
 
-    // 阶段 3：构建跨文件索引
+    // 阶段 3：构建跨文件索引（用合并视图）
+    const merged = allFiles()
     const mdFiles = Object.fromEntries(
-      Object.entries(vaultStore.files).filter(([p]) => p.endsWith('.md')),
+      Object.entries(merged).filter(([p]) => p.endsWith('.md')),
     )
     buildBacklinks(mdFiles)
     buildTags(mdFiles)
     buildTasks(mdFiles)
-    buildCalendar(vaultStore.files)
+    buildCalendar(merged)
     pruneFileStatCache(activePaths).catch(() => {})
     pruneCache(activeHashes).catch(() => {})
 

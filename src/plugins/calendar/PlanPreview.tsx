@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import { vaultStore } from '../../vault'
+import { getFile } from '../../metadata'
 import { fileActions } from '../../fileManager'
 
 const MAX_PREVIEW_ITEMS = 6
@@ -12,7 +12,7 @@ export function PlanPreview(props: {
   compact?: boolean
   onEdit: () => void
 }) {
-  const meta = () => vaultStore.files[props.path]
+  const meta = () => getFile(props.path)
   const exists = () => !!meta()
   const items = () => (meta()?.lists ?? []).map((l) => l.visual).filter((v) => v.trim().length > 0)
 

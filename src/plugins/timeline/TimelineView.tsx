@@ -1,6 +1,5 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { vaultStore } from '../../vault'
-import { metadataStore } from '../../metadata'
+import { metadataStore, allFiles } from '../../metadata'
 import { getStemIndex, getAliasIndex, extractDateFromName } from '../../metadata'
 import { readFile } from '../../vault/fs/io'
 import { resolveLink } from '../../metadata/indexes/backlinks'
@@ -25,7 +24,7 @@ export function TimelineView(props: ViewComponentProps) {
   const neighborhood = createMemo<Neighborhood>(() => {
     const f = focus()
     if (!f) return { notes: [], edges: [] }
-    const files = vaultStore.files
+    const files = allFiles()
     const resolve = (target: string) =>
       resolveLink(target, getStemIndex(), files, getAliasIndex())
     return buildNeighborhood(f, files, metadataStore.backlinkMap, resolve, {
@@ -35,7 +34,7 @@ export function TimelineView(props: ViewComponentProps) {
   })
 
   const events = createMemo<TimelineEvent[]>(() =>
-    deriveEvents(neighborhood(), vaultStore.files),
+    deriveEvents(neighborhood(), allFiles()),
   )
 
   const grid = createMemo(() =>

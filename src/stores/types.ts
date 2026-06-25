@@ -101,7 +101,8 @@ export interface TreeNode {
   children?: TreeNode[]   // 仅 directory
 }
 
-export interface FileMeta {
+/** 文件身份 + stat(vault 拥有)。扫描即就位,内容编辑不动它 → 文件树不重渲染。 */
+export interface FileEntry {
   name: string
   path: string
   kind: 'file' | 'directory'
@@ -109,6 +110,10 @@ export interface FileMeta {
   size: number
   mtime: number
   hash: string           // content hash (two-variant djb2, 64-bit); '' until indexed
+}
+
+/** 解析内容(metadata 拥有,path 键)。内容编辑/重命名时由 metadata 重算。 */
+export interface FileCache {
   frontmatter: Record<string, unknown>
   outLinks: WikiLinkInfo[]
   etags: string[]
@@ -119,6 +124,9 @@ export interface FileMeta {
   dated: string          // YYYY-MM-DD: frontmatter.dated → created (never null)
   lists: ListItem[]      // 全部列表项；task===true 为任务子集
 }
+
+/** 合并视图:需要同时读 stat 与解析内容的消费方用(经 getFile(path) 取)。 */
+export type FileMeta = FileEntry & FileCache
 
 /** 列表项 + 所属文件路径（日历/任务跨文件展示用）。 */
 export type Task = ListItem & { path: string }
@@ -132,13 +140,15 @@ export interface DateBucket {
   entries: Task[]
 }
 
-/** vault 拥有的状态:文件身份 + stat + 内容(FileMeta)。 */
+/** vault 拥有的状态:fileMap(仅身份+stat)。 */
 export interface VaultState {
-  files: Record<string, FileMeta>
+  files: Record<string, FileEntry>
 }
 
-/** metadata 拥有的状态:从 files 派生的跨文件索引。 */
+/** metadata 拥有的状态:每文件解析内容 + 从内容派生的跨文件索引。 */
 export interface MetadataState {
+  /** path → 解析内容(frontmatter/outLinks/tags/lists…)。 */
+  cache: Record<string, FileCache>
   backlinkMap: Record<string, string[]>
   unresolvedMap: Record<string, string[]>
   tagMap: Record<string, string[]>

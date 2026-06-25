@@ -14,3 +14,6 @@ export { extractDateFromName } from './parse/extract'
 
 // 派生索引的响应式 store(只读消费:服务 / 插件)。写入只走本层 indexes/*。
 export { metadataStore } from './store'
+
+// 每文件解析内容的读取 + 合并视图。
+export { fileCache, getFile, allFiles } from './cache'

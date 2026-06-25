@@ -1,6 +1,6 @@
 import { getPluginConfig, setPluginConfig } from '../pluginData'
 import { vaultStore } from '../../vault'
-import type { FileMeta } from '../../stores/types'
+import type { FileEntry } from '../../stores/types'
 
 export interface TemplateEntry {
   name: string
@@ -18,7 +18,7 @@ export function setTemplatesFolder(folder: string): void {
 }
 
 export function filterTemplateFiles(
-  files: Record<string, FileMeta>,
+  files: Record<string, FileEntry>,
   folder: string,
 ): TemplateEntry[] {
   const trimmed = folder.replace(/\/+$/, '')

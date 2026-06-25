@@ -2,24 +2,26 @@
 // 组件直接 import 使用;插件经 ctx.vault / ctx.metadata / ctx.fileManager 拿到的是
 // 同一批单例(pluginRegistry 只是把它们转交给插件,不重建)。
 // 这些是对 src/vault/* 领域模块的稳定门面;依赖方向:services → vault,vault 不反依赖。
-import type { FileMeta } from './stores/types'
+import type { FileEntry, FileMeta } from './stores/types'
 import { readFile, vaultFs, vaultStore } from './vault'
-import { getAliasIndex, getStemIndex, resolveLink, metadataStore } from './metadata'
+import { getAliasIndex, getStemIndex, resolveLink, metadataStore, getFile } from './metadata'
 import { fileActions } from './fileManager'
 
 // ── 契约 ────────────────────────────────────────────────────────────────────
 
-/** 字节层:文件读取 + 响应式 FileMeta(身份+stat+内容)。 */
+/** 字节层:文件读取 + 响应式 fileMap(仅 stat 的 FileEntry)。 */
 export interface VaultService {
   /** vault 是否已打开(响应式)。 */
   ready(): boolean
-  /** 全部文件/目录的 FileMeta(响应式)。 */
-  files(): Record<string, FileMeta>
+  /** 全部文件/目录的 stat(响应式)。解析内容见 metadata.file。 */
+  files(): Record<string, FileEntry>
   readFile(path: string): Promise<string>
 }
 
-/** 解析缓存 / 派生索引:双链、链接解析。 */
+/** 解析缓存 / 派生索引:每文件内容、双链、链接解析。 */
 export interface MetadataService {
+  /** 单文件的合并视图(stat + 解析内容,响应式)。 */
+  file(path: string): FileMeta | undefined
   /** 指向 path 的文件列表(响应式)。 */
   backlinks(path: string): string[]
   /** 把 `[[名字]]` 解析成绝对路径,解析不到返回 null。 */
@@ -46,6 +48,7 @@ export const vault: VaultService = {
 }
 
 export const metadata: MetadataService = {
+  file: (path) => getFile(path),
   backlinks: (path) => [...(metadataStore.backlinkMap[path] ?? [])],
   resolveLink: (target) => {
     const withExt = target.endsWith('.md') ? target : `${target}.md`
