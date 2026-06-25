@@ -15,7 +15,7 @@ import type { FileMeta, TreeNode, ViewComponentProps } from '../../stores/types'
 import { activeFilePath } from '../../stores/workspaceStore'
 import { resolveDropTarget, isOtherFile, folderChain } from './treeUtils'
 import { flatten as flattenTree, structVer, type FlatRow } from '../../vault/fileTree'
-import { revealTarget } from '../../stores/revealStore'
+import { revealTarget } from '../../stores/workspaceStore'
 
 export function toggleInArray(arr: string[], val: string): string[] {
   return arr.includes(val) ? arr.filter((p) => p !== val) : [...arr, val]

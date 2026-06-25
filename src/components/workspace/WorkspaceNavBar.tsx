@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import { ChevronLeft, ChevronRight } from 'lucide-solid'
 import { workspaceActions, leafInstances } from '../../stores/workspaceStore'
-import { revealFolder } from '../../stores/revealStore'
+import { revealFolder } from '../../stores/workspaceStore'
 import { getView } from '../../lib/pluginRegistry'
 import { splitBreadcrumb } from './breadcrumb'
 import type { WorkspaceTabs, WorkspaceLeaf } from '../../stores/types'

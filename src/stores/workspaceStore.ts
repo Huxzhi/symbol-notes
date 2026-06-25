@@ -1,4 +1,4 @@
-import { createRoot, createEffect } from 'solid-js'
+import { createRoot, createEffect, createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import * as vaultConfig from '../config/vaultConfig'
 import { getFileViewForPath, getView } from '../lib/pluginRegistry'
@@ -669,3 +669,27 @@ export const workspaceActions = {
 }
 
 export { workspaceStore, setWorkspaceStore }
+
+// ── 工作区交互态(原 revealStore / tabDragState,折叠至此) ─────────────────────
+
+/** 请求在文件面板中定位并展开某文件夹。nonce 保证重复点击同一路径也能重新触发。 */
+export const [revealTarget, setRevealTarget] = createSignal<{
+  path: string
+  nonce: number
+} | null>(null)
+let _revealN = 0
+export function revealFolder(path: string): void {
+  setRevealTarget({ path, nonce: ++_revealN })
+}
+
+/** 主区标签拖拽中的状态(拖放重排 / 跨区移动)。 */
+export interface TabDragState {
+  leafId: string
+  sourceTabsId: string
+  sourceArea: 'left' | 'main' | 'right'
+}
+const [dragState, setDragState] = createSignal<TabDragState | null>(null)
+export { dragState, setDragState }
+export function isDraggingMainTab(): boolean {
+  return dragState()?.sourceArea === 'main'
+}
