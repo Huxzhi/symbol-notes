@@ -33,7 +33,7 @@ export const FilesPlugin = definePlugin({
           label: '删除',
           action: () => {
             if (confirm(`删除 ${path.split('/').pop()}？`))
-              void ctx.vault.deleteFile(path)
+              void ctx.fileManager.deleteFile(path)
           },
         },
       ]
@@ -52,7 +52,7 @@ export const FilesPlugin = definePlugin({
           label: '删除文件夹',
           action: () => {
             if (confirm(`删除文件夹 ${path.split('/').pop()}？`))
-              void ctx.vault.deleteFolder(path)
+              void ctx.fileManager.deleteFolder(path)
           },
         },
       ]

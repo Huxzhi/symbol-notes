@@ -13,7 +13,9 @@ import {
   onCleanup,
   Show,
 } from 'solid-js'
-import { fileActions, reindexFile, vaultStore, getStemIndex, getAliasIndex, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
+import { vaultStore, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
+import { fileActions, reindexFile } from '../../fileManager'
+import { getStemIndex, getAliasIndex } from '../../metadata'
 import { showConflict } from '../../stores/conflictStore'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
@@ -33,7 +35,7 @@ import {
   setFrontmatterField,
 } from '../../lib/parseFrontmatter'
 import { wikiEmbedParser, wikiLinkParser } from '../../lib/cm6/wikiLinkParser'
-import { extractDateFromName, resolveLink } from '../../vault'
+import { extractDateFromName, resolveLink } from '../../metadata'
 import { workspaceActions, setLeafInstances, leafInstances } from '../../stores/workspaceStore'
 import { findWikiLink, findHeading } from '../../lib/linkLocate'
 import { syntaxTree } from '@codemirror/language'

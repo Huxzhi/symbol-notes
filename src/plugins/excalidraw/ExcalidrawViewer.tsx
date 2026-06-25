@@ -1,6 +1,7 @@
 import { createEffect, on, onCleanup, onMount, createMemo } from 'solid-js'
 import { getPluginConfig as getPluginData } from '../../lib/pluginData'
-import { fileActions, vaultFs } from '../../vault'
+import { vaultFs } from '../../vault'
+import { fileActions } from '../../fileManager'
 import { setLeafInstances } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {

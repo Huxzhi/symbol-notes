@@ -5,21 +5,21 @@ import { produce } from 'solid-js/store'
 import type { ParseResult } from '../lib/parseMarkdown'
 import { parseMarkdown } from '../lib/parseMarkdown'
 import type { FileMeta } from '../stores/types'
-import { buildContentFields, type ContentFields } from './parse/fileMeta'
-import { vaultStore, setVaultStore } from './store'
+import { buildContentFields, type ContentFields } from '../metadata/parse/fileMeta'
+import { vaultStore, setVaultStore } from '../vault/store'
 import {
   applyFileBacklinks,
   removeFileBacklinks,
   resolveNewFile,
   invalidateStemIndex,
-} from './indexes/backlinks'
+} from '../metadata/indexes/backlinks'
 import {
   deleteFileStatEntry,
   getCachedMeta,
   hashContent,
   setCachedMeta,
   setFileStatEntry,
-} from './indexStorage'
+} from '../vault/indexStorage'
 import {
   createDirectory,
   deleteEntry,
@@ -28,17 +28,17 @@ import {
   isReady,
   readFile,
   writeFile,
-} from './fs/io'
-import { applyFileTags, removeFileTags } from './indexes/tags'
-import { applyFileTasks, removeFileTasks } from './indexes/tasks'
-import { applyFileCalendar, removeFileCalendar } from './indexes/calendar'
+} from '../vault/fs/io'
+import { applyFileTags, removeFileTags } from '../metadata/indexes/tags'
+import { applyFileTasks, removeFileTasks } from '../metadata/indexes/tasks'
+import { applyFileCalendar, removeFileCalendar } from '../metadata/indexes/calendar'
 import {
   bumpStruct,
   insertNode,
   removeNode,
   renameNode,
   moveNode,
-} from './fileTree'
+} from '../vault/fileTree'
 
 // ── 单文件 reindex / 删除 / 链接 remap ─────────────────────────────────────────
 

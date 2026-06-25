@@ -9,7 +9,7 @@ export const LinksPlugin = definePlugin({
   setup(ctx) {
     function resolveOutLink(link: OutLink): string | null {
       if (link.type !== 'wiki') return null
-      return ctx.vault.resolveLink(link.target)
+      return ctx.metadata.resolveLink(link.target)
     }
 
     function LinksPanel(_props: ViewComponentProps) {
@@ -17,7 +17,7 @@ export const LinksPlugin = definePlugin({
 
       const backlinks = createMemo(() => {
         const path = ctx.workspace.activeFilePath()
-        return path ? ctx.vault.backlinks(path) : []
+        return path ? ctx.metadata.backlinks(path) : []
       })
 
       return (
@@ -65,7 +65,7 @@ export const LinksPlugin = definePlugin({
                   const focusStem = focusPath.split('/').pop()!.replace(/\.md$/, '')
                   const hit = ctx.vault
                     .files()[path]
-                    ?.outLinks.find((l) => ctx.vault.resolveLink(l.target) === focusPath)
+                    ?.outLinks.find((l) => ctx.metadata.resolveLink(l.target) === focusPath)
                   ctx.workspace.openFileAt(path, {
                     kind: 'wikilink',
                     targetStem: focusStem,

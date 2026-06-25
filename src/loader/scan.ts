@@ -2,18 +2,18 @@
 // 字段抽取/拼装在 parse/；Phase2 索引构建在 index.ts
 import { createMarkdownParser } from '../lib/parseMarkdown'
 import type { FileMeta, TreeNode } from '../stores/types'
-import { setVaultStore, vaultStore } from './store'
-import { buildTreeFromScan, setFileTree } from './fileTree'
+import { setVaultStore, vaultStore } from '../vault/store'
+import { buildTreeFromScan, setFileTree } from '../vault/fileTree'
 import {
   getCachedMeta,
   getManyMeta,
   hashContent,
   setCachedMeta,
   setFileStatEntry,
-} from './indexStorage'
-import { scanTree, readFile, type ScanEntry } from './fs/io'
-import { extractDateFromName } from './parse/extract'
-import { buildContentFields } from './parse/fileMeta'
+} from '../vault/indexStorage'
+import { scanTree, readFile, type ScanEntry } from '../vault/fs/io'
+import { extractDateFromName } from '../metadata/parse/extract'
+import { buildContentFields } from '../metadata/parse/fileMeta'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

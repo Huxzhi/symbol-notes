@@ -119,9 +119,9 @@ export const ExcalidrawPlugin = definePlugin({
     async function createExcalidrawFile(dirPath: string | null): Promise<void> {
       const name = getUniqueName(dirPath)
       const fullName = dirPath ? `${dirPath}/${name}` : name
-      const path = await ctx.vault.createFile(fullName)
+      const path = await ctx.fileManager.createFile(fullName)
       if (!path) return
-      await ctx.vault.saveFile(path, EMPTY_EXCALIDRAW_MD)
+      await ctx.fileManager.saveFile(path, EMPTY_EXCALIDRAW_MD)
       ctx.workspace.openFile(path)
     }
 

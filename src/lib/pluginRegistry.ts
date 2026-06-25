@@ -2,7 +2,7 @@ import type { Component, JSX } from 'solid-js'
 import { createEffect, createRoot, createSignal, onCleanup } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { settingsStore } from '../stores/settingsStore'
-import type { FileMeta, RevealRequest, ViewComponentProps } from '../stores/types'
+import type { RevealRequest, ViewComponentProps } from '../stores/types'
 import {
   activeFilePath,
   activeLayout,
@@ -11,14 +11,12 @@ import {
   leafInstances,
   workspaceActions,
 } from '../stores/workspaceStore'
-import {
-  fileActions,
-  getStemIndex,
-  getAliasIndex,
-  resolveLink,
-  vaultFs,
-  vaultStore,
-} from '../vault'
+import { vault, metadata, fileManager } from '../services'
+import type {
+  VaultService,
+  MetadataService,
+  FileManagerService,
+} from '../services'
 import type { Heading } from './cm6/headingsField'
 import type { OutLink } from './cm6/outLinksField'
 import { getPluginConfig, setPluginConfig } from './pluginData'
@@ -213,27 +211,8 @@ export function _resetContextMenuForTest(): void {
   _contextMenuRegistry.clear()
 }
 
-// ── Vault Service ─────────────────────────────────────────────────────────────
-
-export interface VaultService {
-  /** Whether a vault is open and ready. Reactive — use in createMemo/createEffect. */
-  ready(): boolean
-  /** All vault files and directories. Reactive. */
-  files(): Record<string, FileMeta>
-  /** Files that link to the given path. Reactive. */
-  backlinks(path: string): string[]
-  /** Resolve a wiki link target to an absolute vault path, or null if unresolved. */
-  resolveLink(target: string): string | null
-
-  readFile(path: string): Promise<string>
-  saveFile(path: string, content: string): Promise<void>
-  createFile(name: string): Promise<string | null>
-  createFolder(name: string): Promise<void>
-  deleteFile(path: string): Promise<void>
-  deleteFolder(path: string): Promise<void>
-  renameFile(path: string, newName: string): Promise<void>
-  moveEntry(src: string, dest: string | null): Promise<void>
-}
+// 三个数据服务(VaultService / MetadataService / FileManagerService)的定义与单例
+// 在 src/services.ts;这里只把单例转交给插件(见下方 ctx)。
 
 // ── Plugin Lifecycle ──────────────────────────────────────────────────────────
 
@@ -242,6 +221,8 @@ export interface PluginContext {
   ribbon(def: RibbonItemDef): void
   contextMenu(type: string, factory: ContextMenuFactory): void
   vault: VaultService
+  metadata: MetadataService
+  fileManager: FileManagerService
   workspace: {
     /** 直接按 type+state 申请或切换一个 leaf，不经过文件路径解析 */
     openLeaf(
@@ -323,23 +304,9 @@ function loadPlugin(def: PluginDef): () => void {
         registerContextMenu(type, factory)
         onCleanup(() => unregisterContextMenu(type, factory))
       },
-      vault: {
-        ready: () => vaultFs() !== null,
-        files: () => vaultStore.files,
-        backlinks: (path) => [...(vaultStore.backlinkMap[path] ?? [])],
-        resolveLink: (target) => {
-          const withExt = target.endsWith('.md') ? target : `${target}.md`
-          return resolveLink(withExt, getStemIndex(), vaultStore.files, getAliasIndex())
-        },
-        readFile: (path) => fileActions.readFile(path),
-        saveFile: (path, c) => fileActions.saveFile(path, c),
-        createFile: (name) => fileActions.createFile(name),
-        createFolder: (name) => fileActions.createFolder(name),
-        deleteFile: (path) => fileActions.deleteFile(path),
-        deleteFolder: (path) => fileActions.deleteFolder(path),
-        renameFile: (path, name) => fileActions.renameFile(path, name),
-        moveEntry: (src, dest) => fileActions.moveEntry(src, dest),
-      },
+      vault,
+      metadata,
+      fileManager,
       workspace: {
         openLeaf: (viewState, opts) =>
           workspaceActions.openLeaf(viewState, opts),

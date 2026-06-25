@@ -1,5 +1,5 @@
 import type { FileMeta, ListItem } from '../../stores/types'
-import { setVaultStore } from '../store'
+import { setVaultStore } from '../../vault/store'
 
 export function buildTaskMap(files: Record<string, { lists: ListItem[] }>): Record<string, ListItem[]> {
   const result: Record<string, ListItem[]> = {}

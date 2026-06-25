@@ -1,5 +1,5 @@
 import type { FileMeta } from '../../stores/types'
-import { vaultStore, setVaultStore } from '../store'
+import { vaultStore, setVaultStore } from '../../vault/store'
 
 // ── Stem / alias 懒缓存（派生自 store.files 的链接索引） ───────────────────────
 

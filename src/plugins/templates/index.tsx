@@ -38,12 +38,12 @@ export const TemplatesPlugin = definePlugin({
     async function applyToNewNote(templatePath: string, name: string, folder: string) {
       const targetDir = folder.replace(/\/+$/, '')
       const path = targetDir ? `${targetDir}/${name}` : name
-      const created = await ctx.vault.createFile(path)
+      const created = await ctx.fileManager.createFile(path)
       if (!created) return
       try {
         const raw = await ctx.vault.readFile(templatePath)
         const { text } = resolveTemplate(raw, { title: name })
-        await ctx.vault.saveFile(created, text)
+        await ctx.fileManager.saveFile(created, text)
       } catch {
         showToast('读取模板失败，已创建空文件')
       }

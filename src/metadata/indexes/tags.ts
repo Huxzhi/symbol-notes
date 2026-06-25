@@ -1,5 +1,5 @@
 import type { FileMeta } from '../../stores/types'
-import { setVaultStore } from '../store'
+import { setVaultStore } from '../../vault/store'
 
 function buildTagMap(files: Record<string, { tags: string[] }>): Record<string, string[]> {
   const map: Record<string, string[]> = {}

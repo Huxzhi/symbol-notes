@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { loadProgress } from '../vault/loadProgress'
+import { loadProgress } from '../loader/loadProgress'
 import { maskColors } from '../lib/themeCache'
 
 export function LoadingOverlay() {

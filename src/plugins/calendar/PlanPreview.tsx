@@ -1,5 +1,6 @@
 import { For, Show } from 'solid-js'
-import { vaultStore, fileActions } from '../../vault'
+import { vaultStore } from '../../vault'
+import { fileActions } from '../../fileManager'
 
 const MAX_PREVIEW_ITEMS = 6
 

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockSave = vi.fn()
-vi.mock('../../vault/vaultConfig', () => ({
+vi.mock('../../config/vaultConfig', () => ({
   savePluginData: mockSave,
   isConfigActive: () => false,
 }))

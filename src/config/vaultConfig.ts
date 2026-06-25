@@ -3,7 +3,7 @@
 // vault 外的 meta（路径 / 是否拒绝）存 IndexedDB。
 import { createSignal } from 'solid-js'
 import { get, set } from 'idb-keyval'
-import type { FileSystemAdapter } from './fs/types'
+import type { FileSystemAdapter } from '../vault/fs/types'
 import type { ThemeSettings, VaultSettings, WorkspaceState } from '../stores/types'
 
 export const DEFAULT_CONFIG_PATH = '.symbol-notes'

@@ -1,6 +1,6 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
-import * as vaultConfig from '../vault/vaultConfig'
+import * as vaultConfig from '../config/vaultConfig'
 import { applyTheme, resolveTheme } from '../lib/theme'
 import type {
   SettingsState,
