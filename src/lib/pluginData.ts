@@ -2,7 +2,7 @@
 // 插件早于 vault 连接启动 → store 模块级持有、随启停不丢；vault 连接后由 hydratePluginData 注入。
 import { createEffect, createRoot } from 'solid-js'
 import { createStore, reconcile, type SetStoreFunction } from 'solid-js/store'
-import * as vaultConfig from '../config/vaultConfig'
+import * as vaultConfig from '../vault/vaultConfig'
 
 interface Entry {
   config: Record<string, unknown>

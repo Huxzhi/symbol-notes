@@ -1,6 +1,6 @@
 import { createRoot, createEffect, createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
-import * as vaultConfig from '../config/vaultConfig'
+import * as vaultConfig from '../vault/vaultConfig'
 import { getFileViewForPath, getView } from '../lib/pluginRegistry'
 import { pushHistory } from './leafHistory'
 import {

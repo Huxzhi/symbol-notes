@@ -2,8 +2,8 @@ import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { settingsActions, settingsStore } from "../stores/settingsStore";
 import { vaultFs } from "../vault";
-import { vaultConfigActions } from "../loader";
-import { vaultConfigMeta } from "../config/vaultConfig";
+import { vaultConfigActions } from "../vault/lifecycle";
+import { vaultConfigMeta } from "../vault/vaultConfig";
 import { getRegisteredPlugins } from "../lib/pluginRegistry";
 import { getSettingsTabs } from "../lib/pluginRegistry";
 import {

@@ -8,12 +8,12 @@ import {
   setVaultStore,
   setVaultFs,
   setIsIndexing,
-} from '../vault/store'
+} from './store'
 import { buildBacklinks } from '../metadata/indexes/backlinks'
 import { buildTags } from '../metadata/indexes/tags'
 import { buildTasks } from '../metadata/indexes/tasks'
 import { buildCalendar } from '../metadata/indexes/calendar'
-import { LocalAdapter } from '../vault/fs/LocalAdapter'
+import { LocalAdapter } from './fs/LocalAdapter'
 import {
   beginLoadProgress,
   endLoadProgress,
@@ -25,11 +25,12 @@ import {
   loadAllFileStats,
   pruneCache,
   pruneFileStatCache,
-} from '../vault/indexStorage'
-import { isReady, initFileIO } from '../vault/fs/io'
-import { buildScan, parseAll } from './scan'
-import { setFileTree } from '../vault/fileTree'
-import * as vaultConfig from '../config/vaultConfig'
+} from './indexStorage'
+import { isReady, initFileIO } from './fs/io'
+import { buildScan } from './scan'
+import { parseAll } from '../metadata/parse/parseAll'
+import { setFileTree } from './fileTree'
+import * as vaultConfig from './vaultConfig'
 
 // ── Connection ────────────────────────────────────────────────────────────────
 

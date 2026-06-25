@@ -1,21 +1,18 @@
-// 职责：FS walk → FileMeta（buildScan），后台批量解析（parseAll），快速重扫（rescanTree）
-// 字段抽取/拼装在 parse/；Phase2 索引构建在 index.ts
-import { createMarkdownParser } from '../lib/parseMarkdown'
-import type { FileMeta, TreeNode } from '../stores/types'
-import { setVaultStore, vaultStore } from '../vault/store'
-import { buildTreeFromScan, setFileTree } from '../vault/fileTree'
+// 职责:后台批量「读文件 → 解析内容」,产出每个 path 的解析字段(缓存优先)。
+// 这是 metadata 的「读取+解析」入口(原 loader/scan.ts 的 parseAll)。不写 store,
+// 由调用方(vault/lifecycle.parseAndIndex)一次性合并进 fileMap 并建跨文件索引。
+import { createMarkdownParser } from '../../lib/parseMarkdown'
+import type { FileMeta } from '../../stores/types'
+import { vaultStore } from '../../vault/store'
 import {
   getCachedMeta,
   getManyMeta,
   hashContent,
   setCachedMeta,
   setFileStatEntry,
-} from '../vault/indexStorage'
-import { scanTree, readFile, type ScanEntry } from '../vault/fs/io'
-import { extractDateFromName } from '../metadata/parse/extract'
-import { buildContentFields } from '../metadata/parse/fileMeta'
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+} from '../../vault/indexStorage'
+import { readFile } from '../../vault/fs/io'
+import { buildContentFields } from './fileMeta'
 
 /**
  * Yield to the event loop via a macrotask so the browser can paint and the
@@ -31,66 +28,6 @@ function yieldToMain(): Promise<void> {
 const UNCHANGED_YIELD_EVERY = 50
 // Changed files are parsed (expensive) → yield after every file.
 const CHANGED_YIELD_EVERY = 10
-
-// ── FS Walk → FileMeta (stat only) ───────────────────────────────────────────
-
-export interface ScanResult {
-  files: Record<string, FileMeta>
-  activePaths: Set<string>
-  tree: TreeNode
-}
-
-const EMPTY_CONTENT: Pick<
-  FileMeta,
-  | 'frontmatter'
-  | 'outLinks'
-  | 'etags'
-  | 'tags'
-  | 'aliases'
-  | 'updated'
-  | 'lists'
-> = {
-  frontmatter: {},
-  outLinks: [],
-  etags: [],
-  tags: [],
-  aliases: [],
-  updated: null,
-  lists: [],
-}
-
-export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
-  const files: Record<string, FileMeta> = {}
-  const activePaths = new Set<string>()
-  const epoch = new Date(0).toISOString().slice(0, 10)
-  const roots = await scanTree(32, onDetected)
-  // 顺着嵌套结果一遍：扁平化成 files（合并 store 仍需要）+ 收集活跃路径。
-  const walk = (entries: ScanEntry[]): void => {
-    for (const entry of entries) {
-      const { name, path, kind, parent, size, mtime } = entry
-      if (kind === 'directory') {
-        files[path] = {
-          name, path, kind: 'directory', parent,
-          size: 0, mtime: 0, hash: '', ...EMPTY_CONTENT,
-          created: epoch, dated: extractDateFromName(name) ?? epoch,
-        }
-        walk(entry.children ?? [])
-      } else {
-        const mtimeStr = new Date(mtime).toISOString().slice(0, 10)
-        files[path] = {
-          name, path, kind: 'file', parent,
-          size, mtime, hash: '', ...EMPTY_CONTENT,
-          created: mtimeStr, dated: extractDateFromName(name) ?? mtimeStr,
-        }
-        activePaths.add(path)
-      }
-    }
-  }
-  walk(roots)
-  return { files, activePaths, tree: buildTreeFromScan(roots) }
-}
-
-// ── Phase 1: 内容解析，填充 FileMeta hash/frontmatter/outLinks/tags/tasks ────
 
 export type ParsedFields = Partial<FileMeta>
 
@@ -167,12 +104,4 @@ export async function parseAll(
     }
   }
   return results
-}
-
-// ── Quick rescan (no parsing) ─────────────────────────────────────────────────
-
-export async function rescanTree(): Promise<void> {
-  const { files, tree } = await buildScan()
-  setVaultStore('files', files)
-  setFileTree(tree)
 }

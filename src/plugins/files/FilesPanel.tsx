@@ -4,7 +4,7 @@ import { createVirtualizer } from '@tanstack/solid-virtual'
 
 import { vaultFs, vaultStore } from '../../vault'
 import { fileActions } from '../../fileManager'
-import { openVault } from '../../loader'
+import { openVault } from '../../vault/lifecycle'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { fileOp, beginCreate, cancelOp } from './fileOpStore'
 import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
