@@ -1,5 +1,5 @@
 import type { FileMeta, DateBucket, Task } from '../../stores/types'
-import { setVaultStore, vaultStore } from '../../vault/store'
+import { metadataStore, setMetadataStore } from '../store'
 
 // 日历日期归类逻辑（原先散在 calendar 插件的 buildDayData/buildTaskDayData/
 // buildEntryDayData）。放在 vault 层，因为增量维护需要 reindex 时的 prev/next
@@ -146,12 +146,12 @@ export function buildCalendarByDate(files: Record<string, FileMeta>): Record<str
 
 /** 扫描后写入基线。 */
 export function buildCalendar(files: Record<string, FileMeta>): void {
-  setVaultStore('calendarByDate', buildCalendarByDate(files))
+  setMetadataStore('calendarByDate', buildCalendarByDate(files))
 }
 
 function storeAdd(path: string, cal: FileCal): void {
   const add = (date: string, mut: (b: DateBucket) => DateBucket) =>
-    setVaultStore('calendarByDate', date, (b: DateBucket | undefined) => mut(b ?? emptyBucket()))
+    setMetadataStore('calendarByDate', date, (b: DateBucket | undefined) => mut(b ?? emptyBucket()))
   if (cal.datedDate) add(cal.datedDate, (b) => ({ ...b, dated: [...b.dated, path] }))
   if (cal.createdDate) add(cal.createdDate, (b) => ({ ...b, created: [...b.created, path] }))
   if (cal.updatedDate) add(cal.updatedDate, (b) => ({ ...b, updated: [...b.updated, path] }))
@@ -161,10 +161,10 @@ function storeAdd(path: string, cal: FileCal): void {
 
 function storeRemove(path: string, cal: FileCal): void {
   for (const date of datesOf(cal)) {
-    const cur = vaultStore.calendarByDate[date]
+    const cur = metadataStore.calendarByDate[date]
     if (!cur) continue
     const nb = withoutPath(cur, path)
-    setVaultStore(
+    setMetadataStore(
       'calendarByDate',
       date,
       (isEmptyBucket(nb) ? undefined : nb) as DateBucket,

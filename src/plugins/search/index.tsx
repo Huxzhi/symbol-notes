@@ -1,5 +1,5 @@
 import { createMemo, For, Show } from 'solid-js'
-import { vaultStore } from '../../vault'
+import { metadataStore } from '../../metadata'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { definePlugin } from '../../lib/pluginRegistry'
 import type { ViewComponentProps } from '../../stores/types'
@@ -16,7 +16,7 @@ function SearchPanel(props: ViewComponentProps) {
     const t = tag()
     if (!t) return []
     const paths = new Set<string>()
-    for (const [k, files] of Object.entries(vaultStore.tagMap)) {
+    for (const [k, files] of Object.entries(metadataStore.tagMap)) {
       if (k === t || k.startsWith(t + '/')) {
         for (const f of files) paths.add(f)
       }

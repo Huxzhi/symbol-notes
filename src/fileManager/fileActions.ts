@@ -7,6 +7,7 @@ import { parseMarkdown } from '../lib/parseMarkdown'
 import type { FileMeta } from '../stores/types'
 import { buildContentFields, type ContentFields } from '../metadata/parse/fileMeta'
 import { vaultStore, setVaultStore } from '../vault/store'
+import { metadataStore } from '../metadata/store'
 import {
   applyFileBacklinks,
   removeFileBacklinks,
@@ -150,7 +151,7 @@ async function updateBacklinks(
   oldPath: string,
   newPath: string,
 ): Promise<void> {
-  const backlinks = vaultStore.backlinkMap[oldPath] ?? []
+  const backlinks = metadataStore.backlinkMap[oldPath] ?? []
   for (const bPath of backlinks) {
     try {
       const content = await readFile(bPath)

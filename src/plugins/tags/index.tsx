@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { vaultStore } from '../../vault'
+import { metadataStore } from '../../metadata'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { definePlugin } from '../../lib/pluginRegistry'
 
@@ -136,7 +136,7 @@ function TagTreeNode(props: {
 function TagsPanel() {
   const [collapsed, setCollapsed] = createSignal(new Set<string>())
   const [expandedFiles, setExpandedFiles] = createSignal(new Set<string>())
-  const roots = createMemo(() => buildTagTree(vaultStore.tagMap))
+  const roots = createMemo(() => buildTagTree(metadataStore.tagMap))
 
   function toggleCollapse(tag: string) {
     setCollapsed(prev => {
@@ -169,7 +169,7 @@ function TagsPanel() {
               expandedFiles={expandedFiles()}
               onToggleCollapse={toggleCollapse}
               onToggleFiles={toggleFiles}
-              tagMap={vaultStore.tagMap}
+              tagMap={metadataStore.tagMap}
             />
           )}
         </For>

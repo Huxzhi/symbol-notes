@@ -11,3 +11,6 @@ export {
   resolveNewFile,
 } from './indexes/backlinks'
 export { extractDateFromName } from './parse/extract'
+
+// 派生索引的响应式 store(只读消费:服务 / 插件)。写入只走本层 indexes/*。
+export { metadataStore } from './store'

@@ -1,5 +1,5 @@
 import type { FileMeta, ListItem } from '../../stores/types'
-import { setVaultStore } from '../../vault/store'
+import { setMetadataStore } from '../store'
 
 export function buildTaskMap(files: Record<string, { lists: ListItem[] }>): Record<string, ListItem[]> {
   const result: Record<string, ListItem[]> = {}
@@ -12,15 +12,15 @@ export function buildTaskMap(files: Record<string, { lists: ListItem[] }>): Reco
 
 /** 全量重建 taskMap */
 export function buildTasks(mdFiles: Record<string, FileMeta>): void {
-  setVaultStore('taskMap', buildTaskMap(mdFiles))
+  setMetadataStore('taskMap', buildTaskMap(mdFiles))
 }
 
 /** 单文件 lists 变化时增量更新任务子集 */
 export function applyFileTasks(path: string, lists: ListItem[]): void {
-  setVaultStore('taskMap', path, lists.filter((l) => l.task))
+  setMetadataStore('taskMap', path, lists.filter((l) => l.task))
 }
 
 /** 文件删除：清理 taskMap 条目 */
 export function removeFileTasks(path: string): void {
-  setVaultStore('taskMap', path, undefined as unknown as ListItem[])
+  setMetadataStore('taskMap', path, undefined as unknown as ListItem[])
 }

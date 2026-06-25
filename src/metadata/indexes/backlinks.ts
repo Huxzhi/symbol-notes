@@ -1,5 +1,6 @@
 import type { FileMeta } from '../../stores/types'
-import { vaultStore, setVaultStore } from '../../vault/store'
+import { vaultStore } from '../../vault/store'
+import { metadataStore, setMetadataStore } from '../store'
 
 // ── Stem / alias 懒缓存（派生自 store.files 的链接索引） ───────────────────────
 
@@ -94,8 +95,8 @@ export function buildLinkMaps(
 /** 全量重建 backlinkMap + unresolvedMap（Phase2 全量扫描后调用） */
 export function buildBacklinks(mdFiles: Record<string, FileMeta>): void {
   const { backlinkMap, unresolvedMap } = buildLinkMaps(mdFiles)
-  setVaultStore('backlinkMap', backlinkMap)
-  setVaultStore('unresolvedMap', unresolvedMap)
+  setMetadataStore('backlinkMap', backlinkMap)
+  setMetadataStore('unresolvedMap', unresolvedMap)
 }
 
 /** 把 path 这条入链记进 target 对应的 map（解析得到 → backlinkMap，否则 unresolvedMap）。 */
@@ -107,8 +108,8 @@ function linkSource(
 ): void {
   const add = (l: string[]): string[] => (l ? [...l, path] : [path])
   const r = resolveLink(target, stemIndex, vaultStore.files, aliasIndex)
-  if (r) setVaultStore('backlinkMap', r, add)
-  else setVaultStore('unresolvedMap', target, add)
+  if (r) setMetadataStore('backlinkMap', r, add)
+  else setMetadataStore('unresolvedMap', target, add)
 }
 
 /** 从 target 对应的 map 里移除 path 这条入链。 */
@@ -120,8 +121,8 @@ function unlinkSource(
 ): void {
   const remove = (l: string[]): string[] => l?.filter((p) => p !== path) ?? []
   const r = resolveLink(target, stemIndex, vaultStore.files, aliasIndex)
-  if (r) setVaultStore('backlinkMap', r, remove)
-  else setVaultStore('unresolvedMap', target, remove)
+  if (r) setMetadataStore('backlinkMap', r, remove)
+  else setMetadataStore('unresolvedMap', target, remove)
 }
 
 /** 单文件 outLinks 变化时增量更新 */
@@ -140,10 +141,10 @@ export function applyFileBacklinks(
 
 /** 文件删除：将其入链移入 unresolvedMap，清理出链 */
 export function removeFileBacklinks(path: string, file: FileMeta): void {
-  const backlinks = vaultStore.backlinkMap[path] ?? []
+  const backlinks = metadataStore.backlinkMap[path] ?? []
   if (backlinks.length > 0) {
-    setVaultStore('unresolvedMap', path, (l: string[]) => [...(l ?? []), ...backlinks])
-    setVaultStore('backlinkMap', path, [])
+    setMetadataStore('unresolvedMap', path, (l: string[]) => [...(l ?? []), ...backlinks])
+    setMetadataStore('backlinkMap', path, [])
   }
   const stemIndex = getStemIndex()
   const aliasIndex = getAliasIndex()
@@ -156,9 +157,9 @@ export function resolveNewFile(newPath: string): void {
   const stem = newPath.split('/').pop()!
   const keysToCheck = newPath !== stem ? [newPath, stem] : [newPath]
   for (const key of keysToCheck) {
-    const sources = vaultStore.unresolvedMap[key] ?? []
+    const sources = metadataStore.unresolvedMap[key] ?? []
     if (sources.length === 0) continue
-    setVaultStore('backlinkMap', newPath, (list: string[]) => [...(list ?? []), ...sources])
-    setVaultStore('unresolvedMap', key, [])
+    setMetadataStore('backlinkMap', newPath, (list: string[]) => [...(list ?? []), ...sources])
+    setMetadataStore('unresolvedMap', key, [])
   }
 }

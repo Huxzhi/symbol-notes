@@ -132,8 +132,13 @@ export interface DateBucket {
   entries: Task[]
 }
 
+/** vault 拥有的状态:文件身份 + stat + 内容(FileMeta)。 */
 export interface VaultState {
   files: Record<string, FileMeta>
+}
+
+/** metadata 拥有的状态:从 files 派生的跨文件索引。 */
+export interface MetadataState {
   backlinkMap: Record<string, string[]>
   unresolvedMap: Record<string, string[]>
   tagMap: Record<string, string[]>

@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { vaultStore } from '../../vault'
+import { metadataStore } from '../../metadata'
 import { getStemIndex, getAliasIndex, extractDateFromName } from '../../metadata'
 import { readFile } from '../../vault/fs/io'
 import { resolveLink } from '../../metadata/indexes/backlinks'
@@ -27,7 +28,7 @@ export function TimelineView(props: ViewComponentProps) {
     const files = vaultStore.files
     const resolve = (target: string) =>
       resolveLink(target, getStemIndex(), files, getAliasIndex())
-    return buildNeighborhood(f, files, vaultStore.backlinkMap, resolve, {
+    return buildNeighborhood(f, files, metadataStore.backlinkMap, resolve, {
       maxFiles: maxFiles(),
       isDiary,
     })

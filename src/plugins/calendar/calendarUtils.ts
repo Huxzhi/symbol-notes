@@ -252,7 +252,7 @@ export const ENTRY_STYLE: Record<'event' | 'mood' | 'idea', { hue: string; sig: 
 type DayData = ReturnType<typeof buildDayData>
 
 /** 某天的全部条目（不截断）。月视图自行 slice，周视图列内滚动。
- *  从 vaultStore.calendarByDate[dayStr] 这一日期桶投影，cell 只订阅该日期。 */
+ *  从 metadataStore.calendarByDate[dayStr] 这一日期桶投影，cell 只订阅该日期。 */
 export function buildCellItems(f: FilterState, b: DateBucket | undefined): CellItem[] {
   if (!b) return []
   return [

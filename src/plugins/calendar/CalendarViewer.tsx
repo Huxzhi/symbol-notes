@@ -1,6 +1,6 @@
 import { createSignal, onMount, For, Show, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { vaultStore } from '../../vault'
+import { metadataStore } from '../../metadata'
 import { workspaceActions } from '../../stores/workspaceStore'
 import type { ViewComponentProps } from '../../stores/types'
 import {
@@ -129,7 +129,7 @@ function WeekRowComp(props: {
 
           const cellData = () => {
             // 只订阅这一天的日期桶 → 只有受影响日期的格子重渲染
-            const all = buildCellItems(props.filter(), vaultStore.calendarByDate[dayStr])
+            const all = buildCellItems(props.filter(), metadataStore.calendarByDate[dayStr])
             if (week() || all.length <= MAX_CELL_ITEMS) return { items: all, more: 0 }
             return { items: all.slice(0, MAX_CELL_ITEMS - 1), more: all.length - (MAX_CELL_ITEMS - 1) }
           }
