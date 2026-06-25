@@ -1,5 +1,5 @@
 import type { FileSystemAdapter } from './types'
-import { deleteFileStatEntry } from '../indexStorage'
+import { deleteFileStatEntry } from '../statCache'
 export type { DirEntry, ScanEntry } from './types'
 
 let _adapter: FileSystemAdapter | null = null

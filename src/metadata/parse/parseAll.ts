@@ -4,13 +4,9 @@
 import { createMarkdownParser } from '../../lib/parseMarkdown'
 import type { FileMeta } from '../../stores/types'
 import { vaultStore } from '../../vault/store'
-import {
-  getCachedMeta,
-  getManyMeta,
-  hashContent,
-  setCachedMeta,
-  setFileStatEntry,
-} from '../../vault/indexStorage'
+import { getCachedMeta, getManyMeta, setCachedMeta } from '../parsedCache'
+import { setFileStatEntry } from '../../vault/statCache'
+import { hashContent } from '../../lib/contentHash'
 import { readFile } from '../../vault/fs/io'
 import { buildContentFields } from './fileMeta'
 

@@ -23,11 +23,8 @@ import {
   incDetected,
 } from './loadProgress'
 import { ui } from '../stores/ui'
-import {
-  loadAllFileStats,
-  pruneCache,
-  pruneFileStatCache,
-} from './indexStorage'
+import { loadAllFileStats, pruneFileStatCache } from './statCache'
+import { pruneCache } from '../metadata/parsedCache'
 import { isReady, initFileIO } from './fs/io'
 import { buildScan } from './scan'
 import { parseAll } from '../metadata/parse/parseAll'

@@ -20,13 +20,9 @@ import {
   resolveNewFile,
   invalidateStemIndex,
 } from '../metadata/indexes/backlinks'
-import {
-  deleteFileStatEntry,
-  getCachedMeta,
-  hashContent,
-  setCachedMeta,
-  setFileStatEntry,
-} from '../vault/indexStorage'
+import { deleteFileStatEntry, setFileStatEntry } from '../vault/statCache'
+import { getCachedMeta, setCachedMeta } from '../metadata/parsedCache'
+import { hashContent } from '../lib/contentHash'
 import {
   createDirectory,
   deleteEntry,

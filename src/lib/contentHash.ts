@@ -1,58 +1,6 @@
-import { get, set, del, keys, getMany, createStore } from 'idb-keyval'
-import type { FileMeta } from '../stores/types'
+// 内容哈希(MurmurHash3 x86_128, 128-bit, 同步, 不依赖 crypto.subtle)。输出 32 hex。
+// 作解析缓存的键:path→hash(vault statCache)→FileCache(metadata parsedCache)。
 
-export type CachedFields = Pick<FileMeta,
-  'frontmatter' | 'outLinks' | 'etags' | 'tags' | 'aliases' | 'created' | 'updated' | 'dated' | 'lists'
->
-
-// ── Stat cache: path → { size, mtime, hash } ─────────────────────────────────
-
-const fileStatStore = createStore('sn-stat', 'cache')
-
-export interface FileStatEntry {
-  size: number
-  mtime: number
-  hash: string
-}
-
-export async function loadAllFileStats(): Promise<Map<string, FileStatEntry>> {
-  try {
-    const allKeys = await keys<string>(fileStatStore)
-    const values = await getMany<FileStatEntry>(allKeys, fileStatStore)
-    const map = new Map<string, FileStatEntry>()
-    for (let i = 0; i < allKeys.length; i++) {
-      if (values[i] !== undefined) map.set(allKeys[i], values[i])
-    }
-    return map
-  } catch {
-    return new Map()
-  }
-}
-
-export async function setFileStatEntry(path: string, entry: FileStatEntry): Promise<void> {
-  try {
-    await set(path, entry, fileStatStore)
-  } catch { /* non-fatal */ }
-}
-
-export async function deleteFileStatEntry(path: string): Promise<void> {
-  try {
-    await del(path, fileStatStore)
-  } catch { /* non-fatal */ }
-}
-
-export async function pruneFileStatCache(activePaths: Set<string>): Promise<void> {
-  try {
-    const allKeys = await keys<string>(fileStatStore)
-    await Promise.all(
-      allKeys.filter(k => !activePaths.has(k)).map(k => del(k, fileStatStore)),
-    )
-  } catch { /* non-fatal */ }
-}
-
-// ── Content hash (MurmurHash3 x86_128) ───────────────────────────────────────
-
-// 128-bit, sync, no crypto.subtle. Output: 32 hex chars.
 function fmix32(h: number): number {
   h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0
@@ -127,41 +75,4 @@ export function hashContent(str: string): string {
        + h2.toString(16).padStart(8, '0')
        + h3.toString(16).padStart(8, '0')
        + h4.toString(16).padStart(8, '0')
-}
-
-// ── Parsed meta cache: contentHash → CachedFields ────────────────────────────
-
-// v3: outLinks 由 string[] 升级为 WikiLinkInfo[]，旧缓存失效以触发重解析
-const parsedMetaStore = createStore('sn-meta-v3', 'cache')
-
-export async function getManyMeta(hashes: string[]): Promise<(CachedFields | undefined)[]> {
-  try {
-    return await getMany<CachedFields>(hashes, parsedMetaStore)
-  } catch {
-    return hashes.map(() => undefined)
-  }
-}
-
-export async function getCachedMeta(hash: string): Promise<CachedFields | null> {
-  try {
-    const entry = await get<CachedFields>(hash, parsedMetaStore)
-    return entry ?? null
-  } catch {
-    return null
-  }
-}
-
-export async function setCachedMeta(hash: string, meta: CachedFields): Promise<void> {
-  try {
-    await set(hash, meta, parsedMetaStore)
-  } catch { /* non-fatal */ }
-}
-
-export async function pruneCache(activeHashes: Set<string>): Promise<void> {
-  try {
-    const allKeys = await keys<string>(parsedMetaStore)
-    await Promise.all(
-      allKeys.filter(k => !activeHashes.has(k)).map(k => del(k, parsedMetaStore)),
-    )
-  } catch { /* non-fatal */ }
 }

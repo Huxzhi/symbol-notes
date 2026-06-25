@@ -12,7 +12,7 @@ import {
   resolveDatedField,
 } from './extract'
 
-/** FileMeta 中由内容解析得来的字段子集（与 indexStorage.CachedFields 同形）。 */
+/** FileMeta 中由内容解析得来的字段子集（与 parsedCache 的 FileCache 同形）。 */
 export type ContentFields = Pick<
   FileMeta,
   | 'frontmatter'

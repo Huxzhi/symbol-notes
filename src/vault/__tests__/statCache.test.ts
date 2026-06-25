@@ -20,7 +20,7 @@ const {
   setFileStatEntry,
   deleteFileStatEntry,
   pruneFileStatCache,
-} = await import('../indexStorage')
+} = await import('../statCache')
 
 describe('file-stat-cache', () => {
   beforeEach(() => {
