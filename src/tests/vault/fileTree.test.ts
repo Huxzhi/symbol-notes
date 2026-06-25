@@ -9,12 +9,12 @@ import type { ScanEntry } from '../../vault/fs/types'
 function file(path: string): ScanEntry {
   const name = path.split('/').pop()!
   const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : null
-  return { name, path, kind: 'file', parent, size: 0, mtime: 0 }
+  return { name, path, kind: 'file', parent }
 }
 function dir(path: string, children: ScanEntry[]): ScanEntry {
   const name = path.split('/').pop()!
   const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : null
-  return { name, path, kind: 'directory', parent, size: 0, mtime: 0, children }
+  return { name, path, kind: 'directory', parent, children }
 }
 
 // nested (as the scan walk produces it): top-level notes + a folder with a

@@ -25,7 +25,7 @@ import {
 import { ui } from '../stores/ui'
 import { loadAllFileStats, pruneFileStatCache } from './statCache'
 import { pruneCache } from '../metadata/parsedCache'
-import { isReady, initFileIO } from './fs/io'
+import { isReady, initFileIO, statFiles } from './fs/io'
 import { buildScan } from './scan'
 import { parseAll } from '../metadata/parse/parseAll'
 import { setFileTree } from './fileTree'
@@ -191,12 +191,11 @@ let currentSession: Session | null = null
 
 export interface ScanMid {
   session: Session
-  mdUnchanged: string[]
-  mdChanged: string[]
   activePaths: Set<string>
 }
 
-/** Phase1（reveal 前，串行）：扫描 → 填仅含 stat 的 FileMeta → 建树。不撤遮罩。 */
+/** Phase1（reveal 前，串行）：只建结构树 → 入 store + 画树。不抓 stat、不撤遮罩。
+ *  size/mtime 与变更检测、解析全部下放到 parseAndIndex（reveal 后台），首屏不等 getFile。 */
 export async function scanPhase1(): Promise<ScanMid | null> {
   if (currentSession) currentSession.cancelled = true
   const session: Session = { cancelled: false }
@@ -206,40 +205,63 @@ export async function scanPhase1(): Promise<ScanMid | null> {
   setIsIndexing(true)
   beginLoadProgress(session)
 
-  const [{ entries, activePaths, tree }, idbStats] = await Promise.all([
-    buildScan(incDetected),
-    loadAllFileStats(),
-  ])
-
+  const { entries, activePaths, tree } = await buildScan(incDetected)
   if (session.cancelled) return null
 
-  const MAX_PARSE_BYTES = 20 * 1024 * 1024
-  const mdUnchanged: string[] = []
-  const mdChanged: string[] = []
-
-  for (const [path, entry] of Object.entries(entries)) {
-    if (entry.kind !== 'file' || !path.endsWith('.md')) continue
-    if (entry.size > MAX_PARSE_BYTES) continue
-    const stat = idbStats.get(path)
-    if (stat && stat.size === entry.size && stat.mtime === entry.mtime) {
-      entries[path] = { ...entry, hash: stat.hash }
-      mdUnchanged.push(path)
-    } else {
-      mdChanged.push(path)
-    }
-  }
-
-  // 阶段 1：仅 stat 的 fileMap 入 vault store + 建树 + metadata 播种临时内容
+  // 仅结构的 fileMap（size/mtime=0）入 store + 建树 → 立刻可画
   setVaultStore('files', entries)
-  setMetadataStore('cache', seedCache(entries))
   setFileTree(tree)
-  return { session, mdUnchanged, mdChanged, activePaths }
+  return { session, activePaths }
 }
 
 /** Phase2/3（reveal 后，后台）：解析 → 合并完整 FileMeta → 建跨文件索引。 */
 export async function parseAndIndex(mid: ScanMid): Promise<void> {
-  const { session, mdUnchanged, mdChanged, activePaths } = mid
+  const { session, activePaths } = mid
   try {
+    // 阶段 1.5：后台补 stat（复用扫描时缓存的句柄）→ 回填 fileMap + 播种临时内容
+    const filePaths = [...activePaths]
+    const [stats, idbStats] = await Promise.all([
+      statFiles(filePaths),
+      loadAllFileStats(),
+    ])
+    if (session.cancelled) return
+
+    // 变更检测：size/mtime 与 idb stat 缓存一致 → 复用 hash（跳过重解析）
+    const MAX_PARSE_BYTES = 20 * 1024 * 1024
+    const mdUnchanged: string[] = []
+    const mdChanged: string[] = []
+    const reuseHash = new Map<string, string>()
+    for (const path of filePaths) {
+      if (!path.endsWith('.md')) continue
+      const s = stats.get(path)
+      if (!s || s.size > MAX_PARSE_BYTES) continue
+      const cached = idbStats.get(path)
+      if (cached && cached.size === s.size && cached.mtime === s.mtime) {
+        mdUnchanged.push(path)
+        reuseHash.set(path, cached.hash)
+      } else {
+        mdChanged.push(path)
+      }
+    }
+
+    setVaultStore(
+      'files',
+      produce((fs: Record<string, FileEntry>) => {
+        for (const [path, s] of stats) {
+          const e = fs[path]
+          if (e) {
+            e.size = s.size
+            e.mtime = s.mtime
+          }
+        }
+        for (const [path, hash] of reuseHash) {
+          const e = fs[path]
+          if (e) e.hash = hash
+        }
+      }),
+    )
+    setMetadataStore('cache', seedCache(vaultStore.files))
+
     // 阶段 2：后台解析（不写 store），右上角 toast 进度
     const total = mdUnchanged.length + mdChanged.length
     const toastId =

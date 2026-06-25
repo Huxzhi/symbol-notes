@@ -1,11 +1,6 @@
 import { createSignal } from 'solid-js'
 
-export type LoadPhase =
-  | 'idle'
-  | 'scanning'
-  | 'parsing'
-  | 'building'
-  | 'done'
+export type LoadPhase = 'idle' | 'scanning' | 'parsing' | 'building' | 'done'
 
 export interface LoadSnapshot {
   visible: boolean

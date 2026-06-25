@@ -1,6 +1,6 @@
 import type { FileSystemAdapter } from './types'
 import { deleteFileStatEntry } from '../statCache'
-export type { DirEntry, ScanEntry } from './types'
+export type { ScanEntry } from './types'
 
 let _adapter: FileSystemAdapter | null = null
 const contentCache = new Map<string, string>()
@@ -60,19 +60,20 @@ export async function createDirectory(path: string): Promise<void> {
   return adapter().createDirectory(path)
 }
 
-export async function* listAll(): AsyncGenerator<
-  import('./types').DirEntry
-> {
-  if (!_adapter) return
-  yield* _adapter.listAll()
-}
-
 export async function scanTree(
-  concurrency?: number,
-  onStat?: () => void,
+  onDetected?: () => void,
 ): Promise<import('./types').ScanEntry[]> {
   if (!_adapter) return []
-  return _adapter.scanTree(concurrency, onStat)
+  return _adapter.scanTree(onDetected)
+}
+
+export async function statFiles(
+  paths: string[],
+  concurrency?: number,
+  onStat?: () => void,
+): Promise<Map<string, { size: number; mtime: number }>> {
+  if (!_adapter) return new Map()
+  return _adapter.statFiles(paths, concurrency, onStat)
 }
 
 export function invalidateFile(path: string): void {

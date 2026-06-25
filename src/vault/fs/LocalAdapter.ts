@@ -1,6 +1,6 @@
 import { get, set } from 'idb-keyval'
 
-import type { DirEntry, FileSystemAdapter, ScanEntry } from './types'
+import type { FileSystemAdapter, ScanEntry } from './types'
 
 declare global {
   interface Window {
@@ -16,6 +16,10 @@ declare global {
 }
 
 export class LocalAdapter implements FileSystemAdapter {
+  // path → 文件句柄缓存：scanTree 时填充，省掉每次读取的逐段 getDirectoryHandle。
+  // 仅内存（只持久化 rootHandle），每次 open/scan 重建；外部改动致 stale 时回退 resolveFile。
+  private handleCache = new Map<string, FileSystemFileHandle>()
+
   private constructor(readonly rootHandle: FileSystemDirectoryHandle) {}
 
   static async open(): Promise<LocalAdapter> {
@@ -67,25 +71,51 @@ export class LocalAdapter implements FileSystemAdapter {
   }
 
   async readText(path: string): Promise<string> {
-    const handle = await this.resolveFile(path)
-    return (await handle.getFile()).text()
+    return (await this.getFile(path)).text()
   }
 
   async writeText(path: string, content: string): Promise<void> {
     const handle = await this.resolveFile(path, true)
+    this.handleCache.set(path, handle)
     const writable = await handle.createWritable()
     await writable.write(content)
     await writable.close()
   }
 
   async getMtime(path: string): Promise<number> {
-    const handle = await this.resolveFile(path)
-    return (await handle.getFile()).lastModified
+    return (await this.getFile(path)).lastModified
   }
 
   async getFile(path: string): Promise<File> {
+    const cached = this.handleCache.get(path)
+    if (cached) {
+      try {
+        return await cached.getFile()
+      } catch {
+        this.handleCache.delete(path) // stale（被外部移动/删除）→ 重新解析
+      }
+    }
     const handle = await this.resolveFile(path)
+    this.handleCache.set(path, handle)
     return handle.getFile()
+  }
+
+  async statFiles(
+    paths: string[],
+    concurrency = 32,
+    onStat?: () => void,
+  ): Promise<Map<string, { size: number; mtime: number }>> {
+    const out = new Map<string, { size: number; mtime: number }>()
+    await mapWithConcurrency(paths, concurrency, async (path) => {
+      try {
+        const f = await this.getFile(path)
+        out.set(path, { size: f.size, mtime: f.lastModified })
+      } catch {
+        /* 文件刚被删/无权限 → 跳过，留 stat 为 0 */
+      }
+      onStat?.()
+    })
+    return out
   }
 
   async deleteEntry(
@@ -97,6 +127,11 @@ export class LocalAdapter implements FileSystemAdapter {
       name,
       opts?.recursive ? { recursive: true } : undefined,
     )
+    this.handleCache.delete(path)
+    const prefix = path + '/'
+    for (const k of this.handleCache.keys()) {
+      if (k.startsWith(prefix)) this.handleCache.delete(k)
+    }
   }
 
   async createDirectory(path: string): Promise<void> {
@@ -106,41 +141,9 @@ export class LocalAdapter implements FileSystemAdapter {
       dir = await dir.getDirectoryHandle(part, { create: true })
   }
 
-  async *listAll(
-    parentPath: string | null = null,
-    dir?: FileSystemDirectoryHandle,
-  ): AsyncGenerator<DirEntry> {
-    const handle = dir ?? this.rootHandle
-    for await (const [name, entry] of handle.entries()) {
-      if (name.startsWith('.')) continue
-      const path = parentPath ? `${parentPath}/${name}` : name
-      if (entry.kind === 'directory') {
-        yield {
-          name,
-          path,
-          kind: 'directory',
-          parent: parentPath,
-          size: 0,
-          mtime: 0,
-        }
-        yield* this.listAll(path, entry as FileSystemDirectoryHandle)
-      } else {
-        const file = await (entry as FileSystemFileHandle).getFile()
-        yield {
-          name,
-          path,
-          kind: 'file',
-          parent: parentPath,
-          size: file.size,
-          mtime: file.lastModified,
-        }
-      }
-    }
-  }
-
-  async scanTree(concurrency = 32, onStat?: () => void): Promise<ScanEntry[]> {
-    // walk 递归直接产出层级（结构便宜，当场就有）；文件 stat 攒起来 walk 后并发补。
-    const fileStubs: { node: ScanEntry; handle: FileSystemFileHandle }[] = []
+  async scanTree(onDetected?: () => void): Promise<ScanEntry[]> {
+    // 只走结构（便宜，当场就有）+ 顺手缓存文件句柄；size/mtime 留 0，由后台 statFiles 补。
+    this.handleCache.clear()
     const walk = async (
       parentPath: string | null,
       siblings: ScanEntry[],
@@ -155,38 +158,19 @@ export class LocalAdapter implements FileSystemAdapter {
             path,
             kind: 'directory',
             parent: parentPath,
-            size: 0,
-            mtime: 0,
             children: [],
           }
           siblings.push(node)
           await walk(path, node.children!, entry as FileSystemDirectoryHandle)
         } else {
-          const node: ScanEntry = {
-            name,
-            path,
-            kind: 'file',
-            parent: parentPath,
-            size: 0,
-            mtime: 0,
-          }
-          siblings.push(node)
-          fileStubs.push({ node, handle: entry as FileSystemFileHandle })
+          siblings.push({ name, path, kind: 'file', parent: parentPath })
+          this.handleCache.set(path, entry as FileSystemFileHandle)
+          onDetected?.()
         }
       }
     }
     const roots: ScanEntry[] = []
     await walk(null, roots, this.rootHandle)
-    await mapWithConcurrency(
-      fileStubs,
-      concurrency,
-      async ({ node, handle }) => {
-        const f = await handle.getFile()
-        onStat?.()
-        node.size = f.size
-        node.mtime = f.lastModified
-      },
-    )
     return roots
   }
 }
