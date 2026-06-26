@@ -87,3 +87,40 @@ describe('wikiLinkCompletionSource', () => {
     expect(wikiLinkCompletionSource(ctxAt('[', 1), files, NOW)).toBeNull()
   })
 })
+
+describe('wikiLinkCompletionSource duplicate filenames', () => {
+  const dupFiles: Record<string, FileMeta> = {
+    'work/Todo.md': file('work/Todo.md', NOW),
+    'personal/Todo.md': file('personal/Todo.md', NOW),
+    'notes/Plan.md': file('notes/Plan.md', NOW),
+  }
+
+  it('labels same-named files with their ext-less full path, unique stays bare', () => {
+    const res = wikiLinkCompletionSource(ctxAt('[[', 2), dupFiles, NOW)!
+    const labels = res.options.map((o) => o.label).sort()
+    expect(labels).toEqual(['Plan', 'personal/Todo', 'work/Todo'])
+  })
+
+  it('keeps a unique filename as bare base', () => {
+    const res = wikiLinkCompletionSource(ctxAt('[[', 2), dupFiles, NOW)!
+    expect(res.options.find((o) => o.label === 'Plan')).toBeDefined()
+    expect(res.options.find((o) => o.label === 'notes/Plan')).toBeUndefined()
+  })
+
+  it('inserts the full path so it resolves to the right file', () => {
+    const res = wikiLinkCompletionSource(ctxAt('[[', 2), dupFiles, NOW)!
+    const opt = res.options.find((o) => o.label === 'work/Todo')!
+    const state = EditorState.create({ doc: '[[' })
+    let inserted = ''
+    const view = {
+      state,
+      dispatch: (tr: { changes: { insert: string } }) => {
+        inserted = tr.changes.insert
+      },
+    }
+    ;(opt.apply as (v: unknown, c: unknown, from: number, to: number) => void)(
+      view, opt, 2, 2,
+    )
+    expect(inserted).toBe('work/Todo]]')
+  })
+})

@@ -45,12 +45,23 @@ export function wikiLinkCompletionSource(
   const m = ctx.matchBefore(TRIGGER_RE)
   if (!m) return null
   const from = m.from + 2 // [[ 之后,使过滤文本不含括号
+
+  // 先统计每个 base(去扩展名文件名)出现次数:同名(>1)的候选改用完整路径消歧。
+  const baseCount = new Map<string, number>()
+  for (const path of Object.keys(files)) {
+    if (!path.endsWith('.md')) continue
+    const base = path.split('/').pop()!.replace(/\.md$/, '')
+    baseCount.set(base, (baseCount.get(base) ?? 0) + 1)
+  }
+
   const options: Completion[] = []
   for (const [path, meta] of Object.entries(files)) {
     if (meta.kind !== 'file' || !path.endsWith('.md')) continue
     const base = path.split('/').pop()!.replace(/\.md$/, '')
+    // 同名冲突 → 插入去扩展名的完整路径(如 work/Todo),解析时 target in files 精确命中。
+    const label = (baseCount.get(base) ?? 0) > 1 ? path.replace(/\.md$/, '') : base
     const boost = recencyBoost(meta.mtime, now)
-    options.push({ label: base, type: 'text', boost, apply: makeApply(base) })
+    options.push({ label, type: 'text', boost, apply: makeApply(label) })
     for (const alias of meta.aliases ?? []) {
       options.push({ label: alias, detail: base, type: 'text', boost, apply: makeApply(alias) })
     }
