@@ -157,6 +157,10 @@ export interface MetadataState {
   taskMap: Record<string, ListItem[]>
   /** 按日期(YYYY-MM-DD)增量维护的日历聚合，单文件改动只动受影响日期。 */
   calendarByDate: Record<string, DateBucket>
+  /** 进行中的解析/索引任务数(>0 即后台忙)。初始加载与单文件 reindex 都计数。 */
+  inProgressTaskCount: number
+  /** 首次完整 parse+index 完成后置 true(此后恒为 true)。 */
+  initialized: boolean
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

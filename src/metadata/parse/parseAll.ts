@@ -36,7 +36,6 @@ export async function parseAll(
   unchanged: string[],
   changed: string[],
   activeHashes: Set<string>,
-  onParsed?: () => void,
 ): Promise<Map<string, ParsedFields>> {
   const results = new Map<string, ParsedFields>()
   const parser = createMarkdownParser()
@@ -59,7 +58,6 @@ export async function parseAll(
     const meta = metas[i]
     if (meta && Array.isArray(meta.lists)) {
       results.set(path, { hash, ...meta })
-      onParsed?.()
     } else {
       stillChanged.push(path)
     }
@@ -95,8 +93,6 @@ export async function parseAll(
       }
     } catch {
       /* individual file errors are non-fatal */
-    } finally {
-      onParsed?.()
     }
   }
   return results

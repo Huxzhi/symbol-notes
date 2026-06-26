@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
+// 扫描/解析进度已迁至 metadata/store(inProgressTaskCount / initialized)。
 import type { VaultState } from '../stores/types'
 import type { FileSystemAdapter } from './fs/types'
 
@@ -19,7 +20,3 @@ const [vaultStore, setVaultStore] = createStore<VaultState>({
 })
 
 export { setVaultStore, vaultStore }
-
-// ── Scan status ───────────────────────────────────────────────────────────────
-
-export const [isIndexing, setIsIndexing] = createSignal(false)

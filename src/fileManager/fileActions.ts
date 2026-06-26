@@ -7,7 +7,12 @@ import { parseMarkdown } from '../lib/parseMarkdown'
 import type { FileCache, FileEntry } from '../stores/types'
 import { buildContentFields, type ContentFields } from '../metadata/parse/fileMeta'
 import { vaultStore, setVaultStore } from '../vault/store'
-import { metadataStore, setMetadataStore } from '../metadata/store'
+import {
+  metadataStore,
+  setMetadataStore,
+  beginIndexTask,
+  endIndexTask,
+} from '../metadata/store'
 import {
   getFile,
   setFileCache,
@@ -52,37 +57,42 @@ export async function reindexFile(
   cmParsed?: ParseResult,
   persistStat = false,
 ): Promise<void> {
-  const hash = hashContent(content)
-  const cached = await getCachedMeta(hash)
-  let fields: ContentFields
-  if (cached && Array.isArray(cached.lists)) {
-    fields = cached
-  } else {
-    const existingMtime = vaultStore.files[path]?.mtime ?? Date.now()
-    fields = buildContentFields(content, cmParsed ?? parseMarkdown(content), existingMtime)
-    await setCachedMeta(hash, fields)
-  }
+  beginIndexTask()
+  try {
+    const hash = hashContent(content)
+    const cached = await getCachedMeta(hash)
+    let fields: ContentFields
+    if (cached && Array.isArray(cached.lists)) {
+      fields = cached
+    } else {
+      const existingMtime = vaultStore.files[path]?.mtime ?? Date.now()
+      fields = buildContentFields(content, cmParsed ?? parseMarkdown(content), existingMtime)
+      await setCachedMeta(hash, fields)
+    }
 
-  const prev = getFile(path) // 合并视图(改前),供索引读旧 outLinks/tags
-  setVaultStore('files', path, 'hash', hash) // hash 属 stat
-  setFileCache(path, fields) // 解析内容落 metadata
-  applyFileBacklinks(
-    path,
-    (prev?.outLinks ?? []).map((l) => l.target),
-    fields.outLinks.map((l) => l.target),
-  )
-  applyFileTags(path, prev?.tags ?? [], fields.tags)
-  applyFileTasks(path, fields.lists)
-  applyFileCalendar(path, prev, getFile(path))
+    const prev = getFile(path) // 合并视图(改前),供索引读旧 outLinks/tags
+    setVaultStore('files', path, 'hash', hash) // hash 属 stat
+    setFileCache(path, fields) // 解析内容落 metadata
+    applyFileBacklinks(
+      path,
+      (prev?.outLinks ?? []).map((l) => l.target),
+      fields.outLinks.map((l) => l.target),
+    )
+    applyFileTags(path, prev?.tags ?? [], fields.tags)
+    applyFileTasks(path, fields.lists)
+    applyFileCalendar(path, prev, getFile(path))
 
-  if (persistStat) {
-    const entry = vaultStore.files[path]
-    if (entry?.kind === 'file')
-      await setFileStatEntry(path, {
-        size: entry.size,
-        mtime: entry.mtime,
-        hash,
-      })
+    if (persistStat) {
+      const entry = vaultStore.files[path]
+      if (entry?.kind === 'file')
+        await setFileStatEntry(path, {
+          size: entry.size,
+          mtime: entry.mtime,
+          hash,
+        })
+    }
+  } finally {
+    endIndexTask()
   }
 }
 

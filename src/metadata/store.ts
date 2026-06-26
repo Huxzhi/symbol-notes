@@ -13,6 +13,25 @@ const [metadataStore, setMetadataStore] = createStore<MetadataState>({
   tagMap: {},
   taskMap: {},
   calendarByDate: {},
+  inProgressTaskCount: 0,
+  initialized: false,
 })
 
 export { metadataStore, setMetadataStore }
+
+// ── 解析进度（取代旧的 vault/loadProgress 信号） ────────────────────────────────
+
+/** 标记一个后台解析/索引任务开始（必须与 endIndexTask 配对，建议放 try/finally）。 */
+export function beginIndexTask(): void {
+  setMetadataStore('inProgressTaskCount', (n) => n + 1)
+}
+
+/** 标记一个后台解析/索引任务结束。 */
+export function endIndexTask(): void {
+  setMetadataStore('inProgressTaskCount', (n) => Math.max(0, n - 1))
+}
+
+/** 首次完整 parse+index 建成后调用（幂等，置位后恒为 true）。 */
+export function markInitialized(): void {
+  if (!metadataStore.initialized) setMetadataStore('initialized', true)
+}

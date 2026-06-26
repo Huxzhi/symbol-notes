@@ -1,13 +1,14 @@
 import { Show } from 'solid-js'
-import { loadProgress } from '../vault/loadProgress'
+import { metadataStore } from '../metadata/store'
 import { maskColors } from '../lib/themeCache'
 
 export function LoadingOverlay() {
-  const p = loadProgress
   // 取缓存遮罩颜色；缺失回退到 CSS 变量。与 applyTheme 解耦，互不干扰。
   const c = (name: string) => maskColors()[name] || `var(${name})`
+  // 首次完整索引建成前、且有后台任务在跑时显示全屏遮罩。
+  // 之后(initialized=true)的增量 reindex 只走 StatusBar 的「后台检测中」。
   return (
-    <Show when={p().visible}>
+    <Show when={!metadataStore.initialized && metadataStore.inProgressTaskCount > 0}>
       <div
         class="fixed inset-0 z-[10001] flex items-center justify-center"
         style={{ background: 'rgba(0,0,0,0.6)' }}
@@ -33,7 +34,7 @@ export function LoadingOverlay() {
             />
           </div>
           <div class="text-[12px]" style={{ color: c('--text-2') }}>
-            检测到 {p().detected} 个文件
+            正在扫描与解析…
           </div>
         </div>
       </div>

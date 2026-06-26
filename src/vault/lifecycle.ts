@@ -7,21 +7,19 @@ import {
   vaultStore,
   setVaultStore,
   setVaultFs,
-  setIsIndexing,
 } from './store'
-import { setMetadataStore } from '../metadata/store'
+import {
+  setMetadataStore,
+  beginIndexTask,
+  endIndexTask,
+  markInitialized,
+} from '../metadata/store'
 import { seedCache, allFiles, EMPTY_CACHE } from '../metadata/cache'
 import { buildBacklinks } from '../metadata/indexes/backlinks'
 import { buildTags } from '../metadata/indexes/tags'
 import { buildTasks } from '../metadata/indexes/tasks'
 import { buildCalendar } from '../metadata/indexes/calendar'
 import { LocalAdapter } from './fs/LocalAdapter'
-import {
-  beginLoadProgress,
-  endLoadProgress,
-  endScanOverlay,
-  incDetected,
-} from './loadProgress'
 import { ui } from '../stores/ui'
 import { loadAllFileStats, pruneFileStatCache } from './statCache'
 import { pruneCache } from '../metadata/parsedCache'
@@ -44,7 +42,7 @@ export async function openVault(): Promise<void> {
   workspaceActions.clearAllLeaves()
   const mid = await scanPhase1()
   if (!mid) return
-  await connectVaultConfig(mid.session) // 读配置 + hydrate，并按状态揭开遮罩
+  await connectVaultConfig() // 读配置 + hydrate
   await parseAndIndex(mid)
 }
 
@@ -57,7 +55,7 @@ export async function restoreVault(): Promise<void> {
   await vaultConfig.loadMeta()
   const mid = await scanPhase1()
   if (!mid) return
-  await connectVaultConfig(mid.session)
+  await connectVaultConfig()
   await parseAndIndex(mid)
 }
 
@@ -157,28 +155,22 @@ function promptCreateVaultConfig(): void {
   })
 }
 
-/** 扫描后接入配置并决定揭开遮罩的时机：
- *  active / unknown+exists → 先 hydrate 再 reveal；
- *  declined / unknown 无配置 → 先 reveal 再走原逻辑（不卡在弹窗前）。 */
-async function connectVaultConfig(session: Session): Promise<void> {
+/** 扫描后接入配置（读配置 + hydrate）：
+ *  active / unknown+exists → hydrate；
+ *  declined → 跳过；unknown 无配置 → 弹窗询问是否创建。 */
+async function connectVaultConfig(): Promise<void> {
   const status = vaultConfig.metaStatus()
-  if (status === 'declined') {
-    endScanOverlay(session)
-    return
-  }
+  if (status === 'declined') return
   if (status === 'active') {
     await hydrateVaultConfig()
-    endScanOverlay(session)
     return
   }
   // unknown
   if (await vaultConfig.configFolderExists()) {
     await vaultConfig.markActive()
     await hydrateVaultConfig()
-    endScanOverlay(session)
     return
   }
-  endScanOverlay(session)
   promptCreateVaultConfig()
 }
 
@@ -202,11 +194,13 @@ export async function scanPhase1(): Promise<ScanMid | null> {
   currentSession = session
 
   if (!isReady()) return null
-  setIsIndexing(true)
-  beginLoadProgress(session)
+  beginIndexTask()
 
-  const { entries, activePaths, tree } = await buildScan(incDetected)
-  if (session.cancelled) return null
+  const { entries, activePaths, tree } = await buildScan()
+  if (session.cancelled) {
+    endIndexTask()
+    return null
+  }
 
   // 仅结构的 fileMap（size/mtime=0）入 store + 建树 → 立刻可画
   setVaultStore('files', entries)
@@ -262,31 +256,11 @@ export async function parseAndIndex(mid: ScanMid): Promise<void> {
     )
     setMetadataStore('cache', seedCache(vaultStore.files))
 
-    // 阶段 2：后台解析（不写 store），右上角 toast 进度
-    const total = mdUnchanged.length + mdChanged.length
-    const toastId =
-      total > 0
-        ? ui.toast(`解析 0 / ${total}（双链/任务暂不完整）`, { requireClick: true })
-        : -1
-    let done = 0
+    // 阶段 2：后台解析（不写 store）。进度走 metadata.inProgressTaskCount。
     const activeHashes = new Set<string>()
-    const results = await parseAll(
-      session,
-      mdUnchanged,
-      mdChanged,
-      activeHashes,
-      () => {
-        done++
-        if (toastId >= 0 && (done === total || done % 20 === 0)) {
-          ui.updateToast(toastId, `解析 ${done} / ${total}（双链/任务暂不完整）`)
-        }
-      },
-    )
+    const results = await parseAll(session, mdUnchanged, mdChanged, activeHashes)
 
-    if (session.cancelled) {
-      if (toastId >= 0) ui.dismissToast(toastId)
-      return
-    }
+    if (session.cancelled) return
 
     // 阶段 2.5：一次性合并——hash 落 vault.fileMap，解析内容落 metadata.content
     setVaultStore(
@@ -319,23 +293,16 @@ export async function parseAndIndex(mid: ScanMid): Promise<void> {
     pruneFileStatCache(activePaths).catch(() => {})
     pruneCache(activeHashes).catch(() => {})
 
-    if (toastId >= 0) {
-      ui.dismissToast(toastId)
-      ui.toast('解析完成', { duration: 2000 })
-    }
+    if (currentSession === session) markInitialized()
   } finally {
-    if (currentSession === session) {
-      setIsIndexing(false)
-      endLoadProgress(session)
-    }
+    endIndexTask()
   }
 }
 
-/** Back-compat 包装：扫描后立即撤遮罩再后台解析（无配置编排）。 */
+/** Back-compat 包装：扫描后直接后台解析（无配置编排）。 */
 export async function scanAndIndex(): Promise<void> {
   const mid = await scanPhase1()
   if (!mid) return
-  endScanOverlay(mid.session)
   await parseAndIndex(mid)
 }
 

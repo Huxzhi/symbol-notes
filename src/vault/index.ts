@@ -11,7 +11,6 @@ export {
   writeFile,
 } from './fs/io'
 export {
-  isIndexing,
   setVaultFs,
   setVaultStore,
   vaultFs,

@@ -7,7 +7,7 @@ import {
   workspaceActions,
   workspaceStore,
 } from '../stores/workspaceStore'
-import { isIndexing } from '../vault'
+import { metadataStore } from '../metadata/store'
 
 export function StatusBar() {
   const [showSwitcher, setShowSwitcher] = createSignal(false)
@@ -116,7 +116,7 @@ export function StatusBar() {
         <span>{stats().words} 字</span>
         <span>{stats().lines} 行</span>
         <div class="flex-1" />
-        <Show when={isIndexing()}>
+        <Show when={metadataStore.inProgressTaskCount > 0}>
           <span class="flex items-center gap-1 text-(--text-3)">
             <span class="inline-block w-1.5 h-1.5 rounded-full bg-(--accent) animate-pulse" />
             后台检测中
