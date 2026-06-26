@@ -7,6 +7,7 @@ import type { MetadataState } from '../stores/types'
 
 const [metadataStore, setMetadataStore] = createStore<MetadataState>({
   cache: {},
+  resolvedMap: {},
   backlinkMap: {},
   unresolvedMap: {},
   tagMap: {},

@@ -18,7 +18,7 @@ import {
   applyFileBacklinks,
   removeFileBacklinks,
   resolveNewFile,
-  invalidateStemIndex,
+  invalidateLinkIndexes,
 } from '../metadata/indexes/backlinks'
 import { deleteFileStatEntry, setFileStatEntry } from '../vault/statCache'
 import { getCachedMeta, setCachedMeta } from '../metadata/parsedCache'
@@ -96,7 +96,7 @@ export function removeVaultEntry(path: string): void {
   removeFileCalendar(path, file)
   setVaultStore('files', path, undefined as unknown as FileEntry)
   removeFileCache(path)
-  invalidateStemIndex()
+  invalidateLinkIndexes()
 }
 
 /** 某个文件内的 wiki 链接指向从 oldTarget 重命名为 newTarget */
@@ -227,7 +227,7 @@ async function relocateFile(
   setFileCache(newPath, blankContent())
   applyNode()
   bumpStruct()
-  invalidateStemIndex()
+  invalidateLinkIndexes()
   const { workspaceActions } = await import('../stores/workspaceStore')
   workspaceActions.renameLeafPath(oldPath, newPath)
   await reindexFile(newPath, oldContent)
@@ -267,7 +267,7 @@ export const fileActions = {
     insertNode({ name: finalName, path, kind: 'file', parent })
     bumpStruct()
     applyFileCalendar(path, undefined, getFile(path))
-    invalidateStemIndex()
+    invalidateLinkIndexes()
     resolveNewFile(path)
     return path
   },
@@ -281,7 +281,7 @@ export const fileActions = {
     setVaultStore('files', name, blankEntry(dirName, name, 'directory', parent))
     insertNode({ name: dirName, path: name, kind: 'directory', parent, children: [] })
     bumpStruct()
-    invalidateStemIndex()
+    invalidateLinkIndexes()
   },
 
   async renameFile(oldPath: string, newName: string): Promise<void> {
@@ -306,7 +306,7 @@ export const fileActions = {
     removeFilesFromStore([path])
     removeNode(path)
     bumpStruct()
-    invalidateStemIndex()
+    invalidateLinkIndexes()
   },
 
   async deleteFolder(path: string): Promise<void> {
@@ -325,7 +325,7 @@ export const fileActions = {
     removeFilesFromStore(toRemove.map((e) => e.path))
     removeNode(path)
     bumpStruct()
-    invalidateStemIndex()
+    invalidateLinkIndexes()
   },
 
   async moveFile(srcPath: string, destDirPath: string | null): Promise<void> {
@@ -386,7 +386,7 @@ export const fileActions = {
     }
     moveNode(srcPath, destDirPath)
     bumpStruct()
-    invalidateStemIndex()
+    invalidateLinkIndexes()
     const { workspaceActions } = await import('../stores/workspaceStore')
     for (const entry of fileEntries) {
       const newFilePath = newFolderPath + entry.path.slice(srcPath.length)

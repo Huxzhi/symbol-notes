@@ -149,6 +149,8 @@ export interface VaultState {
 export interface MetadataState {
   /** path → 解析内容(frontmatter/outLinks/tags/lists…)。 */
   cache: Record<string, FileCache>
+  /** src path → 解析后的正向目标路径(去重)。反向链接的真实来源。 */
+  resolvedMap: Record<string, string[]>
   backlinkMap: Record<string, string[]>
   unresolvedMap: Record<string, string[]>
   tagMap: Record<string, string[]>

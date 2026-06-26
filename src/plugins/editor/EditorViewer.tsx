@@ -15,7 +15,7 @@ import {
 } from 'solid-js'
 import { vaultStore, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
 import { fileActions, reindexFile } from '../../fileManager'
-import { getStemIndex, getAliasIndex } from '../../metadata'
+import { uniqueFileLookup, getAliasIndex } from '../../metadata'
 import { ui } from '../../stores/ui'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
@@ -180,7 +180,7 @@ export function EditorViewer(props: ViewComponentProps) {
 
     const { base, anchor } = splitWikiTarget((targetText as string).trim())
     const withExt = base.endsWith('.md') ? base : `${base}.md`
-    const stemIndex = getStemIndex()
+    const stemIndex = uniqueFileLookup()
     const resolved = resolveLink(withExt, stemIndex, vaultStore.files, getAliasIndex())
     if (!resolved) return false
 

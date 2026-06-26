@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractDateFromName, buildStemIndex, buildAliasIndex, resolveLink, buildLinkMaps } from '../../metadata'
+import { extractDateFromName, buildUniqueFileLookup, buildAliasIndex, resolveLink, buildLinkMaps } from '../../metadata'
 import { buildTaskMap } from '../../metadata/indexes/tasks'
 import type { ListItem } from '../../stores/types'
 
@@ -64,22 +64,22 @@ describe('extractDateFromName', () => {
   })
 })
 
-describe('buildStemIndex', () => {
+describe('buildUniqueFileLookup', () => {
   it('maps stem to full path', () => {
-    const index = buildStemIndex({ 'notes/todo.md': {}, 'work/todo.md': {}, 'readme.md': {} })
+    const index = buildUniqueFileLookup({ 'notes/todo.md': {}, 'work/todo.md': {}, 'readme.md': {} })
     expect(index.get('todo.md')).toEqual(['notes/todo.md', 'work/todo.md'])
     expect(index.get('readme.md')).toEqual(['readme.md'])
   })
 
   it('ignores non-md paths', () => {
-    const index = buildStemIndex({ 'notes/todo.md': {}, 'image.png': {} })
+    const index = buildUniqueFileLookup({ 'notes/todo.md': {}, 'image.png': {} })
     expect(index.has('image.png')).toBe(false)
   })
 })
 
 describe('resolveLink', () => {
   const files = { 'notes/todo.md': {}, 'work/other.md': {}, 'readme.md': {} }
-  const stemIndex = buildStemIndex(files)
+  const stemIndex = buildUniqueFileLookup(files)
 
   it('resolves direct full path match', () => {
     expect(resolveLink('notes/todo.md', stemIndex, files)).toBe('notes/todo.md')
@@ -95,12 +95,12 @@ describe('resolveLink', () => {
 
   it('returns null for ambiguous stem', () => {
     const f = { 'notes/todo.md': {}, 'work/todo.md': {} }
-    expect(resolveLink('todo.md', buildStemIndex(f), f)).toBeNull()
+    expect(resolveLink('todo.md', buildUniqueFileLookup(f), f)).toBeNull()
   })
 
   it('disambiguates with path hint when multiple stems exist', () => {
     const f = { 'notes/todo.md': {}, 'work/todo.md': {} }
-    expect(resolveLink('notes/todo.md', buildStemIndex(f), f)).toBe('notes/todo.md')
+    expect(resolveLink('notes/todo.md', buildUniqueFileLookup(f), f)).toBe('notes/todo.md')
   })
 
   it('returns null for non-existent target', () => {
@@ -119,13 +119,47 @@ describe('buildLinkMaps', () => {
     expect(Object.keys(unresolvedMap)).toHaveLength(0)
   })
 
+  it('records forward resolved links in resolvedMap keyed by source path', () => {
+    const files = {
+      'notes/todo.md': { outLinks: [] },
+      'daily/2024-01-01.md': { outLinks: [{ target: 'todo.md' }] },
+    }
+    const { resolvedMap } = buildLinkMaps(files)
+    expect(resolvedMap['daily/2024-01-01.md']).toEqual(['notes/todo.md'])
+    expect(resolvedMap['notes/todo.md']).toBeUndefined()
+  })
+
+  it('backlinkMap is the inversion of resolvedMap', () => {
+    const files = {
+      'a.md': { outLinks: [{ target: 'b.md' }, { target: 'c.md' }] },
+      'b.md': { outLinks: [{ target: 'c.md' }] },
+      'c.md': { outLinks: [] },
+    }
+    const { resolvedMap, backlinkMap } = buildLinkMaps(files)
+    expect(resolvedMap['a.md']).toEqual(['b.md', 'c.md'])
+    expect(resolvedMap['b.md']).toEqual(['c.md'])
+    expect(backlinkMap['b.md']).toEqual(['a.md'])
+    expect(backlinkMap['c.md']).toEqual(['a.md', 'b.md'])
+  })
+
+  it('dedupes a source that resolves to the same target twice', () => {
+    const files = {
+      'notes/todo.md': { outLinks: [] },
+      'src.md': { outLinks: [{ target: 'todo.md' }, { target: 'notes/todo.md' }] },
+    }
+    const { resolvedMap, backlinkMap } = buildLinkMaps(files)
+    expect(resolvedMap['src.md']).toEqual(['notes/todo.md'])
+    expect(backlinkMap['notes/todo.md']).toEqual(['src.md'])
+  })
+
   it('puts unresolvable links in unresolvedMap', () => {
     const files = {
       'a.md': { outLinks: [{ target: 'ghost.md' }] },
     }
-    const { backlinkMap, unresolvedMap } = buildLinkMaps(files)
+    const { backlinkMap, unresolvedMap, resolvedMap } = buildLinkMaps(files)
     expect(unresolvedMap['ghost.md']).toEqual(['a.md'])
     expect(Object.keys(backlinkMap)).toHaveLength(0)
+    expect(resolvedMap['a.md']).toBeUndefined()
   })
 
   it('handles ambiguous stem as unresolved', () => {
@@ -177,7 +211,7 @@ describe('resolveLink alias fallback', () => {
     'work/plan.md': { aliases: ['计划', 'shared'] },
     'misc.md': { aliases: ['shared'] },
   }
-  const stemIndex = buildStemIndex(files)
+  const stemIndex = buildUniqueFileLookup(files)
   const aliasIndex = buildAliasIndex(files)
 
   it('resolves a unique alias to its file path', () => {
@@ -199,7 +233,7 @@ describe('resolveLink alias fallback', () => {
 
   it('prefers stem match over alias (no alias fallback when stem resolves)', () => {
     const f = { 'todo.md': { aliases: [] }, 'other.md': { aliases: ['todo'] } }
-    expect(resolveLink('todo.md', buildStemIndex(f), f, buildAliasIndex(f))).toBe('todo.md')
+    expect(resolveLink('todo.md', buildUniqueFileLookup(f), f, buildAliasIndex(f))).toBe('todo.md')
   })
 
   it('works without aliasIndex (back-compat)', () => {

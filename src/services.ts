@@ -4,7 +4,7 @@
 // 这些是对 src/vault/* 领域模块的稳定门面;依赖方向:services → vault,vault 不反依赖。
 import type { FileEntry, FileMeta } from './stores/types'
 import { readFile, vaultFs, vaultStore } from './vault'
-import { getAliasIndex, getStemIndex, resolveLink, metadataStore, getFile } from './metadata'
+import { getAliasIndex, uniqueFileLookup, resolveLink, metadataStore, getFile } from './metadata'
 import { fileActions } from './fileManager'
 
 // ── 契约 ────────────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ export const metadata: MetadataService = {
   backlinks: (path) => [...(metadataStore.backlinkMap[path] ?? [])],
   resolveLink: (target) => {
     const withExt = target.endsWith('.md') ? target : `${target}.md`
-    return resolveLink(withExt, getStemIndex(), vaultStore.files, getAliasIndex())
+    return resolveLink(withExt, uniqueFileLookup(), vaultStore.files, getAliasIndex())
   },
 }
 

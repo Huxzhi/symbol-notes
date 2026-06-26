@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { metadataStore, allFiles } from '../../metadata'
-import { getStemIndex, getAliasIndex, extractDateFromName } from '../../metadata'
+import { uniqueFileLookup, getAliasIndex, extractDateFromName } from '../../metadata'
 import { readFile } from '../../vault/fs/io'
 import { resolveLink } from '../../metadata/indexes/backlinks'
 import { workspaceActions } from '../../stores/workspaceStore'
@@ -26,7 +26,7 @@ export function TimelineView(props: ViewComponentProps) {
     if (!f) return { notes: [], edges: [] }
     const files = allFiles()
     const resolve = (target: string) =>
-      resolveLink(target, getStemIndex(), files, getAliasIndex())
+      resolveLink(target, uniqueFileLookup(), files, getAliasIndex())
     return buildNeighborhood(f, files, metadataStore.backlinkMap, resolve, {
       maxFiles: maxFiles(),
       isDiary,
