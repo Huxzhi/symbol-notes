@@ -1,6 +1,7 @@
 import { createRoot, createEffect } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import * as vaultConfig from '../vault/vaultConfig'
+import { deepTrack } from '../lib/deepTrack'
 import { applyTheme, resolveTheme } from '../lib/theme'
 import type {
   SettingsState,
@@ -45,21 +46,27 @@ export function hydrateTheme(payload: Partial<ThemeSettings>): void {
 
 createRoot(() => {
   // 非主题 → settings.json（vaultConfig.saveSettings 内 gate isConfigActive + 防抖）
-  createEffect(() =>
-    vaultConfig.saveSettings({
+  // deepTrack：pluginStates[id] 的再次切换是深层 set，只读顶层不会重跑（见 deepTrack）。
+  createEffect(() => {
+    const snapshot = {
       pluginStates: settingsStore.pluginStates,
       autoTimestamps: settingsStore.autoTimestamps,
       showOtherFiles: settingsStore.showOtherFiles,
-    }),
-  )
+    }
+    deepTrack(snapshot)
+    vaultConfig.saveSettings(snapshot)
+  })
   // 主题 → theme.json
-  createEffect(() =>
-    vaultConfig.saveTheme({
+  // deepTrack：updateCustomThemeVar/renameCustomTheme 改的是 customThemes 元素的深层字段。
+  createEffect(() => {
+    const snapshot = {
       theme: settingsStore.theme,
       customThemes: settingsStore.customThemes,
       customCSS: settingsStore.customCSS,
-    }),
-  )
+    }
+    deepTrack(snapshot)
+    vaultConfig.saveTheme(snapshot)
+  })
 })
 
 export const settingsActions = {

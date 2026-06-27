@@ -1,6 +1,7 @@
 import { createRoot, createEffect, createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import * as vaultConfig from '../vault/vaultConfig'
+import { deepTrack } from '../lib/deepTrack'
 import { getFileViewForPath, getView } from '../lib/pluginRegistry'
 import { pushHistory } from './leafHistory'
 import {
@@ -106,12 +107,16 @@ export function hydrateWorkspace(payload: WorkspaceState): void {
 
 createRoot(() => {
   // 仅在配置文件夹激活时落盘；否则仅内存。
-  createEffect(() =>
-    vaultConfig.saveWorkspace({
+  // deepTrack：leaf 开关/移动/分屏/改名 都是 layouts 的深层 set，只读顶层 layouts
+  // 不会重跑本 effect → 每次 workspace 变更都需深读以订阅，确保都触发防抖落盘。
+  createEffect(() => {
+    const snapshot = {
       layouts: workspaceStore.layouts,
       activeLayoutId: workspaceStore.activeLayoutId,
-    }),
-  )
+    }
+    deepTrack(snapshot)
+    vaultConfig.saveWorkspace(snapshot)
+  })
 })
 
 // ── Selectors ────────────────────────────────────────────────────────────────
