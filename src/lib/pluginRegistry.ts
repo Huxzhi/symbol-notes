@@ -1,6 +1,5 @@
 import type { Component, JSX } from 'solid-js'
 import { createEffect, createRoot, createSignal, onCleanup } from 'solid-js'
-import { createStore } from 'solid-js/store'
 import { settingsStore } from '../stores/settingsStore'
 import type { RevealRequest, ViewComponentProps } from '../stores/types'
 import {
@@ -11,15 +10,15 @@ import {
   leafInstances,
   workspaceActions,
 } from '../stores/workspaceStore'
-import { vault, metadata, fileManager } from '../services'
-import type {
-  VaultService,
-  MetadataService,
-  FileManagerService,
-} from '../services'
 import type { Heading } from './cm6/headingsField'
 import type { OutLink } from './cm6/outLinksField'
 import { getPluginConfig, setPluginConfig } from './pluginData'
+import type {
+  FileManagerService,
+  MetadataService,
+  VaultService,
+} from './services'
+import { fileManager, metadata, vault } from './services'
 export type { ViewComponentProps }
 
 export type { Heading, OutLink }
@@ -249,7 +248,11 @@ export interface PluginContext {
     activeLeafId(): string | null
     activeFilePath(): string | null
     activeSidebarType(side: 'left' | 'right'): string | null
-    switchSidebarPanel(side: 'left' | 'right', type: string, allowClose?: boolean): void
+    switchSidebarPanel(
+      side: 'left' | 'right',
+      type: string,
+      allowClose?: boolean,
+    ): void
     /** Out-links parsed from the active editor. Reactive. Empty when no editor is open. */
     activeOutLinks(): OutLink[]
     /** Headings parsed from the active editor. Reactive. Empty when no editor is open. */

@@ -15,7 +15,7 @@ export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
   const entries: Record<string, FileEntry> = {}
   const activePaths = new Set<string>()
   const roots = await scanTree(onDetected)
-  // 顺着嵌套结果一遍：扁平化成 fileMap（结构 only，size/mtime 留 0）+ 收集活跃路径。
+
   const walk = (es: ScanEntry[]): void => {
     for (const e of es) {
       const { name, path, kind, parent } = e

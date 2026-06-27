@@ -2,10 +2,16 @@
 // 组件直接 import 使用;插件经 ctx.vault / ctx.metadata / ctx.fileManager 拿到的是
 // 同一批单例(pluginRegistry 只是把它们转交给插件,不重建)。
 // 这些是对 src/vault/* 领域模块的稳定门面;依赖方向:services → vault,vault 不反依赖。
-import type { FileEntry, FileMeta } from './stores/types'
-import { readFile, vaultFs, vaultStore } from './vault'
-import { getAliasIndex, uniqueFileLookup, resolveLink, metadataStore, getFile } from './metadata'
-import { fileActions } from './fileManager'
+import { fileActions } from '../fileManager'
+import {
+  getAliasIndex,
+  getFile,
+  metadataStore,
+  resolveLink,
+  uniqueFileLookup,
+} from '../metadata'
+import type { FileEntry, FileMeta } from '../stores/types'
+import { readFile, vaultFs, vaultStore } from '../vault'
 
 // ── 契约 ────────────────────────────────────────────────────────────────────
 
@@ -52,7 +58,12 @@ export const metadata: MetadataService = {
   backlinks: (path) => [...(metadataStore.backlinkMap[path] ?? [])],
   resolveLink: (target) => {
     const withExt = target.endsWith('.md') ? target : `${target}.md`
-    return resolveLink(withExt, uniqueFileLookup(), vaultStore.files, getAliasIndex())
+    return resolveLink(
+      withExt,
+      uniqueFileLookup(),
+      vaultStore.files,
+      getAliasIndex(),
+    )
   },
 }
 

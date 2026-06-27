@@ -8,9 +8,11 @@ export function LoadingOverlay() {
   // 首次完整索引建成前、且有后台任务在跑时显示全屏遮罩。
   // 之后(initialized=true)的增量 reindex 只走 StatusBar 的「后台检测中」。
   return (
-    <Show when={!metadataStore.initialized && metadataStore.inProgressTaskCount > 0}>
+    <Show
+      when={!metadataStore.initialized && metadataStore.inProgressTaskCount > 0}
+    >
       <div
-        class="fixed inset-0 z-[10001] flex items-center justify-center"
+        class="fixed inset-0 z-10001 flex items-center justify-center"
         style={{ background: 'rgba(0,0,0,0.6)' }}
       >
         <div
@@ -21,7 +23,10 @@ export function LoadingOverlay() {
             'border-color': c('--border-2'),
           }}
         >
-          <div class="text-[14px] font-semibold" style={{ color: c('--text') }}>
+          <div
+            class="text-[14px] font-semibold"
+            style={{ color: c('--text') }}
+          >
             正在读取本地文件夹…
           </div>
           <div
@@ -33,7 +38,10 @@ export function LoadingOverlay() {
               style={{ background: c('--accent') }}
             />
           </div>
-          <div class="text-[12px]" style={{ color: c('--text-2') }}>
+          <div
+            class="text-[12px]"
+            style={{ color: c('--text-2') }}
+          >
             正在扫描与解析…
           </div>
         </div>

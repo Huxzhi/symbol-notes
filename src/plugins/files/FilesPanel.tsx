@@ -1,21 +1,35 @@
-import { FolderOpen } from 'lucide-solid'
-import { createEffect, createMemo, createSignal, untrack, For, JSX, Show } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
+import { FolderOpen } from 'lucide-solid'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  JSX,
+  Show,
+  untrack,
+} from 'solid-js'
 
-import { vaultFs, vaultStore } from '../../vault'
 import { fileActions } from '../../fileManager'
-import { openVault } from '../../vault/lifecycle'
-import { workspaceActions } from '../../stores/workspaceStore'
-import { fileOp, beginCreate, cancelOp } from './fileOpStore'
-import { computeWikiLink, isValidMoveDrop } from '../../lib/dragDropHelpers'
-import { settingsStore } from '../../stores/settingsStore'
-import { ui } from '../../stores/ui'
 import { getFileViewForPath } from '../../lib/pluginRegistry'
-import type { FileMeta, TreeNode, ViewComponentProps } from '../../stores/types'
-import { activeFilePath } from '../../stores/workspaceStore'
-import { resolveDropTarget, isOtherFile, folderChain } from './treeUtils'
-import { flatten as flattenTree, structVer, type FlatRow } from '../../vault/fileTree'
-import { revealTarget } from '../../stores/workspaceStore'
+import { settingsStore } from '../../stores/settingsStore'
+import type { TreeNode, ViewComponentProps } from '../../stores/types'
+import { ui } from '../../stores/ui'
+import {
+  activeFilePath,
+  revealTarget,
+  workspaceActions,
+} from '../../stores/workspaceStore'
+import { vaultFs, vaultStore } from '../../vault'
+import {
+  flatten as flattenTree,
+  structVer,
+  type FlatRow,
+} from '../../vault/fileTree'
+import { openVault } from '../../vault/lifecycle'
+import { computeWikiLink, isValidMoveDrop } from './dragDropHelpers'
+import { beginCreate, cancelOp, fileOp } from './fileOpStore'
+import { folderChain, isOtherFile, resolveDropTarget } from './treeUtils'
 
 export function toggleInArray(arr: string[], val: string): string[] {
   return arr.includes(val) ? arr.filter((p) => p !== val) : [...arr, val]
@@ -50,7 +64,8 @@ function FileRow(props: {
   const isActive = () => activeFilePath() === entry().path
   const isOther = () => entry().kind === 'file' && isOtherFile(entry().name)
   const isCollapsed = () =>
-    entry().kind === 'directory' && !props.expandedFolders.includes(entry().path)
+    entry().kind === 'directory' &&
+    !props.expandedFolders.includes(entry().path)
   const isRenaming = () =>
     fileOp()?.type === 'rename' &&
     (fileOp() as { path: string }).path === entry().path
@@ -61,7 +76,10 @@ function FileRow(props: {
 
   const confirmRename = async () => {
     const val = renameValue().trim()
-    if (!val) { cancelOp(); return }
+    if (!val) {
+      cancelOp()
+      return
+    }
     cancelOp()
     try {
       await fileActions.renameFile(entry().path, val)
@@ -125,7 +143,9 @@ function FileRow(props: {
       <Show
         when={isRenaming()}
         fallback={
-          <span class={`truncate min-w-0 ${isActive() ? 'text-(--accent)' : ''}`}>
+          <span
+            class={`truncate min-w-0 ${isActive() ? 'text-(--accent)' : ''}`}
+          >
             {displayName(entry().name)}
           </span>
         }
@@ -172,7 +192,9 @@ export function FilesPanel(props: ViewComponentProps) {
   let scrollEl!: HTMLDivElement
 
   const virtualizer = createVirtualizer({
-    get count() { return flatRows().length },
+    get count() {
+      return flatRows().length
+    },
     getScrollElement: () => scrollEl,
     estimateSize: () => ROW_HEIGHT,
     overscan: 10,
@@ -185,7 +207,7 @@ export function FilesPanel(props: ViewComponentProps) {
     const op = fileOp()
     if (op?.type === 'rename') {
       const path = (op as { path: string }).path
-      const idx = flatRows().findIndex(r => r.entry.path === path)
+      const idx = flatRows().findIndex((r) => r.entry.path === path)
       if (idx !== -1) virtualizer.scrollToIndex(idx, { align: 'auto' })
     }
   })
@@ -229,16 +251,26 @@ export function FilesPanel(props: ViewComponentProps) {
   const handleDragStart = (e: DragEvent, entry: TreeNode) => {
     setDragSrc(entry.path)
     e.dataTransfer!.setData('application/x-symbol-notes-file', entry.path)
-    e.dataTransfer!.setData('text/plain', computeWikiLink(entry.name, entry.kind))
+    e.dataTransfer!.setData(
+      'text/plain',
+      computeWikiLink(entry.name, entry.kind),
+    )
     e.dataTransfer!.effectAllowed = 'copyMove'
 
     const ghost = document.createElement('div')
     ghost.textContent = displayName(entry.name)
     Object.assign(ghost.style, {
-      position: 'fixed', top: '-100px', left: '-100px',
-      padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
-      background: 'var(--bg-hover)', color: 'var(--text)',
-      border: '1px solid var(--accent)', whiteSpace: 'nowrap', pointerEvents: 'none',
+      position: 'fixed',
+      top: '-100px',
+      left: '-100px',
+      padding: '2px 8px',
+      borderRadius: '4px',
+      fontSize: '11px',
+      background: 'var(--bg-hover)',
+      color: 'var(--text)',
+      border: '1px solid var(--accent)',
+      whiteSpace: 'nowrap',
+      pointerEvents: 'none',
     })
     document.body.appendChild(ghost)
     e.dataTransfer!.setDragImage(ghost, ghost.offsetWidth / 2, 12)
@@ -261,7 +293,10 @@ export function FilesPanel(props: ViewComponentProps) {
     if (!isValidMoveDrop(src, target, srcEntry?.parent ?? null)) return
     e.preventDefault()
     e.dataTransfer!.dropEffect = 'move'
-    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null }
+    if (dragLeaveTimer) {
+      clearTimeout(dragLeaveTimer)
+      dragLeaveTimer = null
+    }
     setDragOver(target)
   }
 
@@ -276,7 +311,10 @@ export function FilesPanel(props: ViewComponentProps) {
     const target = resolveDropTarget(entry)
     setDragSrc(null)
     setDragOver(null)
-    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null }
+    if (dragLeaveTimer) {
+      clearTimeout(dragLeaveTimer)
+      dragLeaveTimer = null
+    }
     if (!src) return
     const srcEntry = vaultStore.files[src]
     if (!isValidMoveDrop(src, target, srcEntry?.parent ?? null)) return
@@ -297,7 +335,10 @@ export function FilesPanel(props: ViewComponentProps) {
     if (!isValidMoveDrop(src, null, srcEntry?.parent ?? null)) return
     e.preventDefault()
     e.dataTransfer!.dropEffect = 'move'
-    if (dragLeaveTimer) { clearTimeout(dragLeaveTimer); dragLeaveTimer = null }
+    if (dragLeaveTimer) {
+      clearTimeout(dragLeaveTimer)
+      dragLeaveTimer = null
+    }
     setDragOver('__root__')
   }
 
@@ -331,9 +372,13 @@ export function FilesPanel(props: ViewComponentProps) {
 
   const confirmCreate = async () => {
     const val = createValue().trim()
-    if (!val) { cancelOp(); return }
+    if (!val) {
+      cancelOp()
+      return
+    }
     const op = fileOp()
-    if (!op || (op.type !== 'create-file' && op.type !== 'create-folder')) return
+    if (!op || (op.type !== 'create-file' && op.type !== 'create-folder'))
+      return
     cancelOp()
     if (op.type === 'create-file') {
       const path = await fileActions.createFile(val)
@@ -356,7 +401,10 @@ export function FilesPanel(props: ViewComponentProps) {
           onClick={() => void openVault()}
           title={vaultFs() ? '切换文件夹' : '打开文件夹'}
         >
-          <FolderOpen size={12} class="shrink-0 text-(--accent) group-hover:text-(--accent-2)" />
+          <FolderOpen
+            size={12}
+            class="shrink-0 text-(--accent) group-hover:text-(--accent-2)"
+          />
           <span class="truncate text-[10px] text-(--accent) font-bold tracking-widest uppercase group-hover:text-(--accent-2)">
             {vaultFs()?.name ?? '打开文件夹'}
           </span>
@@ -365,13 +413,23 @@ export function FilesPanel(props: ViewComponentProps) {
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors text-[13px]"
             title="新建文件夹"
-            onClick={() => { setCreateValue(''); beginCreate('folder') }}
-          >⊞</button>
+            onClick={() => {
+              setCreateValue('')
+              beginCreate('folder')
+            }}
+          >
+            ⊞
+          </button>
           <button
             class="shrink-0 text-(--text-3) hover:text-(--accent-2) w-5 h-5 flex items-center justify-center rounded hover:bg-(--bg-hover) transition-colors"
             title="新建文件"
-            onClick={() => { setCreateValue(''); beginCreate('file') }}
-          >+</button>
+            onClick={() => {
+              setCreateValue('')
+              beginCreate('file')
+            }}
+          >
+            +
+          </button>
         </Show>
       </div>
 
@@ -399,7 +457,8 @@ export function FilesPanel(props: ViewComponentProps) {
               onKeyDown={onCreateKeyDown}
               onBlur={() => void confirmCreate()}
               ref={(el) => {
-                const prefix = (fileOp() as { prefix?: string } | null)?.prefix ?? ''
+                const prefix =
+                  (fileOp() as { prefix?: string } | null)?.prefix ?? ''
                 setCreateValue(prefix)
                 setTimeout(() => el?.focus(), 0)
               }}
@@ -414,7 +473,11 @@ export function FilesPanel(props: ViewComponentProps) {
             'margin-top': '4px',
           }}
         >
-          <For each={virtualizer.getVirtualItems().filter(v => v.index < flatRows().length)}>
+          <For
+            each={virtualizer
+              .getVirtualItems()
+              .filter((v) => v.index < flatRows().length)}
+          >
             {(vItem) => (
               <FileRow
                 row={flatRows()[vItem.index]}

@@ -1,7 +1,7 @@
 // 职责：把 loading 遮罩用到的几个 CSS 颜色快照到 IndexedDB，供启动首帧给遮罩着色，
 // 避免「主题还没从 .symbol-notes/theme.json 读出来」时遮罩闪烁。不是主题的真实来源。
+import { get, set } from 'idb-keyval'
 import { createSignal } from 'solid-js'
-import { get, set, del } from 'idb-keyval'
 
 const CACHE_KEY = 'sn-mask-colors'
 
@@ -14,9 +14,6 @@ export const MASK_VARS = [
   '--accent',
   '--text-2',
 ] as const
-
-// 清掉上一个功能遗留的「整份主题」缓存键（幂等、吞错）。
-void Promise.resolve(del('sn-theme-cache')).catch(() => {})
 
 /** 读取 <html> 上当前生效的 6 个遮罩变量值。仅浏览器可用。 */
 export function snapshotMaskColors(): Record<string, string> {
@@ -40,7 +37,9 @@ export async function getMaskColors(): Promise<Record<string, string> | null> {
 }
 
 /** 主题变化后镜像遮罩颜色到 IDB（fire-and-forget）。 */
-export async function writeMaskColors(colors: Record<string, string>): Promise<void> {
+export async function writeMaskColors(
+  colors: Record<string, string>,
+): Promise<void> {
   try {
     await set(CACHE_KEY, colors)
   } catch {
