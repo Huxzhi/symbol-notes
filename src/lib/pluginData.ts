@@ -1,6 +1,6 @@
 // 职责：按插件 id 持有响应式内存配置 store，并防抖落盘到 .symbol-notes/plugins/<id>/data.json。
 // 插件早于 vault 连接启动 → store 模块级持有、随启停不丢；vault 连接后由 hydratePluginData 注入。
-import { createEffect, createRoot, untrack } from 'solid-js'
+import { createEffect, createRoot } from 'solid-js'
 import { createStore, reconcile, type SetStoreFunction } from 'solid-js/store'
 import * as vaultConfig from '../vault/vaultConfig'
 
@@ -16,13 +16,9 @@ function ensure(id: string): Entry {
   if (!entry) {
     createRoot(() => {
       const [config, setConfig] = createStore<Record<string, unknown>>({})
-      // 落盘 effect 只追踪 config：savePluginData 内部读 vault meta 信号（isConfigActive），
-      // 必须 untrack，否则启动期 loadMeta/markActive 改 meta 会在 hydrate 前重跑本 effect，
-      // 把空 config 落盘，clobber 掉磁盘上已存的插件配置。
-      createEffect(() => {
-        const snapshot = { ...config }
-        untrack(() => vaultConfig.savePluginData(id, snapshot))
-      })
+      // 落盘 effect 只追踪 config；保存门 isConfigActive 内部已 untrack meta，
+      // 故启动期 meta 变化不会在 hydrate 前重跑本 effect 写空配置。
+      createEffect(() => vaultConfig.savePluginData(id, { ...config }))
       entry = { config, setConfig }
     })
     registry.set(id, entry!)

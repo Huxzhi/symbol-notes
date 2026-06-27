@@ -1,7 +1,7 @@
 // 职责：vault 本地配置（.symbol-notes/）的唯一协调层。
 // 配置 IO 经 FileSystemAdapter 直读直写，绕开 io.ts 的 contentCache 与索引层；
 // vault 外的 meta（路径 / 是否拒绝）存 IndexedDB。
-import { createSignal } from 'solid-js'
+import { createSignal, untrack } from 'solid-js'
 import { get, set } from 'idb-keyval'
 import type { FileSystemAdapter } from './fs/types'
 import type { ThemeSettings, VaultSettings, WorkspaceState } from '../stores/types'
@@ -39,8 +39,12 @@ export function metaStatus(): VaultConfigStatus {
 export function configPath(): string {
   return meta().path
 }
+/** 落盘门：纯非响应式判断。各 save* 在 createEffect 里调用，若此处读 meta() 会让
+ *  effect 订阅 meta 信号——启动期 loadMeta/markActive 改 meta 就会在 hydrate 前重跑
+ *  effect，把内存默认值（空 workspace / 空插件配置）落盘 clobber 掉磁盘已存配置。
+ *  故 untrack：门只用于「当下能不能写」，绝不把调用方 effect 绑到 meta 上。 */
 export function isConfigActive(): boolean {
-  return meta().status === 'active' && _adapter !== null
+  return untrack(() => meta().status === 'active') && _adapter !== null
 }
 
 // ── 纯函数（可单测） ───────────────────────────────────────────────────────────
