@@ -1,7 +1,6 @@
-import { createRoot, createEffect, createSignal } from 'solid-js'
+import { createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import * as vaultConfig from '../vault/vaultConfig'
-import { deepTrack } from '../lib/deepTrack'
 import { getFileViewForPath, getView } from '../lib/pluginRegistry'
 import { pushHistory } from './leafHistory'
 import {
@@ -105,19 +104,16 @@ export function hydrateWorkspace(payload: WorkspaceState): void {
   })
 }
 
-createRoot(() => {
-  // 仅在配置文件夹激活时落盘；否则仅内存。
-  // deepTrack：leaf 开关/移动/分屏/改名 都是 layouts 的深层 set，只读顶层 layouts
-  // 不会重跑本 effect → 每次 workspace 变更都需深读以订阅，确保都触发防抖落盘。
-  createEffect(() => {
-    const snapshot = {
-      layouts: workspaceStore.layouts,
-      activeLayoutId: workspaceStore.activeLayoutId,
-    }
-    deepTrack(snapshot)
-    vaultConfig.saveWorkspace(snapshot)
+/** workspace 落盘的统一入口（收口式，非响应式）。
+ *  快照当前布局并请求落盘；vaultConfig.saveWorkspace 内部 gate isConfigActive + 防抖。
+ *  所有 workspace 写入收口（setLayout/setRoot 与布局增删切换）末尾都调它；
+ *  外部需要主动落盘时经 workspaceActions.requestSave 调同一入口。 */
+function requestSave(): void {
+  vaultConfig.saveWorkspace({
+    layouts: workspaceStore.layouts,
+    activeLayoutId: workspaceStore.activeLayoutId,
   })
-})
+}
 
 // ── Selectors ────────────────────────────────────────────────────────────────
 
@@ -202,8 +198,13 @@ function findLeafWithFile(root: WorkspaceNode, path: string): WorkspaceLeaf | nu
   return null
 }
 
+// 写入收口：所有针对当前布局的深层 set 都经 setLayout；末尾统一 requestSave。
+// setRoot 经 setLayout 间接落盘，无需再调。
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const setLayout = (...args: any[]) => (setWorkspaceStore as any)('layouts', workspaceStore.activeLayoutId, ...args)
+const setLayout = (...args: any[]) => {
+  ;(setWorkspaceStore as any)('layouts', workspaceStore.activeLayoutId, ...args)
+  requestSave()
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const setRoot = (...args: any[]) => setLayout('root', ...args)
 
@@ -650,16 +651,19 @@ export const workspaceActions = {
     }
     setWorkspaceStore('layouts', newId, newLayout)
     setWorkspaceStore('activeLayoutId', newId)
+    requestSave()
     return newId
   },
 
   switchLayout(id: string): void {
     setWorkspaceStore('activeLayoutId', id)
+    requestSave()
   },
 
   renameLayout(id: string, name: string): void {
     if (!workspaceStore.layouts[id]) return
     setWorkspaceStore('layouts', id, 'name', name)
+    requestSave()
   },
 
   deleteLayout(id: string): void {
@@ -670,6 +674,12 @@ export const workspaceActions = {
       : workspaceStore.activeLayoutId
     setWorkspaceStore('layouts', produce((ls) => { delete ls[id] }))
     setWorkspaceStore('activeLayoutId', newActiveId)
+    requestSave()
+  },
+
+  /** 对外统一的主动落盘入口（与内部写入收口同一函数）。 */
+  requestSave(): void {
+    requestSave()
   },
 }
 

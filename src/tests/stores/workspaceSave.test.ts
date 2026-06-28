@@ -12,15 +12,27 @@ vi.mock('../../vault/vaultConfig', async (orig) => ({
   isConfigActive: () => true,
 }))
 
-const { workspaceActions, DEFAULT_LAYOUT_ID } = await import(
+const { workspaceActions, DEFAULT_LAYOUT_ID, ROOT_TABS_ID } = await import(
   '../../stores/workspaceStore'
 )
 const { settingsActions } = await import('../../stores/settingsStore')
 
-describe('workspace 落盘 effect 应追踪深层变更', () => {
-  it('重命名布局（深层 set layouts[id].name）应触发 saveWorkspace', () => {
-    saveWorkspace.mockClear() // 清掉模块加载时 effect 的首跑
+describe('workspace 写入收口应触发 saveWorkspace', () => {
+  it('setLayout/setRoot 路径：createLeaf 应触发 saveWorkspace', () => {
+    saveWorkspace.mockClear()
+    workspaceActions.createLeaf(ROOT_TABS_ID, { type: 'editor', state: {} })
+    expect(saveWorkspace).toHaveBeenCalled()
+  })
+
+  it('布局级直写：renameLayout 应触发 saveWorkspace', () => {
+    saveWorkspace.mockClear()
     workspaceActions.renameLayout(DEFAULT_LAYOUT_ID, '改了名字')
+    expect(saveWorkspace).toHaveBeenCalled()
+  })
+
+  it('对外统一入口：workspaceActions.requestSave 应触发 saveWorkspace', () => {
+    saveWorkspace.mockClear()
+    workspaceActions.requestSave()
     expect(saveWorkspace).toHaveBeenCalled()
   })
 })
