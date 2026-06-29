@@ -1,31 +1,15 @@
-// 职责：vault 接入生命周期——打开/恢复 vault、配置文件夹编排、扫描+解析+建索引管线。
+// 职责：vault 接入生命周期——打开/恢复 vault、配置文件夹编排、扫描+补 stat+置就绪信号。
+// 解析/建索引不在此：由 metadata/derive 订阅 scanReady 自行派生（派生优先，vault 不依赖 metadata）。
 // 这是把磁盘上的 vault「装进」store 的编排层，写操作（CRUD）见 fileActions.ts。
 import { produce } from 'solid-js/store'
 import { clearEmbedUrlCache } from '../lib/cm6/embedExtension'
-import type { FileCache, FileEntry } from '../stores/types'
-import {
-  vaultStore,
-  setVaultStore,
-  setVaultFs,
-} from './store'
-import {
-  setMetadataStore,
-  beginIndexTask,
-  endIndexTask,
-  markInitialized,
-} from '../metadata/store'
-import { seedCache, allFiles, EMPTY_CACHE } from '../metadata/cache'
-import { buildBacklinks } from '../metadata/indexes/backlinks'
-import { buildTags } from '../metadata/indexes/tags'
-import { buildTasks } from '../metadata/indexes/tasks'
-import { buildCalendar } from '../metadata/indexes/calendar'
+import type { FileEntry } from '../stores/types'
+import { markScanReady, setVaultFs, setVaultStore } from './store'
+import { beginIndexTask, endIndexTask } from '../metadata/store'
 import { LocalAdapter } from './fs/LocalAdapter'
 import { ui } from '../stores/ui'
-import { loadAllFileStats, pruneFileStatCache } from './statCache'
-import { pruneCache } from '../metadata/parsedCache'
-import { isReady, initFileIO, statFiles } from './fs/io'
+import { initFileIO, isReady, statFiles } from './fs/io'
 import { buildScan } from './scan'
-import { parseAll } from '../metadata/parse/parseAll'
 import { setFileTree } from './fileTree'
 import * as vaultConfig from './vaultConfig'
 
@@ -43,7 +27,7 @@ export async function openVault(): Promise<void> {
   const mid = await scanPhase1()
   if (!mid) return
   await connectVaultConfig() // 读配置 + hydrate
-  await parseAndIndex(mid)
+  await statAndSignal(mid)
 }
 
 export async function restoreVault(): Promise<void> {
@@ -56,7 +40,7 @@ export async function restoreVault(): Promise<void> {
   const mid = await scanPhase1()
   if (!mid) return
   await connectVaultConfig()
-  await parseAndIndex(mid)
+  await statAndSignal(mid)
 }
 
 // ── Vault 配置编排 ─────────────────────────────────────────────────────────────
@@ -187,7 +171,7 @@ export interface ScanMid {
 }
 
 /** Phase1（reveal 前，串行）：只建结构树 → 入 store + 画树。不抓 stat、不撤遮罩。
- *  size/mtime 与变更检测、解析全部下放到 parseAndIndex（reveal 后台），首屏不等 getFile。 */
+ *  size/mtime 补 stat 见 statAndSignal；变更检测与解析下放到 metadata/derive.buildAll。 */
 export async function scanPhase1(): Promise<ScanMid | null> {
   if (currentSession) currentSession.cancelled = true
   const session: Session = { cancelled: false }
@@ -208,36 +192,16 @@ export async function scanPhase1(): Promise<ScanMid | null> {
   return { session, activePaths }
 }
 
-/** Phase2/3（reveal 后，后台）：解析 → 合并完整 FileMeta → 建跨文件索引。 */
-export async function parseAndIndex(mid: ScanMid): Promise<void> {
+/** Phase2（reveal 后，后台）：补 stat 回填 fileMap → 置就绪信号。
+ *  解析 / 建索引已下放到 metadata/derive.buildAll（订阅 scanReady 触发，派生优先）。
+ *  进度任务：scanPhase1 开启的任务在此关闭；markScanReady 同步触发 buildAll 自己的任务，
+ *  两段衔接无空窗，启动遮罩不闪。 */
+export async function statAndSignal(mid: ScanMid): Promise<void> {
   const { session, activePaths } = mid
+  let ok = false
   try {
-    // 阶段 1.5：后台补 stat（复用扫描时缓存的句柄）→ 回填 fileMap + 播种临时内容
-    const filePaths = [...activePaths]
-    const [stats, idbStats] = await Promise.all([
-      statFiles(filePaths),
-      loadAllFileStats(),
-    ])
+    const stats = await statFiles([...activePaths])
     if (session.cancelled) return
-
-    // 变更检测：size/mtime 与 idb stat 缓存一致 → 复用 hash（跳过重解析）
-    const MAX_PARSE_BYTES = 20 * 1024 * 1024
-    const mdUnchanged: string[] = []
-    const mdChanged: string[] = []
-    const reuseHash = new Map<string, string>()
-    for (const path of filePaths) {
-      if (!path.endsWith('.md')) continue
-      const s = stats.get(path)
-      if (!s || s.size > MAX_PARSE_BYTES) continue
-      const cached = idbStats.get(path)
-      if (cached && cached.size === s.size && cached.mtime === s.mtime) {
-        mdUnchanged.push(path)
-        reuseHash.set(path, cached.hash)
-      } else {
-        mdChanged.push(path)
-      }
-    }
-
     setVaultStore(
       'files',
       produce((fs: Record<string, FileEntry>) => {
@@ -248,62 +212,13 @@ export async function parseAndIndex(mid: ScanMid): Promise<void> {
             e.mtime = s.mtime
           }
         }
-        for (const [path, hash] of reuseHash) {
-          const e = fs[path]
-          if (e) e.hash = hash
-        }
       }),
     )
-    setMetadataStore('cache', seedCache(vaultStore.files))
-
-    // 阶段 2：后台解析（不写 store）。进度走 metadata.inProgressTaskCount。
-    const activeHashes = new Set<string>()
-    const results = await parseAll(session, mdUnchanged, mdChanged, activeHashes)
-
-    if (session.cancelled) return
-
-    // 阶段 2.5：一次性合并——hash 落 vault.fileMap，解析内容落 metadata.content
-    setVaultStore(
-      'files',
-      produce((fs: Record<string, FileEntry>) => {
-        for (const [path, fields] of results) {
-          if (fs[path] && fields.hash !== undefined) fs[path].hash = fields.hash
-        }
-      }),
-    )
-    setMetadataStore(
-      'cache',
-      produce((cs: Record<string, FileCache>) => {
-        for (const [path, fields] of results) {
-          const { hash: _h, ...content } = fields
-          cs[path] = { ...EMPTY_CACHE, ...content }
-        }
-      }),
-    )
-
-    // 阶段 3：构建跨文件索引（用合并视图）
-    const merged = allFiles()
-    const mdFiles = Object.fromEntries(
-      Object.entries(merged).filter(([p]) => p.endsWith('.md')),
-    )
-    buildBacklinks(mdFiles)
-    buildTags(mdFiles)
-    buildTasks(mdFiles)
-    buildCalendar(merged)
-    pruneFileStatCache(activePaths).catch(() => {})
-    pruneCache(activeHashes).catch(() => {})
-
-    if (currentSession === session) markInitialized()
+    ok = true
   } finally {
     endIndexTask()
   }
-}
-
-/** Back-compat 包装：扫描后直接后台解析（无配置编排）。 */
-export async function scanAndIndex(): Promise<void> {
-  const mid = await scanPhase1()
-  if (!mid) return
-  await parseAndIndex(mid)
+  if (ok) markScanReady()
 }
 
 // ── 配置 actions（供设置页） ────────────────────────────────────────────────────

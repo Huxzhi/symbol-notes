@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js'
 import { getFile } from '../../metadata'
-import { fileActions } from '../../fileManager'
+import { fileActions } from '../../commands'
 
 const MAX_PREVIEW_ITEMS = 6
 

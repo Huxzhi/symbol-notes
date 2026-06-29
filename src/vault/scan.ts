@@ -19,7 +19,7 @@ export async function buildScan(onDetected?: () => void): Promise<ScanResult> {
   const walk = (es: ScanEntry[]): void => {
     for (const e of es) {
       const { name, path, kind, parent } = e
-      // size/mtime 占位 0：由 parseAndIndex 的 statFiles 补真实值。
+      // size/mtime 占位 0：由 statAndSignal 的 statFiles 补真实值。
       entries[path] = { name, path, kind, parent, size: 0, mtime: 0, hash: '' }
       if (kind === 'directory') walk(e.children ?? [])
       else activePaths.add(path)

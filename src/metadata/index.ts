@@ -7,6 +7,7 @@ export {
   resolveLink,
   getAliasIndex,
   resolveNewFile,
+  invalidateLinkIndexes,
 } from './indexes/backlinks'
 // 「文件名→文件」高速查找表(metadata 直接管理):自动补全 / 链接解析消歧。
 export {
@@ -20,3 +21,12 @@ export { metadataStore } from './store'
 
 // 每文件解析内容的读取 + 合并视图。
 export { fileCache, getFile, allFiles } from './cache'
+
+// 派生引擎：全量（启动订阅 scanReady）+ 增量（命令层落盘后调）+ 链接 remap。
+export {
+  buildAll,
+  startMetadataDerivation,
+  updateFile,
+  removeFile,
+  remapFileLink,
+} from './derive'

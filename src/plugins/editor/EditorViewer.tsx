@@ -14,8 +14,8 @@ import {
   Show,
 } from 'solid-js'
 import { vaultStore, vaultFs, readFile, writeFile, getFileMtime, invalidateFile } from '../../vault'
-import { fileActions, reindexFile } from '../../fileManager'
-import { uniqueFileLookup, getAliasIndex } from '../../metadata'
+import { fileActions } from '../../commands'
+import { uniqueFileLookup, getAliasIndex, updateFile } from '../../metadata'
 import { ui } from '../../stores/ui'
 import { darkHighlightStyle, darkTheme } from '../../lib/cm6/cmTheme'
 import { embedPreviewPlugin, embedTheme } from '../../lib/cm6/embedExtension'
@@ -130,7 +130,7 @@ export function EditorViewer(props: ViewComponentProps) {
       reindexTimer = null
       const p = filePath()
       if (p && view) {
-        void reindexFile(p, view.state.doc.toString(), parseFromState(view.state))
+        void updateFile(p, view.state.doc.toString(), parseFromState(view.state))
       }
     }, 800)
     if (props.isActive) {

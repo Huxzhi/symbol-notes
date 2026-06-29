@@ -1,5 +1,5 @@
 // 职责：把「文件内容 + body 解析结果」拼成 FileMeta 的内容字段。
-// 这是 scan.parseAll（批量后台解析）与 fileActions.reindexFile（单文件保存）
+// 这是 parseAll（批量后台解析）与 derive.updateFile（单文件保存）
 // 共用的唯一字段构建器——避免两处各写一遍同款拼装逻辑。
 import { parseFrontmatter } from '../../lib/parseFrontmatter'
 import type { ParseResult } from '../../lib/parseMarkdown'

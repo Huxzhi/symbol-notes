@@ -1,7 +1,7 @@
 import { getPluginConfig } from '../../lib/pluginData'
 import { workspaceActions } from '../../stores/workspaceStore'
 import { vaultStore, readFile } from '../../vault'
-import { fileActions } from '../../fileManager'
+import { fileActions } from '../../commands'
 import { resolveTemplate } from '../../lib/templates'
 import { ui } from '../../stores/ui'
 import { todayPath } from './formatDate'

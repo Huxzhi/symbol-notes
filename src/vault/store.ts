@@ -20,3 +20,12 @@ const [vaultStore, setVaultStore] = createStore<VaultState>({
 })
 
 export { setVaultStore, vaultStore }
+
+// ── 扫描就绪信号（vault → metadata 的派生触发） ─────────────────────────────────
+// 结构扫描 + 补 stat 完成后 bump。metadata 订阅它跑全量派生（解析+建索引）。
+// vault 叶子不 import metadata；方向是 metadata 读这个信号。每次 vault 加载/切换 bump 一次。
+const [scanReady, bumpScanReady] = createSignal(0)
+export function markScanReady(): void {
+  bumpScanReady((n) => n + 1)
+}
+export { scanReady }

@@ -1,7 +1,21 @@
 import type { Component, JSX } from 'solid-js'
 import { createEffect, createRoot, createSignal, onCleanup } from 'solid-js'
+import { fileActions } from '../commands'
+import {
+  getAliasIndex,
+  getFile,
+  metadataStore,
+  resolveLink,
+  uniqueFileLookup,
+} from '../metadata'
 import { settingsStore } from '../stores/settingsStore'
-import type { RevealRequest, ViewComponentProps } from '../stores/types'
+import type {
+  FileEntry,
+  FileMeta,
+  RevealRequest,
+  ViewComponentProps,
+} from '../stores/types'
+import { readFile, vaultFs, vaultStore } from '../vault'
 import {
   activeFilePath,
   activeLayout,
@@ -13,12 +27,6 @@ import {
 import type { Heading } from './cm6/headingsField'
 import type { OutLink } from './cm6/outLinksField'
 import { getPluginConfig, setPluginConfig } from './pluginData'
-import type {
-  FileManagerService,
-  MetadataService,
-  VaultService,
-} from './services'
-import { fileManager, metadata, vault } from './services'
 export type { ViewComponentProps }
 
 export type { Heading, OutLink }
@@ -210,8 +218,69 @@ export function _resetContextMenuForTest(): void {
   _contextMenuRegistry.clear()
 }
 
-// 三个数据服务(VaultService / MetadataService / FileManagerService)的定义与单例
-// 在 src/services.ts;这里只把单例转交给插件(见下方 ctx)。
+// ── 数据服务（VaultService / MetadataService / FileManagerService） ─────────────
+// 三个平级数据服务的接口契约 + 单例实现。直接内联在 ctx 所在文件，作为插件唯一接触面，
+// 不再单独走一层 services.ts。依赖方向：服务 → vault/metadata/fileManager 领域 API。
+
+/** 字节层：文件读取 + 响应式 fileMap（仅 stat 的 FileEntry）。 */
+export interface VaultService {
+  /** vault 是否已打开（响应式）。 */
+  ready(): boolean
+  /** 全部文件/目录的 stat（响应式）。解析内容见 metadata.file。 */
+  files(): Record<string, FileEntry>
+  readFile(path: string): Promise<string>
+}
+
+/** 解析缓存 / 派生索引：每文件内容、双链、链接解析。 */
+export interface MetadataService {
+  /** 单文件的合并视图（stat + 解析内容，响应式）。 */
+  file(path: string): FileMeta | undefined
+  /** 指向 path 的文件列表（响应式）。 */
+  backlinks(path: string): string[]
+  /** 把 `[[名字]]` 解析成绝对路径，解析不到返回 null。 */
+  resolveLink(target: string): string | null
+}
+
+/** 链接感知的高层文件操作（落盘 + 增量索引 + 改反链）。 */
+export interface FileManagerService {
+  saveFile(path: string, content: string): Promise<void>
+  createFile(name: string): Promise<string | null>
+  createFolder(name: string): Promise<void>
+  deleteFile(path: string): Promise<void>
+  deleteFolder(path: string): Promise<void>
+  renameFile(path: string, newName: string): Promise<void>
+  moveEntry(src: string, dest: string | null): Promise<void>
+}
+
+const vault: VaultService = {
+  ready: () => vaultFs() !== null,
+  files: () => vaultStore.files,
+  readFile: (path) => readFile(path),
+}
+
+const metadata: MetadataService = {
+  file: (path) => getFile(path),
+  backlinks: (path) => [...(metadataStore.backlinkMap[path] ?? [])],
+  resolveLink: (target) => {
+    const withExt = target.endsWith('.md') ? target : `${target}.md`
+    return resolveLink(
+      withExt,
+      uniqueFileLookup(),
+      vaultStore.files,
+      getAliasIndex(),
+    )
+  },
+}
+
+const fileManager: FileManagerService = {
+  saveFile: (path, content) => fileActions.saveFile(path, content),
+  createFile: (name) => fileActions.createFile(name),
+  createFolder: (name) => fileActions.createFolder(name),
+  deleteFile: (path) => fileActions.deleteFile(path),
+  deleteFolder: (path) => fileActions.deleteFolder(path),
+  renameFile: (path, newName) => fileActions.renameFile(path, newName),
+  moveEntry: (src, dest) => fileActions.moveEntry(src, dest),
+}
 
 // ── Plugin Lifecycle ──────────────────────────────────────────────────────────
 

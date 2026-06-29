@@ -11,7 +11,7 @@ import { livePreviewExtension } from '../../lib/cm6/livePreviewExtension'
 import { hideFrontmatterExtension } from '../../lib/cm6/hideFrontmatterExtension'
 import { editorKeymap } from '../../lib/cm6/markdownShortcuts'
 import { readFile, vaultStore } from '../../vault'
-import { fileActions } from '../../fileManager'
+import { fileActions } from '../../commands'
 
 export function PlanCellEditor(props: { path: string; label?: string; onClose: () => void }) {
   let editorHost!: HTMLDivElement

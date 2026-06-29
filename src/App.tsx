@@ -16,11 +16,11 @@ import {
   startPlugins,
 } from './lib/pluginRegistry'
 
+import { registerFilesView } from './components/workspace/files'
 import { CalendarPlugin } from './plugins/calendar'
 import { DailyNotePlugin } from './plugins/daily-note'
 import { EditorPlugin } from './plugins/editor'
 import { ExcalidrawPlugin } from './plugins/excalidraw'
-import { FilesPlugin } from './plugins/files'
 import { LinksPlugin } from './plugins/links'
 import { OutlinePlugin } from './plugins/outline'
 import { SearchPlugin } from './plugins/search'
@@ -30,6 +30,7 @@ import { TemplatePicker } from './plugins/templates/TemplatePicker'
 import { TimelinePlugin } from './plugins/timeline'
 import { LoadingOverlay } from './components/LoadingOverlay'
 import { restoreVault } from './vault/lifecycle'
+import { startMetadataDerivation } from './metadata/derive'
 import { settingsStore } from './stores/settingsStore'
 import { activeRoot } from './stores/workspaceStore'
 import { applyTheme, resolveTheme } from './lib/theme'
@@ -53,9 +54,11 @@ const AppPlugin = definePlugin({
   },
 })
 
+// 文件列表是内核 shell，恒在、不可关闭——直接注册，不走插件开关。
+registerFilesView()
+
 // Core plugins first; specific plugins registered later take priority (last-wins in getFileViewForPath)
 registerPlugin(EditorPlugin)
-registerPlugin(FilesPlugin)
 registerPlugin(LinksPlugin)
 registerPlugin(OutlinePlugin)
 registerPlugin(TagsPlugin)
@@ -67,6 +70,9 @@ registerPlugin(ExcalidrawPlugin)
 registerPlugin(TemplatesPlugin)
 registerPlugin(TimelinePlugin)
 startPlugins()
+
+// metadata 订阅 vault 的 scanReady，扫描就绪即跑全量派生（解析+建索引）。须在 restoreVault 前就位。
+startMetadataDerivation()
 
 export default function App() {
   createEffect(() => {

@@ -1,4 +1,4 @@
-import type { FileMeta } from '../../stores/types'
+import type { FileMeta } from '../../../stores/types'
 
 export interface FlatRow {
   entry: FileMeta

@@ -1,6 +1,6 @@
 // 职责:后台批量「读文件 → 解析内容」,产出每个 path 的解析字段(缓存优先)。
 // 这是 metadata 的「读取+解析」入口(原 loader/scan.ts 的 parseAll)。不写 store,
-// 由调用方(vault/lifecycle.parseAndIndex)一次性合并进 fileMap 并建跨文件索引。
+// 由调用方(metadata/derive.buildAll)一次性合并进 fileMap 并建跨文件索引。
 import { createMarkdownParser } from '../../lib/parseMarkdown'
 import type { FileMeta } from '../../stores/types'
 import { vaultStore } from '../../vault/store'

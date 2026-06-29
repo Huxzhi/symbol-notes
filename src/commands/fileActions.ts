@@ -1,33 +1,19 @@
-// 职责：vault 的写操作编排——所有文件 CRUD 与单文件 reindex 的唯一入口。
-// 契约：先落盘（fs/io）→ 再增量更新 store 与各索引 → 必要时改写反链。
-// 不要绕过 fileActions 直接 setVaultStore。
+// 职责：vault 写操作编排（命令层）——所有文件 CRUD 的唯一入口：落盘 + 改 fileMap / 文件树。
+// 增量索引派生委托给 metadata（updateFile/removeFile）；rename 反链改写读 metadata.backlinkMap
+// + 经 metadata.remapFileLink 更新缓存。不要绕过 fileActions 直接 setVaultStore。
 import { produce } from 'solid-js/store'
 import type { ParseResult } from '../lib/parseMarkdown'
-import { parseMarkdown } from '../lib/parseMarkdown'
-import type { FileCache, FileEntry } from '../stores/types'
-import { buildContentFields, type ContentFields } from '../metadata/parse/fileMeta'
+import type { FileEntry } from '../stores/types'
 import { vaultStore, setVaultStore } from '../vault/store'
+import { metadataStore } from '../metadata/store'
 import {
-  metadataStore,
-  setMetadataStore,
-  beginIndexTask,
-  endIndexTask,
-} from '../metadata/store'
-import {
-  getFile,
-  setFileCache,
-  removeFileCache,
-  EMPTY_CACHE,
-} from '../metadata/cache'
-import {
-  applyFileBacklinks,
-  removeFileBacklinks,
-  resolveNewFile,
   invalidateLinkIndexes,
-} from '../metadata/indexes/backlinks'
-import { deleteFileStatEntry, setFileStatEntry } from '../vault/statCache'
-import { getCachedMeta, setCachedMeta } from '../metadata/parsedCache'
-import { hashContent } from '../lib/contentHash'
+  remapFileLink,
+  removeFile,
+  resolveNewFile,
+  updateFile,
+} from '../metadata'
+import { deleteFileStatEntry } from '../vault/statCache'
 import {
   createDirectory,
   deleteEntry,
@@ -37,9 +23,6 @@ import {
   readFile,
   writeFile,
 } from '../vault/fs/io'
-import { applyFileTags, removeFileTags } from '../metadata/indexes/tags'
-import { applyFileTasks, removeFileTasks } from '../metadata/indexes/tasks'
-import { applyFileCalendar, removeFileCalendar } from '../metadata/indexes/calendar'
 import {
   bumpStruct,
   insertNode,
@@ -47,87 +30,6 @@ import {
   renameNode,
   moveNode,
 } from '../vault/fileTree'
-
-// ── 单文件 reindex / 删除 / 链接 remap ─────────────────────────────────────────
-
-/** 单文件保存后：解析内容 → 更新 FileMeta → 增量更新三个索引 */
-export async function reindexFile(
-  path: string,
-  content: string,
-  cmParsed?: ParseResult,
-  persistStat = false,
-): Promise<void> {
-  beginIndexTask()
-  try {
-    const hash = hashContent(content)
-    const cached = await getCachedMeta(hash)
-    let fields: ContentFields
-    if (cached && Array.isArray(cached.lists)) {
-      fields = cached
-    } else {
-      const existingMtime = vaultStore.files[path]?.mtime ?? Date.now()
-      fields = buildContentFields(content, cmParsed ?? parseMarkdown(content), existingMtime)
-      await setCachedMeta(hash, fields)
-    }
-
-    const prev = getFile(path) // 合并视图(改前),供索引读旧 outLinks/tags
-    setVaultStore('files', path, 'hash', hash) // hash 属 stat
-    setFileCache(path, fields) // 解析内容落 metadata
-    applyFileBacklinks(
-      path,
-      (prev?.outLinks ?? []).map((l) => l.target),
-      fields.outLinks.map((l) => l.target),
-    )
-    applyFileTags(path, prev?.tags ?? [], fields.tags)
-    applyFileTasks(path, fields.lists)
-    applyFileCalendar(path, prev, getFile(path))
-
-    if (persistStat) {
-      const entry = vaultStore.files[path]
-      if (entry?.kind === 'file')
-        await setFileStatEntry(path, {
-          size: entry.size,
-          mtime: entry.mtime,
-          hash,
-        })
-    }
-  } finally {
-    endIndexTask()
-  }
-}
-
-/** 文件删除：从 fileMap、解析内容和所有索引中移除 */
-export function removeVaultEntry(path: string): void {
-  const file = getFile(path)
-  if (!file) return
-  removeFileBacklinks(path, file)
-  removeFileTags(path, file.tags)
-  removeFileTasks(path)
-  removeFileCalendar(path, file)
-  setVaultStore('files', path, undefined as unknown as FileEntry)
-  removeFileCache(path)
-  invalidateLinkIndexes()
-}
-
-/** 某个文件内的 wiki 链接指向从 oldTarget 重命名为 newTarget */
-export function remapFileLink(
-  filePath: string,
-  oldTarget: string,
-  newTarget: string,
-): void {
-  const content = metadataStore.cache[filePath]
-  if (!content) return
-  const prevOutLinks = content.outLinks
-  const nextOutLinks = prevOutLinks.map((l) =>
-    l.target === oldTarget ? { ...l, target: newTarget } : l,
-  )
-  setMetadataStore('cache', filePath, 'outLinks', nextOutLinks)
-  applyFileBacklinks(
-    filePath,
-    prevOutLinks.map((l) => l.target),
-    nextOutLinks.map((l) => l.target),
-  )
-}
 
 // ── Wiki 链接重写（改名 / 移动时改写指向本文件的反链） ─────────────────────────
 
@@ -182,8 +84,6 @@ async function updateBacklinks(
 
 // ── CRUD 公共小工具 ────────────────────────────────────────────────────────────
 
-const EPOCH = new Date(0).toISOString().slice(0, 10)
-
 /** 新建文件/目录的空 fileMap 条目（仅 stat）。 */
 function blankEntry(
   name: string,
@@ -194,23 +94,12 @@ function blankEntry(
   return { name, path, kind, parent, size: 0, mtime: 0, hash: '' }
 }
 
-/** 新建文件的空解析内容（日期占位为 epoch）。 */
-function blankContent(): FileCache {
-  return { ...EMPTY_CACHE, created: EPOCH, dated: EPOCH }
-}
-
-/** 从 fileMap 与 cache 一次性删掉若干 path（单次响应式更新）。 */
+/** 从 fileMap 一次性删掉若干 path（cache/索引由先行的 removeFile 清理）。 */
 function removeFilesFromStore(paths: string[]): void {
   setVaultStore(
     'files',
     produce((m: Record<string, FileEntry>) => {
       for (const p of paths) delete m[p]
-    }),
-  )
-  setMetadataStore(
-    'cache',
-    produce((c: Record<string, FileCache>) => {
-      for (const p of paths) delete c[p]
     }),
   )
 }
@@ -227,20 +116,19 @@ async function relocateFile(
   await writeFile(newPath, oldContent)
   await deleteEntry(oldPath)
   await deleteFileStatEntry(oldPath)
-  removeVaultEntry(oldPath)
+  removeFile(oldPath)
   removeFilesFromStore([oldPath])
   setVaultStore(
     'files',
     newPath,
     blankEntry(newPath.split('/').pop()!, newPath, 'file', parent),
   )
-  setFileCache(newPath, blankContent())
   applyNode()
   bumpStruct()
   invalidateLinkIndexes()
   const { workspaceActions } = await import('../stores/workspaceStore')
   workspaceActions.renameLeafPath(oldPath, newPath)
-  await reindexFile(newPath, oldContent)
+  await updateFile(newPath, oldContent)
   await updateBacklinks(oldPath, newPath)
 }
 
@@ -259,7 +147,7 @@ export const fileActions = {
     await writeFile(path, content)
     const mtime = await getFileMtime(path)
     setVaultStore('files', path, 'mtime', mtime)
-    await reindexFile(path, content, cmParsed, true)
+    await updateFile(path, content, cmParsed, true)
   },
 
   async createFile(name: string): Promise<string | null> {
@@ -273,10 +161,9 @@ export const fileActions = {
     await writeFile(path, '')
     const parent = parts.length > 0 ? parts.join('/') : null
     setVaultStore('files', path, blankEntry(finalName, path, 'file', parent))
-    setFileCache(path, blankContent())
     insertNode({ name: finalName, path, kind: 'file', parent })
     bumpStruct()
-    applyFileCalendar(path, undefined, getFile(path))
+    await updateFile(path, '') // 解析空内容 → cache + 各索引（含日历）
     invalidateLinkIndexes()
     resolveNewFile(path)
     return path
@@ -312,7 +199,7 @@ export const fileActions = {
     if (!isReady()) return
     await deleteEntry(path)
     await deleteFileStatEntry(path)
-    removeVaultEntry(path)
+    removeFile(path)
     removeFilesFromStore([path])
     removeNode(path)
     bumpStruct()
@@ -329,7 +216,7 @@ export const fileActions = {
     for (const entry of toRemove) {
       if (entry.kind === 'file') {
         await deleteFileStatEntry(entry.path)
-        removeVaultEntry(entry.path)
+        removeFile(entry.path)
       }
     }
     removeFilesFromStore(toRemove.map((e) => e.path))
@@ -380,7 +267,7 @@ export const fileActions = {
     await deleteEntry(srcPath, { recursive: true })
     invalidatePrefix(srcPath)
     for (const entry of fileEntries) await deleteFileStatEntry(entry.path)
-    for (const entry of fileEntries) removeFileCalendar(entry.path, getFile(entry.path))
+    for (const entry of fileEntries) removeFile(entry.path)
     removeFilesFromStore(descendants.map((e) => e.path))
     for (const entry of descendants) {
       const newEntryPath = newFolderPath + entry.path.slice(srcPath.length)
@@ -402,7 +289,7 @@ export const fileActions = {
       const newFilePath = newFolderPath + entry.path.slice(srcPath.length)
       const content = fileContents.get(entry.path) ?? ''
       workspaceActions.renameLeafPath(entry.path, newFilePath)
-      await reindexFile(newFilePath, content)
+      await updateFile(newFilePath, content)
       await updateBacklinks(entry.path, newFilePath)
     }
   },

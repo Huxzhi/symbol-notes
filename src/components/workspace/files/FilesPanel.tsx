@@ -10,23 +10,23 @@ import {
   untrack,
 } from 'solid-js'
 
-import { fileActions } from '../../fileManager'
-import { getFileViewForPath } from '../../lib/pluginRegistry'
-import { settingsStore } from '../../stores/settingsStore'
-import type { TreeNode, ViewComponentProps } from '../../stores/types'
-import { ui } from '../../stores/ui'
+import { fileActions } from '../../../commands'
+import { getFileViewForPath } from '../../../lib/pluginRegistry'
+import { settingsStore } from '../../../stores/settingsStore'
+import type { TreeNode, ViewComponentProps } from '../../../stores/types'
+import { ui } from '../../../stores/ui'
 import {
   activeFilePath,
   revealTarget,
   workspaceActions,
-} from '../../stores/workspaceStore'
-import { vaultFs, vaultStore } from '../../vault'
+} from '../../../stores/workspaceStore'
+import { vaultFs, vaultStore } from '../../../vault'
 import {
   flatten as flattenTree,
   structVer,
   type FlatRow,
-} from '../../vault/fileTree'
-import { openVault } from '../../vault/lifecycle'
+} from '../../../vault/fileTree'
+import { openVault } from '../../../vault/lifecycle'
 import { computeWikiLink, isValidMoveDrop } from './dragDropHelpers'
 import { beginCreate, cancelOp, fileOp } from './fileOpStore'
 import { folderChain, isOtherFile, resolveDropTarget } from './treeUtils'

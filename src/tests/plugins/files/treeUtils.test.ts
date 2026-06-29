@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { flattenTree, resolveDropTarget, folderChain } from '../../../plugins/files/treeUtils'
+import { flattenTree, resolveDropTarget, folderChain } from '../../../components/workspace/files/treeUtils'
 import type { FileMeta } from '../../../stores/types'
 
 function m(
